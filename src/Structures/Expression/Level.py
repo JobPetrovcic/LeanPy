@@ -23,7 +23,7 @@ class Level:
 
 class LevelZero(Level):
     def __str__(self) -> str:
-        return "Zero"
+        return "0"
 
     def defEq(self, other: 'Level') -> bool:
         return isinstance(other, LevelZero)
@@ -40,7 +40,15 @@ class LevelSucc(Level):
         self.anc = anc
     
     def __str__(self) -> str:
-        return f"Succ({self.anc})"
+        r = self
+        o = 0
+        while isinstance(r, LevelSucc):
+            o += 1
+            r = r.anc
+        if isinstance(r, LevelZero):
+            return f"{o}"
+        else:
+            return f"{o} + {r}"
 
     def defEq(self, other: 'Level') -> bool:
         return isinstance(other, LevelSucc) and self.anc.defEq(other.anc)

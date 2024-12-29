@@ -1,5 +1,5 @@
 import functools
-from typing import Callable, Optional, List, Tuple
+from typing import Callable, Optional, List, Sequence, Tuple
 
 from Structures.Expression.Level import *
 
@@ -32,7 +32,6 @@ def from_offset(level : Level, offset : int) -> Level:
         cur = LevelSucc(cur)
     return cur
 
-
 def simplify(level : Level) -> Level:
     """Simplifies a level."""
     if isinstance(level, LevelZero):
@@ -55,7 +54,7 @@ def simplify(level : Level) -> Level:
             return LevelIMax(simplify(level.lhs), simplified_r)
     else: raise ValueError(f"Cannot simplify unknown level type {level.__class__.__name__}")
 
-def are_unique_level_params(levels : List[Level]) -> bool:
+def are_unique_level_params(levels : Sequence[Level]) -> bool:
     """Checks if all elements in the list are unique levels."""
     # sort using leq
     sorted_levels = sorted(levels, key=functools.cmp_to_key(lambda l, r: 1 if leq(l, r) else -1))
@@ -138,6 +137,10 @@ def leq(l : Level, r : Level) -> bool:
     r_prime = simplify(r)
     return leq_core(l_prime, r_prime, 0)
 
+def is_zero_level(level : Level) -> bool:
+    """Checks if the given level is zero."""
+    return leq(level, LevelZero())
+
 @typechecked
 def antisymm_eq(l : Level, r : Level) -> bool:
     """Checks if l is equal to r."""
@@ -200,11 +203,13 @@ def replace_level_clone(level : Level, fn : Callable[[Level], Optional[Level]]) 
     elif isinstance(level, LevelIMax): return LevelIMax(replace_level_clone(level.lhs, fn), replace_level_clone(level.rhs, fn))
     else: raise ValueError(f"Unknown level type {level.__class__.__name__}")
 
-def substitute_level_params_level(level : Level, params : List[Tuple[Level, Level]], clone : bool) -> Level:
+LevelSubList = List[Tuple[LevelParam, Level]]
+
+def substitute_level_params_level(level : Level, params : LevelSubList, clone : bool) -> Level:
     """ Replaces all level parameters in the given level with the given values. """
     def replace_fn(l : Level) -> Optional[Level]:
         for to_sub, value in params:
-            if antisymm_eq(to_sub, l):
+            if isinstance(l, LevelParam) and l.name == to_sub.name:
                 return value
         return None
     if clone:

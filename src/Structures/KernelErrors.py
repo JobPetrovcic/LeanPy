@@ -17,7 +17,7 @@ class ExpectedDifferentExpressionError(KernelError):
 
 class ExpectedDifferentTypesError(KernelError):
     def __init__(self, expected : Expression, got : Expression):
-        super().__init__(f"Expected type {expected} but got {got}")
+        super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}")
 
 class ProjectionError(KernelError):
     def __init__(self, message : str):

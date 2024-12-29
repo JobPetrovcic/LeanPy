@@ -1,13 +1,11 @@
 from abc import abstractmethod
-from typing import List
+from typing import List, Optional
 from typing_extensions import override
 
 from typeguard import typechecked
 
 from Structures.Expression.Level import *
 from Structures.Name import *
-
-
 
 class Expression:
     @typechecked
@@ -16,7 +14,7 @@ class Expression:
         
     @abstractmethod
     def get_hash(self) -> int:
-        raise NotImplementedError("Method get_hash not implemented for abstract class Expression")
+        raise NotImplementedError(f"Method get_hash not implemented for class {self.__class__.__name__}")
     
     def __hash__(self) -> int:
         if self.hash is None:
@@ -25,7 +23,7 @@ class Expression:
 
     @abstractmethod
     def __str__(self) -> str:
-        raise NotImplementedError("Method __str__ not implemented for abstract class Expression")
+        raise NotImplementedError(f"Method __str__ not implemented for clas {self.__class__.__name__}")
 
 class BVar(Expression):
     @typechecked
@@ -42,17 +40,26 @@ class BVar(Expression):
 
 class FVar(Expression):
     @typechecked
-    def __init__(self, name : Name):
+    def __init__(self, name : Name, type : Expression, val : Optional[Expression], is_let : bool):
         #print(f"FVar created with id {hex(id(self))} and name {name}")
         self.name = name
+        self.type = type
+        self.val = val
+        self.is_let = is_let
         Expression.__init__(self)
+
+    def full_identifier(self) -> str:
+        return f"{self.name}-{hex(id(self))}"# : ({self.type}) := ({self.val})"
     
+    def full_print(self) -> str:
+        return f"{self.full_identifier()} : ({self.type}) := ({self.val})"
+
     @override
     def get_hash(self) -> int:
         return hash(("FVar", hash(self.name)))
     
     def __str__(self) -> str:
-        return str(self.name)
+        return self.full_identifier()
 
 class Sort(Expression):
     @typechecked
@@ -79,7 +86,7 @@ class Const(Expression):
         return hash(("Const", hash(self.name)))
     
     def __str__(self) -> str:
-        return f"{self.name}"
+        return f"{self.name}.{{{', '.join(map(str, self.lvl_params))}}}"
     
 class App(Expression):
     @typechecked
@@ -148,10 +155,17 @@ class Proj(Expression):
         self.index = index
         self.struct = struct
         Expression.__init__(self)
+    
+    def get_hash(self) -> int:
+        return hash(("Proj", hash(self.type_name), self.index, hash(self.struct)))
+    
+    def __str__(self) -> str:
+        return f"({self.struct}).{self.index}"
 
 class NatLit(Expression):
     @typechecked
     def __init__(self, val : int):
+        assert val >= 0, "Natural number literals must be non-negative"
         self.val = val
         Expression.__init__(self)
     
