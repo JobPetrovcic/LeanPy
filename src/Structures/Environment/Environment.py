@@ -126,6 +126,9 @@ class Environment:
             raise ValueError(f"Name {name} does not specify a declaration, it is an empty name.")
         return found
     
+    def exists_declaration_under_name(self, name : Name) -> bool:
+        return name in self.name_dict
+    
     @typechecked
     def get_cloned_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level]) -> Expression:
         if len(decl.info.lvl_params) != len(subs):

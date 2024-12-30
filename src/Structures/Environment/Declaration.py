@@ -1,7 +1,8 @@
 from abc import abstractmethod
 from typeguard import typechecked
-from Structures.Environment.ReducibilityHint import ReducibilityHint
+from Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
 from Structures.Expression.ExpressionManipulation import get_app_function, get_binding_body, get_binding_type
+from Structures.KernelErrors import PanicError
 from Structures.Name import Name
 from Structures.Expression.Expression import *
 from Structures.Expression.Level import LevelParam
@@ -38,6 +39,12 @@ class Declaration:
     @abstractmethod
     def has_value(self, allow_opaque : bool = False) -> bool:
         raise NotImplementedError("Method has_value not implemented for abstract class Declaration")
+    
+    def get_hint(self) -> "ReducibilityHint":
+        if isinstance(self, Definition):
+            return self.hint
+        else:
+            return OpaqueHint()
 
 class Axiom(Declaration):
     @typechecked
@@ -170,5 +177,32 @@ class Recursor(Declaration):
                 return rule
         return None
 
+
+def compare_reducibility_hints_core(d1 : Declaration, d2 : Declaration) -> int:
+    h1 = d1.get_hint()
+    h2 = d2.get_hint()
+
+    if h1.__class__ == h2.__class__:
+        if isinstance(h1, Regular):
+            assert isinstance(h2, Regular)
+            if h1.depth == h2.depth:
+                return 0 # unfold both
+            elif h1.depth > h2.depth:
+                return -1 # unfold d1
+            else: 
+                return 1
+        else:
+            return 0 # reduce both
+    else:
+        if isinstance(h1, Opaque):
+            return 1 # reduce d2
+        elif isinstance(h2, Opaque):
+            return -1 # reduce d1
+        elif isinstance(h1, Abbrev):
+            return -1 # reduce d1
+        elif isinstance(h2, Abbrev):
+            return 1 # reduce d2
+        else:
+            raise PanicError(f"Unreachable code reached in compare_reducibility_hints by comparing {h1} and {h2}.")
 
 __all__ = ["Declaration", "Axiom", "Definition", "Theorem", "Opaque", "Quot", "InductiveType", "Constructor", "Recursor", "DeclarationInfo", "RecursionRule"]

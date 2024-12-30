@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Callable, List, Optional, Tuple, Dict
 
 from typeguard import typechecked
@@ -313,3 +314,9 @@ def has_loose_bvars(expr : Expression) -> bool:
     do_fn_w_depth(expr, is_loose_bvarfn, 0)
 
     return has_loose
+
+class ReductionStatus(Enum):
+    NOT_EQUAL = 0
+    EQUAL = 1
+    CONTINUE = 2
+    UNKNOWN = 3

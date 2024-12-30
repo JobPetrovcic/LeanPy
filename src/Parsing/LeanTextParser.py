@@ -87,10 +87,8 @@ class LeanFormatParser:
     @typechecked
     def get_hierarchical_name(self, hid : int) -> Name:
         assert hid >= 0, "Hierarchical id must be non-negative"
-        if hid == 0:
-            raise FormatError("The root hierarchical name is anonymous and should not be used")
-        if hid >= len(self.hierarchical_names):
-            raise FormatError("Hierarchical id must be defined before it is used")
+        if hid == 0: raise FormatError("The root hierarchical name is anonymous and should not be used")
+        if hid >= len(self.hierarchical_names): raise FormatError("Hierarchical id must be defined before it is used")
         return self.hierarchical_names[hid]
     
     @typechecked
@@ -458,7 +456,7 @@ class LeanFormatParser:
         )
 
     def process_line(self, line : str):
-        #print(line)
+        print(line)
         # split the line into parts separated by exactly one space
         parts = line.split(" ")
 
