@@ -517,8 +517,10 @@ class TypeChecker:
             elif name == self.environment.Nat_gcd_name: return reduce_bin_nat_op(nat_gcd, arg1.val, arg2.val)
             elif name == self.environment.Nat_mod_name: return reduce_bin_nat_op(nat_mod, arg1.val, arg2.val)
             elif name == self.environment.Nat_div_name: return reduce_bin_nat_op(nat_div, arg1.val, arg2.val)
-            elif name == self.environment.Nat_eq_name: return reduce_bin_nat_pred(nat_eq, arg1.val, arg2.val)
-            elif name == self.environment.Nat_le_name: return reduce_bin_nat_pred(nat_le, arg1.val, arg2.val)
+            elif name == self.environment.Nat_eq_name: raise NotImplementedError("Nat_eq is not implemented yet.")
+            #return reduce_bin_nat_pred(nat_eq, arg1.val, arg2.val)
+            elif name == self.environment.Nat_le_name: raise NotImplementedError("Nat_le is not implemented yet.")
+            #return reduce_bin_nat_pred(nat_le, arg1.val, arg2.val)
             elif name == self.environment.Nat_land_name: return reduce_bin_nat_op(nat_land, arg1.val, arg2.val)
             elif name == self.environment.Nat_lor_name: return reduce_bin_nat_op(nat_lor, arg1.val, arg2.val)
             elif name == self.environment.Nat_lxor_name: return reduce_bin_nat_op(nat_lxor, arg1.val, arg2.val)
@@ -624,7 +626,6 @@ class TypeChecker:
 
     @typechecked
     def reduce_recursor(self, e : Expression) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
-        print(e)
         # First check if it is a quotient recursor
         r = self.quot_reduce_rec(e)
         if r is not None: return r
@@ -670,7 +671,9 @@ class TypeChecker:
         #The number of parameters in the constructor is not necessarily
         #equal to the number of parameters in the recursor when we have
         #nested inductive types. 
-        selected_major_args = major_args[-rule.num_fields:]
+        nparams = len(major_args) - rule.num_fields
+        # apply fields from major premise
+        selected_major_args = major_args[nparams: nparams + rule.num_fields]
         if len(selected_major_args) != rule.num_fields: raise RecursorError("Major premise does not have the expected number of fields.")
         rhs = fold_apps(rhs, selected_major_args) # reapply the indices' arguments back
 
@@ -885,7 +888,6 @@ class TypeChecker:
             if has_loose_bvars(constructor_type):
                 raise PanicError("Loose bvars in constructor type")
 
-            #dprint(f"1create proj with type_name {inductive_name.name}")
             constructor_type = self.instantiate(
                 body=constructor_type.body_type,
                 val=Proj(inductive_name.name, i, proj.struct), 
