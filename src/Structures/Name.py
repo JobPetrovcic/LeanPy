@@ -25,11 +25,12 @@ class Anonymous(Name):
 
 class SubName(Name):
     @typechecked
-    def __init__(self, ancestor : Name, name : str):
+    def __init__(self, anc : Name, name : str):
         self.name = name
-        self.ancestor = ancestor
+        self.anc = anc
     
     def __str__(self) -> str:
-        return f"{self.ancestor}.{self.name}"
+        if isinstance(self.anc, Anonymous): return self.name
+        else: return f"{self.anc}.{self.name}"
     
 __all__ = ['Name', 'Anonymous', 'SubName']

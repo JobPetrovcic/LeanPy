@@ -13,3 +13,5 @@ class Regular(ReducibilityHint):
 class Abbrev(ReducibilityHint):
     def __init__(self):
         super().__init__()
+
+__all__ = ['ReducibilityHint', 'OpaqueHint', 'Regular', 'Abbrev']

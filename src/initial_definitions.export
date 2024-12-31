@@ -1,0 +1,78 @@
+0.1.2
+1 #NS 0 Nat
+2 #NS 1 zero
+3 #NS 1 succ
+1 #US 0
+0 #ES 1
+#IND 1 0 1 0 0 0 1 1 2 2 3 
+1 #EC 1 
+#CTOR 2 1 1 0 0 0 
+4 #NS 0 n
+2 #EP #BD 4 1 1
+#CTOR 3 2 1 1 0 1 
+5 #NS 0 List
+6 #NS 5 nil
+7 #NS 5 cons
+8 #NS 0 u
+2 #UP 8
+3 #US 2
+3 #ES 3
+9 #NS 0 α
+4 #EP #BD 9 3 3
+#IND 5 4 1 0 1 0 1 5 2 6 7 8
+5 #EV 0
+6 #EC 5 2
+7 #EV 1
+8 #EA 6 7
+9 #EV 2
+10 #EA 6 9
+10 #NS 0 tail
+11 #EP #BD 10 8 10
+11 #NS 0 head
+12 #EP #BD 11 5 11
+13 #EP #BI 9 3 12
+#CTOR 7 13 5 1 1 2 8
+14 #EA 6 5
+15 #EP #BI 9 3 14
+#CTOR 6 15 5 0 1 0 8
+12 #NS 0 Quot
+16 #ES 2
+17 #ES 0
+13 #NS 0 a
+18 #EP #BD 13 7 17
+19 #EP #BD 13 5 18
+14 #NS 0 r
+20 #EP #BD 14 19 16
+21 #EP #BI 9 16 20
+#QUOT 12 21 8
+15 #NS 12 mk
+22 #EC 12 2
+23 #EA 22 9
+24 #EA 23 7
+25 #EP #BD 13 7 24
+26 #EP #BD 14 19 25
+27 #EP #BI 9 16 26
+#QUOT 15 27 8
+16 #NS 12 ind
+28 #EA 22 7
+29 #EA 28 5
+30 #EP #BD 13 29 17
+31 #EC 15 2
+32 #EV 3
+33 #EA 31 32
+34 #EA 33 9
+35 #EA 34 5
+36 #EA 7 35
+37 #EP #BD 13 9 36
+38 #EA 22 32
+39 #EA 38 9
+40 #EA 9 5
+17 #NS 0 q
+41 #EP #BD 17 39 40
+18 #NS 0 mk
+42 #EP #BD 18 37 41
+19 #NS 0 β
+43 #EP #BI 19 30 42
+44 #EP #BI 14 19 43
+45 #EP #BI 9 16 44
+#QUOT 16 45 8

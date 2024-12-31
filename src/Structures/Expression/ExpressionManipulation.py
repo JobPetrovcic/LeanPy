@@ -271,18 +271,6 @@ def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:
     do_fn(expr, fn)
     return has_fvar
 
-
-# Literal manipulation
-@typechecked
-def nat_lit_to_constructor(nat_lit : NatLit) -> Expression:
-    """ If val is 0, returns the zero constructor, otherwise returns the successor constructor. """
-    raise NotImplementedError("nat_lit_to_constructor not implemented")
-
-@typechecked
-def str_lit_to_constructor(str_lit : StringLit) -> Expression:
-    """ Returns the string constructor with the given string literal value. """
-    raise NotImplementedError("str_lit_to_constructor not implemented")
-
 def level_zip(lvl_params : List[LevelParam], lvl_values : List[Level]) -> LevelSubList:
     """ Checks if the two lists of levels have the same length and zips them together. """
     if len(lvl_params) != len(lvl_values): raise ValueError("Found different number of level parameters.")

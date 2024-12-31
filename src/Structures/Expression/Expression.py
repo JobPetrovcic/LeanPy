@@ -189,17 +189,4 @@ class StringLit(Expression):
     def __str__(self) -> str:
         return f'"{self.val}"'
 
-__all__ = [
-    'Expression', 
-    'BVar', 
-    'FVar', 
-    'Sort', 
-    'Const', 
-    'App', 
-    'Pi', 
-    'Lambda', 
-    'Let', 
-    'Proj', 
-    'NatLit', 
-    'StringLit'
-]
+__all__ = ['Expression', 'BVar', 'FVar', 'Sort', 'Const', 'App', 'Pi', 'Lambda', 'Let', 'Proj', 'NatLit', 'StringLit']

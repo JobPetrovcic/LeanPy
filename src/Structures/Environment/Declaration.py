@@ -107,6 +107,8 @@ class InductiveType(Declaration):
         self.num_indices = num_indices
         self.all_inductive_names = all_inductive_names
         self.constructor_names = constructor_names
+
+        self.is_checked : bool = False
     
     def number_of_constructors(self) -> int:
         return len(self.constructor_names)
@@ -127,6 +129,8 @@ class Constructor(Declaration):
         self.inductive_name = inductive_name
         self.num_params = num_params
         self.num_fields = num_fields
+
+        self.is_checked : bool = False
     
     def has_value(self, allow_opaque : bool = False) -> bool:
         return False
@@ -178,7 +182,7 @@ class Recursor(Declaration):
         return None
 
 
-def compare_reducibility_hints_core(d1 : Declaration, d2 : Declaration) -> int:
+def compare_reducibility_hints(d1 : Declaration, d2 : Declaration) -> int:
     h1 = d1.get_hint()
     h2 = d2.get_hint()
 

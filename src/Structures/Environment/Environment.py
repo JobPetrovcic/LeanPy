@@ -2,16 +2,15 @@ from typing import Dict, List
 
 from typeguard import typechecked
 
-from Structures.Environment.Declaration import Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Theorem
-from Structures.Environment.ExpressionConstruction import create_arrow_type, create_named_fvar, create_sort_param
-from Structures.Expression.Expression import App, Const, Expression, FVar, Pi, Sort
-from Structures.Expression.ExpressionManipulation import fold_apps, substitute_level_params_in_expression
-from Structures.Expression.Level import Level, LevelParam, LevelSucc, LevelZero
+from Structures.Environment.Declaration import Constructor, Declaration, Definition, InductiveType, Opaque, Quot, Theorem
+from Structures.Expression.Expression import Const, Expression, Sort
+from Structures.Expression.ExpressionManipulation import substitute_level_params_in_expression
+from Structures.Expression.Level import Level, LevelSucc, LevelZero
 from Structures.Name import Anonymous, Name, SubName
 
 class Environment:
     def __init__(self):
-        
+        self.checking_inductive = False
         self.init_name_dict()
     
     def get_anonymous(self) -> Anonymous:
@@ -20,9 +19,16 @@ class Environment:
     def init_name_dict(self):
         self.init_bases()
         self.name_dict : Dict[Name, Declaration | None] = {Anonymous() : None}
-        self.init_special_structures()
     
     # SPECIAL STRUCTURES : Nat, String, Quot (TODO : List)
+
+    def create_name_from_str(self, name_str : str) -> Name:
+        """ Creates a name from a string. """
+        parts = name_str.split(".")
+        cur = self.anonymous
+        for part in parts:
+            cur = SubName(cur, part)
+        return cur
 
     def init_bases(self):
         self.anonymous = Anonymous()
@@ -30,89 +36,39 @@ class Environment:
         self.level_one = LevelSucc(self.level_zero)
         self.Prop = Sort(self.level_zero)
         self.Type = Sort(self.level_one)
-    
-    def init_natural_numbers(self):
-        self.NatName = SubName(self.get_anonymous(), "Nat")
-        self._add_subname(self.NatName, None)
 
-    def init_string(self):
-        self.StringName = SubName(self.get_anonymous(), "String")
-        self._add_subname(self.StringName, None)
-    
-    def init_quotient(self):
-        """
-        for quotient we have the following declarations:
-         - Quot.{u} {α : Sort u} (r : α → α → Prop) : Sort u
-         - Quot.mk.{u} {α : Sort u} (r : α → α → Prop) (a : α) : Quot r
-         - Quot.lift.{u, v} {α : Sort u} {r : α → α → Prop} {β : Sort v} (f : α → β) (a : ∀ (a b : α), r a b → f a = f b) : Quot r → β
-         - Quot.ind.{u} {α : Sort u} {r : α → α → Prop} {β : Quot r → Prop} (mk : ∀ (a : α), β (Quot.mk r a)) (q : Quot r) : β q
-        """
-
-        NotImplementedError("Quotient not implemented yet.")
-
-        self.Quot_name = SubName(self.get_anonymous(), "Quot")
-        self.Quot_mk_name = SubName(self.Quot_name, "mk")
-        self.Quot_lift_name = SubName(self.Quot_name, "lift")
-        self.Quot_ind_name = SubName(self.Quot_name, "ind")
-
-        # define universe u
-        param_u, sort_u = create_sort_param(self.Quot_name, "u")
-
-        # define alpha 
-        alpha = create_named_fvar(self.Quot_name, "α", sort_u)
-
-        # define r : alpha -> alpha -> Prop
-        r_type = create_arrow_type([(None, alpha[1]), (None, alpha[1])], self.Prop, self.Quot_name) # None will be replaced with an anonymous name
-
-        r = create_named_fvar(self.Quot_name, "r", r_type)
-        # define Quot.{u} {α : Sort u} (r : α → α → Prop) : Sort u
-        Quot_type = create_arrow_type([alpha, r], sort_u, self.Quot_name)
-
-        # add Quot to the environment
-        Quot_info = DeclarationInfo(self.Quot_name, [param_u], Quot_type)
-        Quot_def = Quot(Quot_info)
-        self.add_quot_declaration(self.Quot_name, Quot_def)
-
-        # define Quot.mk.{u} {α : Sort u} (r : α → α → Prop) (a : α) : Quot r
-        a = create_named_fvar(self.Quot_name, "a", alpha[1])
-        Quot_mk_type = create_arrow_type([alpha, r, a], fold_apps(Const(self.Quot_name, [param_u]), [alpha[1], r[1], a[1]]), self.Quot_name)
+        self.Nat_name = self.create_name_from_str("Nat")
+        self.Nat_zero_name = SubName(self.Nat_name, "zero")
+        self.Nat_succ_name = SubName(self.Nat_name, "succ")
+        self.Nat_add_name = SubName(self.Nat_name, "add")
+        self.Nat_sub_name = SubName(self.Nat_name, "sub")
+        self.Nat_mul_name = SubName(self.Nat_name, "mul")
+        self.Nat_pow_name = SubName(self.Nat_name, "pow")
+        self.Nat_gcd_name = SubName(self.Nat_name, "gcd")
+        self.Nat_div_name = SubName(self.Nat_name, "div")
+        self.Nat_mod_name = SubName(self.Nat_name, "mod")
+        self.Nat_beq_name = SubName(self.Nat_name, "beq")
+        self.Nat_ble_name = SubName(self.Nat_name, "ble")
+        self.Nat_land_name = SubName(self.Nat_name, "land")
+        self.Nat_lor_name = SubName(self.Nat_name, "lor")
+        self.Nat_xor_name = SubName(self.Nat_name, "xor")
+        self.Nat_shiftLeft_name = SubName(self.Nat_name, "shiftLeft")
+        self.Nat_shiftRight_name = SubName(self.Nat_name, "shiftRight")
 
 
-        Quot_mk_info = DeclarationInfo(self.Quot_mk_name, [param_u], Quot_mk_type)
-        Quot_mk_def = Quot(Quot_mk_info)
-        self.add_quot_declaration(self.Quot_mk_name, Quot_mk_def)
+        self.String_name = self.create_name_from_str("String")
+        self.String_mk_name = SubName(self.String_name, "mk")
 
-        b = create_named_fvar(self.Quot_name, "b", alpha[1])
-        
-        # define Quot.lift.{u, v} {α : Sort u} {r : α → α → Prop} {β : Sort v} (f : α → β) (f_a_eq_f_b : ∀ (a b : α), r a b → f a = f b) : Quot r → β
-        param_v, sort_v = create_sort_param(self.Quot_name, "v")
-        beta = create_named_fvar(self.Quot_name, "β", sort_v)
+        self.List_name = self.create_name_from_str("List")
+        self.List_nil_name = SubName(self.List_name, "nil")
+        self.List_cons_name = SubName(self.List_name, "cons")
 
-        f_type = create_arrow_type([(None, alpha[1])], beta[1], self.Quot_name)
-        f = create_named_fvar(self.Quot_name, "f", f_type)
-
-        f_a_eq_f_b_type = create_arrow_type([a, b, (None, fold_app(r[1], [a[1], b[1]]))],  )
-        
-
-
-        Qout_lift_type = create_arrow_type([alpha, r, beta, f, ])
+        self.Char_name = self.create_name_from_str("Char")
                                         
-
-    def init_special_structures(self):
-        self.init_natural_numbers()
-        self.init_string()
-        #self.init_quotient()
-
-    def get_nat_name(self) -> SubName:
-        return self.NatName
-    
-    def get_string_name(self) -> SubName:
-        return self.StringName
-    
     @typechecked
     def _add_subname(self, name : SubName, decl : Declaration | None):
-        if not name.ancestor in self.name_dict:
-            raise ValueError(f"Ancestor {name.ancestor} not found in environment.")
+        if not name.anc in self.name_dict:
+            raise ValueError(f"Ancestor {name.anc} not found in environment.")
         if name in self.name_dict:
             raise ValueError(f"Name {name} already exists in environment.")
         self.name_dict[name] = decl
@@ -120,10 +76,19 @@ class Environment:
     @typechecked
     def get_declaration_under_name(self, name : Name) -> Declaration:
         if name not in self.name_dict:
-            raise ValueError(f"Name {name} not found in environment.")
+            print([str(k) for k in self.name_dict.keys()])
+            raise ValueError(f"Name {name} does not belong to any declaration.")
         found = self.name_dict[name]
         if found is None:
             raise ValueError(f"Name {name} does not specify a declaration, it is an empty name.")
+        if not self.checking_inductive:
+            if isinstance(found, InductiveType):
+                if not found.is_checked:
+                    raise ValueError(f"Inductive type {name} has not been checked.")
+            elif isinstance(found, Constructor):
+                if not found.is_checked:
+                    raise ValueError(f"Constructor {name} has not been checked.")
+        
         return found
     
     def exists_declaration_under_name(self, name : Name) -> bool:
@@ -134,7 +99,7 @@ class Environment:
         if len(decl.info.lvl_params) != len(subs):
             print(f"decl parameters : {[str(l) for l in decl.info.lvl_params]}")
             print(f"subs parameters : {[str(l) for l in subs]}")
-            raise ValueError(f"Declaration {decl} has {len(decl.info.lvl_params)} level parameters, but {len(subs)} substitutions were provided.")
+            raise ValueError(f"Declaration {decl.info.name} has {len(decl.info.lvl_params)} level parameters, but {len(subs)} substitutions were provided.")
         substitutions = list(zip(decl.info.lvl_params, subs))
         return substitute_level_params_in_expression(decl.get_type(), substitutions) # this clones the expression
     

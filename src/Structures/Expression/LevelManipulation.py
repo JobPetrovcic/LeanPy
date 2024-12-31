@@ -95,7 +95,7 @@ def leq_core(l : Level, r : Level, diff : int) -> bool:
 
     elif (isinstance(l, LevelParam) or isinstance(l, LevelZero)) and isinstance(r, LevelMax): return leq_core(l, r.lhs, diff) or leq_core(l, r.rhs, diff)
 
-    elif isinstance(l, LevelIMax) and isinstance(r, LevelIMax) and l.lhs == r.lhs and l.rhs == r.rhs: return True
+    elif isinstance(l, LevelIMax) and isinstance(r, LevelIMax) and leq_core(l.lhs, r.lhs, 0) and leq_core(l.rhs, r.rhs, 0): return True
     elif isinstance(l, LevelIMax) and isinstance(l.rhs, LevelParam): return leq_imax_by_cases(l.rhs, l, r, diff)
     elif isinstance(r, LevelIMax) and isinstance(r.rhs, LevelParam): return leq_imax_by_cases(r.rhs, l, r, diff)
     elif isinstance(l, LevelIMax) and is_any_max(l.rhs):
