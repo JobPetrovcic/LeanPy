@@ -1,15 +1,19 @@
 from enum import Enum
-from typing import Callable, List, Optional, Tuple, Dict
+from typing import Callable, List, Optional, Tuple
 
 from typeguard import typechecked
 
 from Structures.Expression.Expression import *
 from Structures.Expression.Level import Level, LevelParam
-from Structures.Expression.LevelManipulation import clone_level, substitute_level_params_level, LevelSubList
+from Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
+
+# TODO:
+# - there might be an optimization opportunity when replacing expressions: when all expressions that an expression refers to are unchanged, the expression itself is unchanged, so no need to create a new expression
+
 
 # for fvars we are relying on total equality
 @typechecked
-def replace_expression_clone(expr : Expression, fn : Callable[[Expression], Optional[Expression]], fvar_dict : Dict[FVar, FVar]) -> Expression:
+def replace_expression(expr : Expression, fn : Callable[[Expression], Optional[Expression]]) -> Expression:
     """ 
     Recursively replaces subexpressions in the given expression using the given function. It does by creating a new expression tree. 
 
@@ -23,24 +27,21 @@ def replace_expression_clone(expr : Expression, fn : Callable[[Expression], Opti
     new_expr = fn(expr)
     if new_expr is not None: return new_expr
 
-    if isinstance(expr, BVar): return BVar(dbj_id=expr.dbj_id)
-    elif isinstance(expr, FVar):
-        if expr not in fvar_dict: 
-            fvar_dict[expr] = FVar(name=expr.name, type=expr.type, val=expr.val, is_let=expr.is_let) # create a new fvar, but, whenever we see this fvar again, we will use the same one
-        return fvar_dict[expr] 
-    elif isinstance(expr, Sort): return Sort(level=clone_level(expr.level))
-    elif isinstance(expr, Const): return Const(name=expr.name, lvl_params=expr.lvl_params)  # don't clone the name
-    elif isinstance(expr, App): return App(fn=replace_expression_clone(expr.fn, fn, fvar_dict), arg=replace_expression_clone(expr.arg, fn, fvar_dict))
-    elif isinstance(expr, Lambda): return Lambda(bname=expr.bname, arg_type=replace_expression_clone(expr.arg_type, fn, fvar_dict), body=replace_expression_clone(expr.body, fn, fvar_dict))
-    elif isinstance(expr, Pi): return Pi(bname=expr.bname, arg_type=replace_expression_clone(expr.arg_type, fn, fvar_dict), body_type=replace_expression_clone(expr.body_type, fn, fvar_dict))
-    elif isinstance(expr, Let): return Let(bname=expr.bname, arg_type=replace_expression_clone(expr.arg_type, fn, fvar_dict), val=replace_expression_clone(expr.val, fn, fvar_dict), body=replace_expression_clone(expr.body, fn, fvar_dict))
-    elif isinstance(expr, Proj): return Proj(type_name=expr.type_name, index=expr.index, struct=replace_expression_clone(expr.struct, fn, fvar_dict))
-    elif isinstance(expr, NatLit): return NatLit(val=expr.val)
-    elif isinstance(expr, StringLit): return StringLit(val=expr.val)
+    if isinstance(expr, BVar): return expr
+    elif isinstance(expr, FVar): return expr
+    elif isinstance(expr, Sort): return expr
+    elif isinstance(expr, Const): return expr
+    elif isinstance(expr, App): return App(fn=replace_expression(expr.fn, fn), arg=replace_expression(expr.arg, fn))
+    elif isinstance(expr, Lambda): return Lambda(bname=expr.bname, arg_type=replace_expression(expr.arg_type, fn), body=replace_expression(expr.body, fn))
+    elif isinstance(expr, Pi): return Pi(bname=expr.bname, arg_type=replace_expression(expr.arg_type, fn), body_type=replace_expression(expr.body_type, fn))
+    elif isinstance(expr, Let): return Let(bname=expr.bname, arg_type=replace_expression(expr.arg_type, fn), val=replace_expression(expr.val, fn), body=replace_expression(expr.body, fn))
+    elif isinstance(expr, Proj): return Proj(type_name=expr.type_name, index=expr.index, struct=replace_expression(expr.struct, fn))
+    elif isinstance(expr, NatLit): return expr
+    elif isinstance(expr, StringLit): return expr
     else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
 
 @typechecked
-def replace_expression_w_depth_clone(expr : Expression, fn : Callable[[Expression, int], Optional[Expression]], fvar_dict : Dict[FVar, FVar], depth :int) -> Expression:
+def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int], Optional[Expression]], depth :int) -> Expression:
     """ 
     Recursively replaces subexpressions in the given expression using the given function. It does by creating a new expression tree. 
 
@@ -55,79 +56,41 @@ def replace_expression_w_depth_clone(expr : Expression, fn : Callable[[Expressio
     if new_expr is not None: return new_expr
 
     if isinstance(expr, BVar): return BVar(dbj_id=expr.dbj_id)
-    elif isinstance(expr, FVar):
-        if expr not in fvar_dict: 
-            fvar_dict[expr] = FVar(name=expr.name, type=expr.type, val=expr.val, is_let=expr.is_let) # create a new fvar, but, whenever we see this fvar again, we will use the same one
-        return fvar_dict[expr] 
-    elif isinstance(expr, Sort): return Sort(level=clone_level(expr.level))
-    elif isinstance(expr, Const): return Const(name=expr.name, lvl_params=expr.lvl_params)  # don't clone the name
+    elif isinstance(expr, FVar): return expr # fvars differentiate by reference
+    elif isinstance(expr, Sort): return Sort(level=expr.level) # don't copy the level
+    elif isinstance(expr, Const): return Const(name=expr.name, lvl_params=expr.lvl_params)  # don't copy the name
     elif isinstance(expr, App): 
         return App(
-            fn=replace_expression_w_depth_clone(expr.fn, fn, fvar_dict, depth), 
-            arg=replace_expression_w_depth_clone(expr.arg, fn, fvar_dict, depth)
+            fn=replace_expression_w_depth(expr.fn, fn, depth), 
+            arg=replace_expression_w_depth(expr.arg, fn, depth)
         )
     elif isinstance(expr, Lambda): 
         return Lambda(
             bname=expr.bname, 
-            arg_type=replace_expression_w_depth_clone(expr.arg_type, fn, fvar_dict, depth), 
-            body=replace_expression_w_depth_clone(expr.body, fn, fvar_dict, depth + 1))
+            arg_type=replace_expression_w_depth(expr.arg_type, fn, depth), 
+            body=replace_expression_w_depth(expr.body, fn, depth + 1))
     elif isinstance(expr, Pi): 
         return Pi(
             bname=expr.bname, 
-            arg_type=replace_expression_w_depth_clone(expr.arg_type, fn, fvar_dict, depth), 
-            body_type=replace_expression_w_depth_clone(expr.body_type, fn, fvar_dict, depth + 1)
+            arg_type=replace_expression_w_depth(expr.arg_type, fn, depth), 
+            body_type=replace_expression_w_depth(expr.body_type, fn, depth + 1)
         )
     elif isinstance(expr, Let): 
         return Let(
             bname=expr.bname, 
-            arg_type=replace_expression_w_depth_clone(expr.arg_type, fn, fvar_dict, depth), 
-            val=replace_expression_w_depth_clone(expr.val, fn, fvar_dict, depth), 
-            body=replace_expression_w_depth_clone(expr.body, fn, fvar_dict, depth + 1))
+            arg_type=replace_expression_w_depth(expr.arg_type, fn, depth), 
+            val=replace_expression_w_depth(expr.val, fn, depth), 
+            body=replace_expression_w_depth(expr.body, fn, depth + 1))
     elif isinstance(expr, Proj): 
         return Proj(
             type_name=expr.type_name, 
             index=expr.index, 
-            struct=replace_expression_w_depth_clone(expr.struct, fn, fvar_dict, depth))
+            struct=replace_expression_w_depth(expr.struct, fn, depth))
     elif isinstance(expr, NatLit): 
-        return NatLit(val=expr.val)
+        return expr
     elif isinstance(expr, StringLit): 
-        return StringLit(val=expr.val)
+        return expr
     else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
-
-@typechecked
-def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int], Optional[Expression]], depth : int) -> Expression:
-    """ 
-    Recursively replaces subexpressions in the given expression using the given function. It does this in place.
-
-    Args:
-        expr: The expression to replace subexpressions in.
-        fn: The function to use to replace subexpressions. It should return None if the expression should not be replaced.
-        depth: The current depth in the expression tree.
-    
-    Returns:
-        The modified expression with subexpressions replaced.
-    """
-    new_expr = fn(expr, depth)
-    if new_expr is not None: return new_expr
-
-    if isinstance(expr, BVar) or isinstance(expr, Sort) or isinstance(expr, Const) or isinstance(expr, FVar): pass
-    if isinstance(expr, App):
-        expr.fn = replace_expression_w_depth(expr.fn, fn, depth)
-        expr.arg = replace_expression_w_depth(expr.arg, fn, depth)
-    elif isinstance(expr, Lambda):
-        expr.arg_type = replace_expression_w_depth(expr.arg_type, fn, depth)
-        expr.body = replace_expression_w_depth(expr.body, fn, depth + 1)
-    elif isinstance(expr, Pi):
-        expr.arg_type = replace_expression_w_depth(expr.arg_type, fn, depth)
-        expr.body_type = replace_expression_w_depth(expr.body_type, fn, depth + 1)
-    elif isinstance(expr, Let):
-        expr.arg_type = replace_expression_w_depth(expr.arg_type, fn, depth)
-        expr.val = replace_expression_w_depth(expr.val, fn, depth)
-        expr.body = replace_expression_w_depth(expr.body, fn, depth + 1)
-    elif isinstance(expr, Proj):
-        expr.struct = replace_expression_w_depth(expr.struct, fn, depth)
-    elif isinstance(expr, NatLit) or isinstance(expr, StringLit): pass
-    return expr
 
 @typechecked
 def do_fn(expr : Expression, fn : Callable[[Expression], None]):
@@ -178,12 +141,12 @@ def substitute_level_params_in_expression(body : Expression, params : LevelSubLi
     """ Replaces all level parameters in the given"""
     def replace_level_params(expr : Expression) -> Optional[Expression]:
         if isinstance(expr, Sort):
-            return Sort(level=substitute_level_params_level(expr.level, params, True))
+            return Sort(level=substitute_level_params_level(expr.level, params)) # copy the levels since we are changing them
         elif isinstance(expr, Const):
-            return Const(name=expr.name, lvl_params=[substitute_level_params_level(l, params, True) for l in expr.lvl_params])
+            return Const(name=expr.name, lvl_params=[substitute_level_params_level(l, params) for l in expr.lvl_params]) # copy the levels since we are changing them
         return None
 
-    return replace_expression_clone(body, replace_level_params, {})
+    return replace_expression(body, replace_level_params)
 
 @typechecked
 def has_fvars(body : Expression) -> bool:
@@ -196,33 +159,39 @@ def has_fvars(body : Expression) -> bool:
     return has_fvar
 
 @typechecked
-def instantiate_bvar(body : Expression, val : Expression, clone_body : bool, clone_val : bool, use_same_fvars : bool) -> Expression:
+def instantiate_bvar(body : Expression, val : Expression) -> Expression:
     """
     Replaces the outermost bound variable in the given expression with the given free variable. Throws an error if it finds an unbound bvar index.
     """
     def intantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if isinstance(expr, BVar): 
-            if expr.dbj_id == depth: 
-                if clone_val: return clone_expression(val, use_same_fvars) # we clone the value every time
-                else: return val
-        elif isinstance(expr, FVar) and use_same_fvars: return expr
+            if expr.dbj_id == depth: return val
         return None
-    if clone_body: return replace_expression_w_depth_clone(body, intantiation_fn, {}, 0)
-    else: return replace_expression_w_depth(body, intantiation_fn, 0)
+    return replace_expression_w_depth(body, intantiation_fn, 0)
+
+def instantiate_bvars(body : Expression, vals : List[Expression]) -> Expression:
+    """
+    Replaces the outermost bound variables in the given expression with the given free variables. Throws an error if it finds an unbound bvar index.
+    """
+    def instantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
+        if isinstance(expr, BVar): 
+            if expr.dbj_id >= depth: 
+                if expr.dbj_id - depth < len(vals): return vals[expr.dbj_id - depth]
+                else: raise ValueError(f"Unbound de Bruijn index {expr.dbj_id}")
+        return None
+    return replace_expression_w_depth(body, instantiation_fn, 0)
+
 
 @typechecked
-def abstract_bvar(body : Expression, fvar : FVar, clone : bool, use_same_fvars : bool) -> Expression:
-    # turns fvar into a bound variable with de Bruijn index dpth
+def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
+    # turns fvar into a bound variable with de Bruijn index depth
     def abstraction_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if isinstance(expr, FVar):
             if expr == fvar:
                 return BVar(dbj_id=depth)
-            elif use_same_fvars:
-                return expr
         return None
     
-    if clone: return replace_expression_w_depth_clone(body, abstraction_fn, {}, 0)
-    else: return replace_expression_w_depth(body, abstraction_fn, 0)
+    return replace_expression_w_depth(body, abstraction_fn, 0)
 
 def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression]]:
     """ If expr is of form (... ((f a1) a2) ... an), returns f, [a1, a2, ..., an]. """
@@ -253,13 +222,12 @@ def fold_apps(fn : Expression, args : List[Expression]) -> Expression:
         result = App(fn=result, arg=arg)
     return result
 
-@typechecked
-def clone_expression(expr : Expression, use_same_fvars : bool) -> Expression:
-    """ Clones the given expression. """
-    def clone_Fn(expr : Expression) -> Optional[Expression]:
-        if isinstance(expr, FVar) and use_same_fvars: return expr
-        return None
-    return replace_expression_clone(expr, clone_Fn, {})
+#@typechecked
+#def clone_expression(expr : Expression) -> Expression:
+#    """ Clones the given expression. """
+#    def clone_fn(expr : Expression) -> Optional[Expression]:
+#        return None
+#    return replace_expression(expr, clone_fn)
 
 @typechecked
 def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:

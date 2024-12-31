@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typeguard import typechecked
 from Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
 from Structures.Expression.ExpressionManipulation import get_app_function, get_binding_body, get_binding_type
-from Structures.KernelErrors import PanicError
+from Kernel.KernelErrors import PanicError
 from Structures.Name import Name
 from Structures.Expression.Expression import *
 from Structures.Expression.Level import LevelParam
@@ -155,11 +155,19 @@ class Recursor(Declaration):
     def has_value(self, allow_opaque : bool = False) -> bool:
         return False
     
-    def get_major_idx(self) -> int:
+    def get_major_index(self) -> int:
+        """ Returns the index of the major premise -- the argument for which we want the inductive proof (technically type, which is more general than a proof). Suppose we have an inductive type and an application of its recursor. Then there are first num_params parameters' arguments, then num_indices indices' arguments, then num_motives motives' arguments, then num_minors minor premises arguments. Finally, the next argument is the major premise.
+        Example:
+            Nat.rec takes no parameters, no indices, a motive (P : Nat -> Type)
+            Then follow two premises:
+            - premise for 0: P 0 (proof/type that P holds for 0)
+            - premise for succ: (n : Nat) -> P n -> P (succ n) (induction step)
+            The next arguments is the major premise is the next argument -- the argument for which we actually want to prove the motive.
+        """
         return self.num_params + self.num_motives + self.num_minors + self.num_indices
     
-    def get_major_induct(self) -> Name:
-        n = self.get_major_idx()
+    def get_major_induct(self) -> Name: # DOES NOT CHANGE ANYTHING
+        n = self.get_major_index()
         t = self.info.type
 
         for _ in range(n):

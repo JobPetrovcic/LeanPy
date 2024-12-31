@@ -5,7 +5,7 @@ from Structures.Expression.Level import *
 
 
 from typeguard import typechecked
-from Structures.KernelErrors import PanicError
+from Kernel.KernelErrors import PanicError
 from Structures.Expression.Level import *
 
 def combine_to_max(l : Level, r : Level) -> Level:
@@ -63,7 +63,6 @@ def are_unique_level_params(levels : Sequence[Level]) -> bool:
             return False
     return True
 
-
 @typechecked
 def is_any_max(level : Level) -> bool:
     return isinstance(level, LevelMax) or isinstance(level, LevelIMax)
@@ -71,10 +70,10 @@ def is_any_max(level : Level) -> bool:
 @typechecked
 def leq_imax_by_cases(m : LevelParam, l : Level, r : Level, diff : int) -> bool:
     """ Tests whether l <= r regardless of m."""
-    lhs_0 = substitute_level_params_level(l, [(m, LevelZero())], True)
-    rhs_0 = substitute_level_params_level(r, [(m, LevelZero())], True)
-    lhs_1 = substitute_level_params_level(l, [(m, LevelSucc(LevelZero()))], True)
-    rhs_1 = substitute_level_params_level(r, [(m, LevelSucc(LevelZero()))], True)
+    lhs_0 = substitute_level_params_level(l, [(m, LevelZero())])
+    rhs_0 = substitute_level_params_level(r, [(m, LevelZero())])
+    lhs_1 = substitute_level_params_level(l, [(m, LevelSucc(LevelZero()))])
+    rhs_1 = substitute_level_params_level(r, [(m, LevelSucc(LevelZero()))])
     return leq_core(lhs_0, rhs_0, diff) and leq_core(lhs_1, rhs_1, diff)
 
 @typechecked
@@ -157,66 +156,26 @@ def antisymm_eq_list(l : List[Level], r : List[Level]) -> bool:
     return True
 
 def replace_level(level : Level, fn : Callable[[Level], Optional[Level]]) -> Level:
-    """ Recursively replaces sublevels in the given level using the given function. It does this in place when it can.
-    
-    Args:
-        level: The level to replace sublevels in.
-        fn: The function to use to replace sublevels. It should return None if the level should not be replaced.
-
-    Returns:
-        The level with sublevels replaced.
-    """
-    new_level = fn(level)
-    if new_level is not None: return new_level
-
-    if isinstance(level, LevelZero): return level
-    elif isinstance(level, LevelParam): return level
-    elif isinstance(level, LevelSucc):
-        level.anc = replace_level(level.anc, fn)
-    elif isinstance(level, LevelMax):
-        level.lhs = replace_level(level.lhs, fn)
-        level.rhs = replace_level(level.rhs, fn)
-    elif isinstance(level, LevelIMax):
-        level.lhs = replace_level(level.lhs, fn)
-        level.rhs = replace_level(level.rhs, fn)
-    else: raise ValueError(f"Unknown level type {level.__class__.__name__}")
-    return level
-    
-def replace_level_clone(level : Level, fn : Callable[[Level], Optional[Level]]) -> Level:
     """ 
-    Recursively replaces sublevels in the given level using the given function. It does by creating a new level tree. 
-
-    Args:
-        level: The level to replace sublevels in.
-        fn: The function to use to replace sublevels. It should return None if the level should not be replaced.
-    
-    Returns:
-        The new level with sublevels replaced.
+    Recursively replaces sublevels in the given level using the given function. It does by creating a new level tree for levels that refer to other levels.
     """
     new_level = fn(level)
     if new_level is not None: return new_level
 
-    if isinstance(level, LevelZero): return LevelZero()
-    elif isinstance(level, LevelParam): return LevelParam(level.name) # don't clone the name
-    elif isinstance(level, LevelSucc): return LevelSucc(replace_level_clone(level.anc, fn))
-    elif isinstance(level, LevelMax): return LevelMax(replace_level_clone(level.lhs, fn), replace_level_clone(level.rhs, fn))
-    elif isinstance(level, LevelIMax): return LevelIMax(replace_level_clone(level.lhs, fn), replace_level_clone(level.rhs, fn))
+    if isinstance(level, LevelZero): return level # does not refer to any other level
+    elif isinstance(level, LevelParam): return level # does not refer to any other level
+    elif isinstance(level, LevelSucc): return LevelSucc(replace_level(level.anc, fn))
+    elif isinstance(level, LevelMax): return LevelMax(replace_level(level.lhs, fn), replace_level(level.rhs, fn))
+    elif isinstance(level, LevelIMax): return LevelIMax(replace_level(level.lhs, fn), replace_level(level.rhs, fn))
     else: raise ValueError(f"Unknown level type {level.__class__.__name__}")
 
 LevelSubList = List[Tuple[LevelParam, Level]]
 
-def substitute_level_params_level(level : Level, params : LevelSubList, clone : bool) -> Level:
+def substitute_level_params_level(level : Level, params : LevelSubList) -> Level:
     """ Replaces all level parameters in the given level with the given values. """
     def replace_fn(l : Level) -> Optional[Level]:
         for to_sub, value in params:
             if isinstance(l, LevelParam) and l.name == to_sub.name:
                 return value
         return None
-    if clone:
-        return replace_level_clone(level, replace_fn)
-    else:
-        return replace_level(level, replace_fn)
-
-def clone_level(level : Level) -> Level:
-    """ Clones the given level. """
-    return replace_level_clone(level, lambda l: None)
+    return replace_level(level, replace_fn)

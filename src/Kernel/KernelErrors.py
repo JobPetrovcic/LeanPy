@@ -30,3 +30,7 @@ class EnvironmentError(KernelError):
 class DeclarationError(KernelError):
     def __init__(self, message : str):
         super().__init__(message)
+
+class RecursorError(KernelError):
+    def __init__(self, message : str):
+        super().__init__(message)
