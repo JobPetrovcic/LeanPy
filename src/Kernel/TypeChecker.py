@@ -354,12 +354,13 @@ class TypeChecker:
         return False
     
     # REDUCTIONS
-    def beta_reduction(self, expr : App) -> Expression: # DOES NOT CHANGE ANYTHING
+    def beta_reduction(self, 
+            f : Expression, #  ( ... ((f a_1) a_2) ... a_n -> f, [a_1, a_2, ..., a_n] outermost to innermost
+            args : List[Expression]
+        ) -> Expression: # DOES NOT CHANGE ANYTHING
         """
         Reduces the application by substituting the argument in the body.
         """
-        # start with ( ... ((f a_1) a_2) ... a_n
-        f, args = unfold_app(expr) # f, [a_1, a_2, ..., a_n] outermost to innermost
         n_successful_subs = 0
         while isinstance(f, Lambda) and n_successful_subs < len(args):
             f = f.body
@@ -705,10 +706,10 @@ class TypeChecker:
             else:
                 r = self.whnf_core(pos_red, cheap_proj=cheap_proj)     
         elif isinstance(expr, App):
-            raw_fn = get_app_function(expr)
+            raw_fn, raw_args = unfold_app(expr)
             fn = self.whnf_core(raw_fn, cheap_proj=cheap_proj)
             if isinstance(fn, Lambda):
-                r = self.whnf_core(self.beta_reduction(expr), cheap_proj=cheap_proj)
+                r = self.whnf_core(self.beta_reduction(fn, raw_args), cheap_proj=cheap_proj)
             elif fn == raw_fn:
                 r = self.reduce_recursor(expr)
                 if r is not None: 
