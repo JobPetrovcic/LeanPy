@@ -226,13 +226,6 @@ class TypeChecker:
         ret = self.def_eq_core(l_n, r_n)
         self.remove_fvar(fvar)
         return ret
-    
-    @typechecked
-    def def_eq_proj(self, l : Proj, r : Proj) -> Optional[bool]: # DOES NOT CHANGE ANYTHING
-        if l.index != r.index: return None
-        if self.lazy_delta_proj_reduction(l, r, l.index):
-            return True
-        return None
 
     @typechecked
     def try_structural_eta_expansion_core(self, t : Expression, s : Expression) -> bool: # DOES NOT CHANGE ANYTHING
@@ -333,7 +326,7 @@ class TypeChecker:
         if isinstance(l_n_n, Const) and isinstance(r_n_n, Const):
             if self.def_eq_const(l_n_n, r_n_n): return True
         if isinstance(l_n_n, Proj) and isinstance(r_n_n, Proj) and l_n_n.index == r_n_n.index:
-            if self.def_eq_proj(l_n_n, r_n_n): return True
+            if self.lazy_delta_proj_reduction(l_n_n.struct, r_n_n.struct, l_n_n.index): return True
 
 
         # finally try unfolding stuff
