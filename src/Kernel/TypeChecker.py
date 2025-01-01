@@ -15,7 +15,7 @@ from Structures.Name import Name
 import warnings
 
 import sys
-sys.setrecursionlimit(10**6) 
+sys.setrecursionlimit(10**4) 
 
 #TODO s:
 # - special cases for Nat and String literals
@@ -295,6 +295,11 @@ class TypeChecker:
         elif isinstance(l, BVar) or isinstance(r, BVar): raise PanicError("BVar should have been substituted by now, when comparing expressions for definitional equality.")
         elif isinstance(l, FVar) and isinstance(r, FVar): return l is r
         
+        elif isinstance(l, Pi) and isinstance(r, Pi):
+            return self.def_eq_pi(l, r)
+        elif isinstance(l, Lambda) and isinstance(r, Lambda):
+            return self.def_eq_lambda(l, r)
+        
     def is_def_eq_proof_irrel(self, t : Expression, s : Expression) -> Optional[bool]: # DOES NOT CHANGE ANYTHING
         """ Proof irrelevance support for propositions. If two expressions have equal types, and the types are proposition, then the expressions are considered equal. """
         t_type = self.infer_core(t, infer_only=True)
@@ -327,29 +332,31 @@ class TypeChecker:
 
         if isinstance(l_n_n, Const) and isinstance(r_n_n, Const):
             if self.def_eq_const(l_n_n, r_n_n): return True
-
-        if (l_n_n is not l_n) or (r_n_n is not r_n):
-            is_easy = self.def_eq_easy(l_n_n, r_n_n)
-            if is_easy is not None: return is_easy
-        
-        if isinstance(l_n_n, App) and isinstance(r_n_n, App):
-            if self.def_eq_app(l_n_n, r_n_n): return True
-        if isinstance(l_n_n, Pi) and isinstance(r_n_n, Pi):
-            if self.def_eq_pi(l_n_n, r_n_n): return True
-        if isinstance(l_n_n, Lambda) and isinstance(r_n_n, Lambda):
-            if self.def_eq_lambda(l_n_n, r_n_n): return True
-        if isinstance(l_n_n, Proj) and isinstance(r_n_n, Proj):
+        if isinstance(l_n_n, Proj) and isinstance(r_n_n, Proj) and l_n_n.index == r_n_n.index:
             if self.def_eq_proj(l_n_n, r_n_n): return True
 
+
         # finally try unfolding stuff
-        l_n_n_n = self.whnf(l_n_n, unfold_definition=True)
-        r_n_n_n = self.whnf(r_n_n, unfold_definition=True)
+        l_n_n_n = self.whnf_core(l_n_n, cheap_proj=False)
+        r_n_n_n = self.whnf_core(r_n_n, cheap_proj=False)
+
+        if (l_n_n_n is not l_n_n) or (r_n_n_n is not r_n_n): return self.def_eq_core(l_n_n_n, r_n_n_n)
+
+        is_easy = self.def_eq_easy(l_n_n_n, r_n_n_n)
+        if is_easy is not None: return is_easy
+
+        if isinstance(l_n_n_n, App) and isinstance(r_n_n_n, App):
+            if self.def_eq_app(l_n_n_n, r_n_n_n): return True
 
         # Reductions
         if self.try_structural_eta_expansion(l_n_n_n, r_n_n_n):
             return True
         if self.try_eta_expansion(l_n_n_n, r_n_n_n):
             return True
+        
+        # TODO
+        #if (is_def_eq_unit_like(t_n, s_n))
+        #   return true;
 
         return False
     
@@ -491,7 +498,7 @@ class TypeChecker:
                 if t is not None:
                     s = self.reduce_proj_core(s_n, idx)
                     if s is not None:
-                        return self.def_eq_core(t, s) # this is risky
+                        return self.def_eq_core(t, s)
                 return self.def_eq_core(t_n, s_n)
 
     @typechecked
