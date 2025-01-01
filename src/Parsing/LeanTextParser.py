@@ -219,7 +219,7 @@ class LeanFormatParser:
     def add_expression_let(self, parts : List[str]):
         self.assert_parts_tag(parts, "#EZ", 1)
 
-        eid, _, _info, hid, eid1, eid2, eid3 = LeanFormatParser.process_types(parts, [int, str, str, int, int, int, int])
+        eid, _, hid, eid1, eid2, eid3 = LeanFormatParser.process_types(parts, [int, str, int, int, int, int])
 
         self.add_expression(eid, Let(bname=self.get_hierarchical_name(hid), arg_type=self.get_expression(eid1), val=self.get_expression(eid2), body=self.get_expression(eid3)))
 

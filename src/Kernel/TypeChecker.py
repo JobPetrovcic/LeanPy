@@ -300,6 +300,18 @@ class TypeChecker:
             return None
         s_type = self.infer_core(s, infer_only=True)
         return self.def_eq_core(t_type, s_type)
+    
+    def def_eq_unit_like(self, t : Expression, s : Expression) -> bool:
+        t_type = self.whnf(self.infer_core(t, infer_only=True), unfold_definition=True)
+        inductive_const = get_app_function(t_type)
+
+        if not isinstance(inductive_const, Const): return False
+        if not self.is_structure_like(inductive_const.name): return False
+
+        constructor = self.get_first_constructor(inductive_const.name)
+        if constructor is None: return False
+        if constructor.num_fields != 0: return False
+        return self.def_eq_core(t_type, self.infer_core(s, infer_only=True))
 
     def def_eq_core(self, l: Expression, r: Expression) -> bool: # DOES NOT CHANGE ANYTHING
         if l is r: return True
@@ -346,10 +358,8 @@ class TypeChecker:
             return True
         if self.try_eta_expansion(l_n_n_n, r_n_n_n):
             return True
-        
-        # TODO
-        #if (is_def_eq_unit_like(t_n, s_n))
-        #   return true;
+   
+        if self.def_eq_unit_like(l_n_n_n, r_n_n_n): return True
 
         return False
     
