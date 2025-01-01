@@ -63,7 +63,9 @@ class LeanFormatParser:
                 # ensure that it is between 0 and 1
                 if not (part == "0" or part == "1"):
                     raise FormatError(f"Expected a boolean value between 0 and 1, but got {part}")
-            processed_part = expected_types[i](part)
+                processed_part = bool(int(str(part)))
+            else:
+                processed_part = expected_types[i](part)
             processed_parts.append(processed_part)
         return processed_parts
     
@@ -463,7 +465,7 @@ class LeanFormatParser:
 
         rule_idxs = LeanFormatParser.process_types(parts[:num_rule_idxs], [int] * num_rule_idxs)
         parts = parts[num_rule_idxs:]
-
+        
         isK = LeanFormatParser.process_types(parts[:1], [bool])[0]
         parts = parts[1:]
 
