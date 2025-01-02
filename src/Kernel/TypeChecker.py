@@ -1017,14 +1017,13 @@ class TypeChecker:
         
         self.environment.add_declaration(name, ind)
 
-        if not self.check_inductive_declaration_infos(name):
-            raise DeclarationError(f"Inductive type {name} not well-formed.")
+        self.check_inductive_declaration_infos(name)
         #rprint(f"ADDED INDUCTIVE : {name}")
 
     def add_constructor(self, name : Name, constructor : Constructor): # DOES NOT CHANGE ANYTHING
         #rprint(f"ADDING CONSTRUCTOR: {name}")
-        # Don't do this: self.check_declaration_info(constructor.info); see check_inductive_declaration_infos
         self.environment.add_declaration(name, constructor)
+        self.check_inductive_declaration_infos(constructor.inductive_name)
 
         #rprint(f"ADDED CONSTRUCTOR : {name}")
 
@@ -1037,18 +1036,19 @@ class TypeChecker:
                 count += 1
         return count
     
-    def check_inductive_declaration_infos(self, inductive : Name) -> bool: # CHANGES INDUCTIVE, BUT THIS IS OK
+    def check_inductive_declaration_infos(self, inductive : Name): # CHANGES INDUCTIVE, BUT THIS IS OK
         """
         Inductive types are special in that they are defined cyclically: the constructors and the inductive type refer to each other cyclically. Thus we cannot check them as they are added to the environment. Instead, we check them once each part of the inductive definition has been added to the environment. We mark the inductive type and its constructors as checked once they have been successfully checked.
         """
         self.environment.checking_inductive = True # CHANGES INDUCTIVE, BUT THIS IS OK
         # First check that all the constructors have been added
+        if not self.environment.exists_declaration_under_name(inductive): return
         inductive_decl = self.environment.get_declaration_under_name(inductive)
         if not isinstance(inductive_decl, InductiveType):
             raise DeclarationError(f"Inductive type {inductive} not found.")
         
         found_constructors = self.number_of_added_constructors(inductive_decl)
-        if found_constructors < inductive_decl.number_of_constructors(): return False
+        if found_constructors < inductive_decl.number_of_constructors(): return
         assert(found_constructors == inductive_decl.number_of_constructors()), "Sanity check failed: number of found constructors does not match the number of expected constructors."
 
         self.check_declaration_info(inductive_decl.info)
@@ -1068,7 +1068,6 @@ class TypeChecker:
             assert isinstance(constructor_decl, Constructor), f"Sanity check failed: constructor {constructor_name} is not a constructor."
             constructor_decl.is_checked = True # CHANGES INDUCTIVE, BUT THIS IS OK
         self.environment.checking_inductive = False # CHANGES INDUCTIVE, BUT THIS IS OK
-        return True
 
     def add_recursor(self, name : Name, recursor : Recursor): # DOES NOT CHANGE ANYTHING
         #rprint(f"ADDING RECURSOR : {name}")
