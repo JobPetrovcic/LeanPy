@@ -384,18 +384,17 @@ class TypeChecker:
 
         return fold_apps(inst_f, rest_args)
 
-    def zeta_reduction(self, expr : Let) -> Expression: # DOES NOT CHANGE ANYTHING
+    def zeta_reduction(self, expr : Let) -> Tuple[FVar, Expression]: # DOES NOT CHANGE ANYTHING
         """
         Reduces the let expression by substituting the fvar with the value of the let expression into the body.
         """
-        _, sub_expr = self.instantiate_fvar( # for let expression we use fvars; it is up to the wnhf to further unfold the fvar later
+        return self.instantiate_fvar( # for let expression we use fvars; it is up to the wnhf to further unfold the fvar later
             bname=expr.bname,
             arg_type=expr.arg_type,
             arg_val=expr.val, 
             body=expr.body, 
             is_let=True
         )
-        return sub_expr
     
     @typechecked
     def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression]]]: # DOES NOT CHANGE ANYTHING
@@ -729,7 +728,8 @@ class TypeChecker:
             else:
                 r = expr
         elif isinstance(expr, Let):
-            r = self.whnf_core(self.zeta_reduction(expr), cheap_proj=cheap_proj)
+            _, r = self.zeta_reduction(expr)
+            r = self.whnf_core(r, cheap_proj=cheap_proj)
         
         if r is None:
             raise PanicError(f"Expr of type {expr.__class__.__name__} could not be matched, this should not happen.")
@@ -838,12 +838,7 @@ class TypeChecker:
             if not self.def_eq_core(inferred_val_type, e.arg_type):
                 raise ExpectedDifferentTypesError(inferred_val_type, e.arg_type)
         
-        fvar, inst_body = self.instantiate_fvar( # we are using fvars since it is up to infer_core to unfold them if needed
-            bname=e.bname, 
-            arg_type=e.arg_type, 
-            arg_val=e.val,
-            body=e.body,  
-        )
+        fvar, inst_body = self.zeta_reduction(e)
         inferred_type = self.infer_core(inst_body, infer_only=False)
         self.remove_fvar(fvar)
 
