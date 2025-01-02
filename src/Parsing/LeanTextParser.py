@@ -68,7 +68,7 @@ class LeanFormatParser:
             processed_parts.append(processed_part)
         return processed_parts
     
-    def read_same_typed_input(self, le : int, parts : List[str], expected_type : type) -> Tuple[List[Any], List[str]]:
+    def read_multiple_input(self, le : int, parts : List[str], expected_type : type) -> Tuple[List[Any], List[str]]:
         assert le>=0, "The number of elements to read must be non-negative"
         if le == 0:
             # since we are splitting " " if le = 0, we still need to remove an element from the parts
@@ -369,7 +369,7 @@ class LeanFormatParser:
         # then follow indNames
         ind_name_types = [int] * num_ind_name_idxs
         ind_name_pt = LeanFormatParser.process_types(parts[0 : num_ind_name_idxs], ind_name_types)
-        ind_name_pt, parts = self.read_same_typed_input(num_ind_name_idxs, parts, int)
+        ind_name_pt, parts = self.read_multiple_input(num_ind_name_idxs, parts, int)
 
         ind_names : List[Name] = []
         for ind_name in ind_name_pt:
@@ -384,7 +384,7 @@ class LeanFormatParser:
         parts = parts[1:]
 
         # then follow the constructor names
-        ctor_name_pt, parts = self.read_same_typed_input(num_constructors, parts, int)
+        ctor_name_pt, parts = self.read_multiple_input(num_constructors, parts, int)
 
         constructor_names : List[Name] = []
         for ctor_name in ctor_name_pt:
@@ -424,6 +424,7 @@ class LeanFormatParser:
         # NUM OF PARAMETERS IS NOT THE SAME AS NUMBER OF LEVEL PARAMETERS
         _, hid, val_eid, induct_hid, cidx, num_params, num_fields = LeanFormatParser.process_types(parts[:7], types)
         parts = parts[7:]
+        # TODO: what is cidx?
 
         # the rest are hierarchical ids for the level params
         lvl_params = self.get_lvl_params(LeanFormatParser.process_types(parts, [int] * len(parts)))
@@ -462,7 +463,7 @@ class LeanFormatParser:
         _, hid, val_type, num_ind_name_idxs = LeanFormatParser.process_types(parts[:4], types)
         parts = parts[4:]
 
-        ind_name_pt, parts = self.read_same_typed_input(num_ind_name_idxs, parts, int)
+        ind_name_pt, parts = self.read_multiple_input(num_ind_name_idxs, parts, int)
         ind_names : List[Name] = []
         for ind_name in ind_name_pt:
             ind_names.append(self.get_hierarchical_name(ind_name))
@@ -470,7 +471,7 @@ class LeanFormatParser:
         num_params, num_indices, num_motives, num_minors, num_rule_idxs = LeanFormatParser.process_types(parts[:5], [int] * 5)
         parts = parts[5:]
 
-        rule_idxs, parts = self.read_same_typed_input(num_rule_idxs, parts, int)
+        rule_idxs, parts = self.read_multiple_input(num_rule_idxs, parts, int)
         
         isK = LeanFormatParser.process_types(parts[:1], [bool])[0]
         parts = parts[1:]
@@ -531,7 +532,9 @@ class LeanFormatParser:
         elif parts[0] == "#REC": self.add_recursor_definition(parts)
         elif parts[0] == "#CTOR": self.add_constructor_definition(parts)
         elif parts[0] == "#QUOT": self.add_quotient_definition(parts)
-        elif parts[0] == "#PREFIX": raise NotImplementedError("Prefix types are not supported")
+        elif parts[0] == "#PREFIX":
+            # TODO: check that this is probably not needed
+            raise NotImplementedError("Prefix types are not supported")
         else: raise ValueError(f"None of the tags {parts[0]} and {parts[1]} are known")
 
     @staticmethod
