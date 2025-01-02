@@ -52,7 +52,7 @@ class FVar(Expression):
         return f"{self.name}-{hex(id(self))}"# : ({self.type}) := ({self.val})"
     
     def full_print(self) -> str:
-        return f"{self.full_identifier()} : ({self.type}) := ({self.val})"
+        return f"{'let ' if self.is_let else ''}{self.full_identifier()} : ({self.type}) := ({self.val})"
 
     @override
     def get_hash(self) -> int:

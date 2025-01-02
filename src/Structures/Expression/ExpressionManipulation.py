@@ -7,10 +7,6 @@ from Structures.Expression.Expression import *
 from Structures.Expression.Level import Level, LevelParam
 from Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
 
-# TODO:
-# - there might be an optimization opportunity when replacing expressions: when all expressions that an expression refers to are unchanged, the expression itself is unchanged, so no need to create a new expression
-
-
 # for fvars we are relying on total equality
 @typechecked
 def replace_expression(expr : Expression, fn : Callable[[Expression], Optional[Expression]]) -> Expression:

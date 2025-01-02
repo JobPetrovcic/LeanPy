@@ -111,6 +111,6 @@ class LevelParam(Level):
         return hash(("Param", self.name))
     
     def clone(self):
-        return LevelParam(self.name) # TODO: check if we also need to clone the name
+        return LevelParam(self.name)
 
 __all__ = ['Level', 'LevelZero', 'LevelSucc', 'LevelMax', 'LevelIMax', 'LevelParam']    

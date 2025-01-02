@@ -40,6 +40,7 @@ class LocalContext:
         raise ValueError(f"Cannot get value: FVar {fvar.full_identifier()} not found in local with: {[fvar.full_identifier() for fvar in self.fvars]})")
     
     def clear(self):
+        print(f"Context cleared")
         self.fvars.clear()
     
     def is_empty(self) -> bool:

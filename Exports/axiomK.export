@@ -1,0 +1,56 @@
+0.1.2
+1 #NS 0 Eq
+2 #NS 1 refl
+3 #NS 0 u_1
+1 #UP 3
+0 #ES 1
+1 #EV 0
+2 #EC 1 1
+3 #EV 1
+4 #EA 2 3
+5 #EA 4 1
+6 #EA 5 1
+4 #NS 0 a
+7 #EP #BD 4 1 6
+5 #NS 0 α
+8 #EP #BI 5 0 7
+#CTOR 2 8 1 0 2 0 3
+9 #ES 0
+6 #NS 4 _@
+7 #NS 6 Init
+8 #NS 7 Prelude
+9 #NS 8 _hyg
+10 #NI 9 193
+10 #EP #BD 10 3 9
+11 #NI 9 191
+11 #EP #BD 11 1 10
+12 #EP #BI 5 0 11
+#IND 1 12 0 0 2 1 1 1 1 2 3
+12 #NS 0 axiomK
+13 #EC 1 0
+14 #EV 2
+15 #EA 2 14
+16 #EA 15 3
+17 #EA 16 3
+18 #EA 13 17
+19 #EC 2 1
+20 #EA 19 14
+21 #EA 20 3
+22 #EA 18 21
+23 #EA 22 1
+13 #NS 0 h
+24 #EP #BD 13 6 23
+25 #EP #BI 4 1 24
+14 #NS 5 _@
+15 #NS 14 TestProject
+16 #NS 15 Basic
+17 #NS 16 _hyg
+18 #NI 17 19
+26 #EP #BI 18 0 25
+27 #EC 2 0
+28 #EA 27 17
+29 #EA 28 21
+30 #EL #BD 13 6 29
+31 #EL #BI 4 1 30
+32 #EL #BI 18 0 31
+#THM 12 26 32 3

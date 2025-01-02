@@ -36,6 +36,9 @@ class Declaration:
     def get_type(self) -> Expression:
         return self.info.type
 
+    def get_height(self) -> int:
+        return self.get_hint().get_height()
+
     @abstractmethod
     def has_value(self, allow_opaque : bool = False) -> bool:
         raise NotImplementedError("Method has_value not implemented for abstract class Declaration")
@@ -121,12 +124,16 @@ class InductiveType(Declaration):
 
     def has_value(self, allow_opaque : bool = False) -> bool:
         return False
+    
+    def __str__(self):
+        return f"InductiveType:\n{self.info}\n\tParams: {self.num_params}\n\tIndices: {self.num_indices}\n\tConstructors: {[str(n) for n in self.constructor_names]}\n\tRecursive: {self.is_recursive}"      
 
 class Constructor(Declaration):
     @typechecked
-    def __init__(self, info: DeclarationInfo, inductive_name: Name, num_params: int, num_fields: int):
+    def __init__(self, info: DeclarationInfo, c_index : int, inductive_name: Name, num_params: int, num_fields: int):
         super().__init__(info)
         self.inductive_name = inductive_name
+        self.c_index = c_index
         self.num_params = num_params
         self.num_fields = num_fields
 

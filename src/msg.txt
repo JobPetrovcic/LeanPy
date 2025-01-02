@@ -1,0 +1,244 @@
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort u_1 and Sort u_1
+Testing equality between α-0x7f51accec5b0 and α-0x7f51accec5b0
+Testing equality between α-0x7f51accec5b0 and α-0x7f51accec5b0
+ADDING DEFINITION : outParam
+Testing equality between Sort u and Sort u
+Testing equality between Sort u and Sort u
+Testing equality between (α : Sort u) -> (Sort u) and (α : Sort u) -> (Sort u)
+Testing equality between Sort 2 + w and Sort 2 + w
+Testing equality between Sort 2 + w and Sort 2 + w
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + v and Sort 1 + v
+Testing equality between (outParam.{2 + w}) (Sort 1 + w) and (outParam.{2 + w}) (Sort 1 + w)
+ADDING DEFINITION : HMul.hMul
+Testing equality between Sort 2 + w and Sort 2 + w
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + v and Sort 1 + v
+Testing equality between (outParam.{2 + w}) (Sort 1 + w) and (outParam.{2 + w}) (Sort 1 + w)
+Testing equality between Sort 2 + w and Sort 2 + w
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + v and Sort 1 + v
+Testing equality between (outParam.{2 + w}) (Sort 1 + w) and (outParam.{2 + w}) (Sort 1 + w)
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + v and Sort 1 + v
+Testing equality between (outParam.{2 + w}) (Sort 1 + w) and (outParam.{2 + w}) (Sort 1 + w)
+Testing equality between HMul.{u, v, w} and HMul.{u, v, w}
+Testing equality between α-0x7f51aca5d630 and α-0x7f51aca5d630
+Testing equality between β-0x7f51aca5fb80 and β-0x7f51aca5fb80
+Testing equality between (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (β-0x7f51aca5fb80)) (γ-0x7f51aca5cc70) and (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (β-0x7f51aca5fb80)) (γ-0x7f51aca5cc70)
+Testing equality between α-0x7f51aca5d630 and α-0x7f51aca5d630
+Testing equality between β-0x7f51aca5fb80 and β-0x7f51aca5fb80
+Testing equality between γ-0x7f51aca5cc70 and γ-0x7f51aca5cc70
+Testing equality between (a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (γ-0x7f51aca5cc70) and (a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (γ-0x7f51aca5cc70)
+Testing equality between (a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (γ-0x7f51aca5cc70)) and (a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (γ-0x7f51aca5cc70))
+Testing equality between (self : (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (β-0x7f51aca5fb80)) (γ-0x7f51aca5cc70)) -> ((a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (γ-0x7f51aca5cc70))) and (self : (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (β-0x7f51aca5fb80)) (γ-0x7f51aca5cc70)) -> ((a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (γ-0x7f51aca5cc70)))
+Testing equality between (γ : (outParam.{2 + w}) (Sort 1 + w)) -> ((self : (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (β-0x7f51aca5fb80)) (db0)) -> ((a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (db3)))) and (γ : (outParam.{2 + w}) (Sort 1 + w)) -> ((self : (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (β-0x7f51aca5fb80)) (db0)) -> ((a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : β-0x7f51aca5fb80) -> (db3))))
+Testing equality between (β : Sort 1 + v) -> ((γ : (outParam.{2 + w}) (Sort 1 + w)) -> ((self : (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (db1)) (db0)) -> ((a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : db3) -> (db3))))) and (β : Sort 1 + v) -> ((γ : (outParam.{2 + w}) (Sort 1 + w)) -> ((self : (((HMul.{u, v, w}) (α-0x7f51aca5d630)) (db1)) (db0)) -> ((a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5d630) -> ((a._@.Init.Prelude._hyg.2559 : db3) -> (db3)))))
+Testing equality between (α : Sort 1 + u) -> ((β : Sort 1 + v) -> ((γ : (outParam.{2 + w}) (Sort 1 + w)) -> ((self : (((HMul.{u, v, w}) (db2)) (db1)) (db0)) -> ((a._@.Init.Prelude._hyg.2557 : db3) -> ((a._@.Init.Prelude._hyg.2559 : db3) -> (db3)))))) and (α : Sort 1 + u) -> ((β : Sort 1 + v) -> ((γ : (outParam.{2 + w}) (Sort 1 + w)) -> ((self : (((HMul.{u, v, w}) (db2)) (db1)) (db0)) -> ((a._@.Init.Prelude._hyg.2557 : db3) -> ((a._@.Init.Prelude._hyg.2559 : db3) -> (db3))))))
+ADDING DEFINITION : Mul.mul
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Mul.{u} and Mul.{u}
+Testing equality between (Mul.{u}) (α-0x7f51aca5d240) and (Mul.{u}) (α-0x7f51aca5d240)
+Testing equality between α-0x7f51aca5d240 and α-0x7f51aca5d240
+Testing equality between α-0x7f51aca5d240 and α-0x7f51aca5d240
+Testing equality between α-0x7f51aca5d240 and α-0x7f51aca5d240
+Testing equality between (a._@.Init.Prelude._hyg.2753 : α-0x7f51aca5d240) -> (α-0x7f51aca5d240) and (a._@.Init.Prelude._hyg.2753 : α-0x7f51aca5d240) -> (α-0x7f51aca5d240)
+Testing equality between (a._@.Init.Prelude._hyg.2751 : α-0x7f51aca5d240) -> ((a._@.Init.Prelude._hyg.2753 : α-0x7f51aca5d240) -> (α-0x7f51aca5d240)) and (a._@.Init.Prelude._hyg.2751 : α-0x7f51aca5d240) -> ((a._@.Init.Prelude._hyg.2753 : α-0x7f51aca5d240) -> (α-0x7f51aca5d240))
+Testing equality between (self : (Mul.{u}) (α-0x7f51aca5d240)) -> ((a._@.Init.Prelude._hyg.2751 : α-0x7f51aca5d240) -> ((a._@.Init.Prelude._hyg.2753 : α-0x7f51aca5d240) -> (α-0x7f51aca5d240))) and (self : (Mul.{u}) (α-0x7f51aca5d240)) -> ((a._@.Init.Prelude._hyg.2751 : α-0x7f51aca5d240) -> ((a._@.Init.Prelude._hyg.2753 : α-0x7f51aca5d240) -> (α-0x7f51aca5d240)))
+Testing equality between (α : Sort 1 + u) -> ((self : (Mul.{u}) (db0)) -> ((a._@.Init.Prelude._hyg.2751 : db1) -> ((a._@.Init.Prelude._hyg.2753 : db2) -> (db3)))) and (α : Sort 1 + u) -> ((self : (Mul.{u}) (db0)) -> ((a._@.Init.Prelude._hyg.2751 : db1) -> ((a._@.Init.Prelude._hyg.2753 : db2) -> (db3))))
+ADDING DEFINITION : instHMul
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between (outParam.{2 + u_1}) (Sort 1 + u_1) and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between (outParam.{2 + u_1}) (Sort 1 + u_1) and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Mul.{u_1} and Mul.{u_1}
+Testing equality between (Mul.{u_1}) (α-0x7f51aca5fa90) and (Mul.{u_1}) (α-0x7f51aca5fa90)
+Testing equality between α-0x7f51aca5fa90 and α-0x7f51aca5fa90
+Testing equality between α-0x7f51aca5fa90 and α-0x7f51aca5fa90
+Testing equality between α-0x7f51aca5fa90 and α-0x7f51aca5fa90
+Testing equality between α-0x7f51aca5fa90 and α-0x7f51aca5fa90
+Testing equality between α-0x7f51aca5fa90 and α-0x7f51aca5fa90
+Testing equality between (a._@.Init.Prelude._hyg.2559 : α-0x7f51aca5fa90) -> (α-0x7f51aca5fa90) and (b : α-0x7f51aca5fa90) -> (α-0x7f51aca5fa90)
+Testing equality between (a._@.Init.Prelude._hyg.2557 : α-0x7f51aca5fa90) -> ((a._@.Init.Prelude._hyg.2559 : α-0x7f51aca5fa90) -> (α-0x7f51aca5fa90)) and (a : α-0x7f51aca5fa90) -> ((b : α-0x7f51aca5fa90) -> (α-0x7f51aca5fa90))
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Mul.{u_1} and Mul.{u_1}
+Testing equality between (Mul.{u_1}) (α-0x7f51aca5cc40) and (Mul.{u_1}) (α-0x7f51aca5cc40)
+Testing equality between HMul.{u_1, u_1, u_1} and HMul.{u_1, u_1, u_1}
+Testing equality between α-0x7f51aca5cc40 and α-0x7f51aca5cc40
+Testing equality between α-0x7f51aca5cc40 and α-0x7f51aca5cc40
+Testing equality between (((HMul.{u_1, u_1, u_1}) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40) and (((HMul.{u_1, u_1, u_1}) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40)
+Testing equality between (inst._@.Init.Prelude._hyg.2958 : (Mul.{u_1}) (α-0x7f51aca5cc40)) -> ((((HMul.{u_1, u_1, u_1}) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40)) and (inst._@.Init.Prelude._hyg.2958 : (Mul.{u_1}) (α-0x7f51aca5cc40)) -> ((((HMul.{u_1, u_1, u_1}) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40)) (α-0x7f51aca5cc40))
+Testing equality between (α : Sort 1 + u_1) -> ((inst._@.Init.Prelude._hyg.2958 : (Mul.{u_1}) (db0)) -> ((((HMul.{u_1, u_1, u_1}) (db1)) (db1)) (db1))) and (α : Sort 1 + u_1) -> ((inst._@.Init.Prelude._hyg.2958 : (Mul.{u_1}) (db0)) -> ((((HMul.{u_1, u_1, u_1}) (db1)) (db1)) (db1)))
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between (outParam.{2 + u}) (Sort 1 + u) and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Mul.{u} and Mul.{u}
+Testing equality between (Mul.{u}) (G-0x7f51aca5caf0) and (Mul.{u}) (G-0x7f51aca5caf0)
+Testing equality between HMul.{u, u, u} and HMul.{u, u, u}
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0) and (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between (outParam.{2 + u}) (Sort 1 + u) and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Mul.{u} and Mul.{u}
+Testing equality between (Mul.{u}) (G-0x7f51aca5caf0) and (Mul.{u}) (G-0x7f51aca5caf0)
+Testing equality between HMul.{u, u, u} and HMul.{u, u, u}
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0) and (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between (outParam.{2 + u}) (Sort 1 + u) and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Mul.{u} and Mul.{u}
+Testing equality between (Mul.{u}) (G-0x7f51aca5caf0) and (Mul.{u}) (G-0x7f51aca5caf0)
+Testing equality between HMul.{u, u, u} and HMul.{u, u, u}
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0) and (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between (outParam.{2 + u}) (Sort 1 + u) and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Mul.{u} and Mul.{u}
+Testing equality between (Mul.{u}) (G-0x7f51aca5caf0) and (Mul.{u}) (G-0x7f51aca5caf0)
+Testing equality between HMul.{u, u, u} and HMul.{u, u, u}
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0) and (((HMul.{u, u, u}) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)) (G-0x7f51aca5caf0)
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between G-0x7f51aca5caf0 and G-0x7f51aca5caf0
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+ADDING DEFINITION : Semigroup.toMul
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Semigroup.{u} and Semigroup.{u}
+Testing equality between (Semigroup.{u}) (G-0x7f51aca5f340) and (Semigroup.{u}) (G-0x7f51aca5f340)
+Testing equality between Mul.{u} and Mul.{u}
+Testing equality between (Mul.{u}) (G-0x7f51aca5f340) and (Mul.{u}) (G-0x7f51aca5f340)
+Testing equality between (self : (Semigroup.{u}) (G-0x7f51aca5f340)) -> ((Mul.{u}) (G-0x7f51aca5f340)) and (self : (Semigroup.{u}) (G-0x7f51aca5f340)) -> ((Mul.{u}) (G-0x7f51aca5f340))
+Testing equality between (G : Sort 1 + u) -> ((self : (Semigroup.{u}) (db0)) -> ((Mul.{u}) (db1))) and (G : Sort 1 + u) -> ((self : (Semigroup.{u}) (db0)) -> ((Mul.{u}) (db1)))
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Nat.{} and Nat.{}
+ADDING DEFINITION : OfNat.ofNat
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Nat.{} and Nat.{}
+Testing equality between OfNat.{u} and OfNat.{u}
+Testing equality between α-0x7f51acb853c0 and α-0x7f51acb853c0
+Testing equality between ((OfNat.{u}) (α-0x7f51acb853c0)) (x._@.Init.Prelude._hyg.2237-0x7f51acb86ad0) and ((OfNat.{u}) (α-0x7f51acb853c0)) (x._@.Init.Prelude._hyg.2237-0x7f51acb86ad0)
+Testing equality between α-0x7f51acb853c0 and α-0x7f51acb853c0
+Testing equality between (self : ((OfNat.{u}) (α-0x7f51acb853c0)) (x._@.Init.Prelude._hyg.2237-0x7f51acb86ad0)) -> (α-0x7f51acb853c0) and (self : ((OfNat.{u}) (α-0x7f51acb853c0)) (x._@.Init.Prelude._hyg.2237-0x7f51acb86ad0)) -> (α-0x7f51acb853c0)
+Testing equality between (x._@.Init.Prelude._hyg.2237 : Nat.{}) -> ((self : ((OfNat.{u}) (α-0x7f51acb853c0)) (db0)) -> (α-0x7f51acb853c0)) and (x._@.Init.Prelude._hyg.2237 : Nat.{}) -> ((self : ((OfNat.{u}) (α-0x7f51acb853c0)) (db0)) -> (α-0x7f51acb853c0))
+Testing equality between (α : Sort 1 + u) -> ((x._@.Init.Prelude._hyg.2237 : Nat.{}) -> ((self : ((OfNat.{u}) (db1)) (db0)) -> (db2))) and (α : Sort 1 + u) -> ((x._@.Init.Prelude._hyg.2237 : Nat.{}) -> ((self : ((OfNat.{u}) (db1)) (db0)) -> (db2)))
+ADDING DEFINITION : One.one
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between One.{u} and One.{u}
+Testing equality between (One.{u}) (α-0x7f51acb85a50) and (One.{u}) (α-0x7f51acb85a50)
+Testing equality between α-0x7f51acb85a50 and α-0x7f51acb85a50
+Testing equality between (self : (One.{u}) (α-0x7f51acb85a50)) -> (α-0x7f51acb85a50) and (self : (One.{u}) (α-0x7f51acb85a50)) -> (α-0x7f51acb85a50)
+Testing equality between (α : Sort 1 + u) -> ((self : (One.{u}) (db0)) -> (db1)) and (α : Sort 1 + u) -> ((self : (One.{u}) (db0)) -> (db1))
+ADDING DEFINITION : One.toOfNat1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between One.{u_1} and One.{u_1}
+Testing equality between (One.{u_1}) (α-0x7f51acb86fb0) and (One.{u_1}) (α-0x7f51acb86fb0)
+Testing equality between α-0x7f51acb86fb0 and α-0x7f51acb86fb0
+Testing equality between Sort 1 + u_1 and Sort 1 + u_1
+Testing equality between One.{u_1} and One.{u_1}
+Testing equality between (One.{u_1}) (α-0x7f51acb84d60) and (One.{u_1}) (α-0x7f51acb84d60)
+Testing equality between OfNat.{u_1} and OfNat.{u_1}
+Testing equality between α-0x7f51acb84d60 and α-0x7f51acb84d60
+Testing equality between ((OfNat.{u_1}) (α-0x7f51acb84d60)) (1) and ((OfNat.{u_1}) (α-0x7f51acb84d60)) (1)
+Testing equality between (inst._@.Mathlib.Algebra.Group.ZeroOne._hyg.16 : (One.{u_1}) (α-0x7f51acb84d60)) -> (((OfNat.{u_1}) (α-0x7f51acb84d60)) (1)) and (inst._@.Mathlib.Algebra.Group.ZeroOne._hyg.16 : (One.{u_1}) (α-0x7f51acb84d60)) -> (((OfNat.{u_1}) (α-0x7f51acb84d60)) (1))
+Testing equality between (α : Sort 1 + u_1) -> ((inst._@.Mathlib.Algebra.Group.ZeroOne._hyg.16 : (One.{u_1}) (db0)) -> (((OfNat.{u_1}) (db1)) (1))) and (α : Sort 1 + u_1) -> ((inst._@.Mathlib.Algebra.Group.ZeroOne._hyg.16 : (One.{u_1}) (db0)) -> (((OfNat.{u_1}) (db1)) (1)))
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+ADDING DEFINITION : LT.lt
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between LT.{u} and LT.{u}
+Testing equality between (LT.{u}) (α-0x7f51acb86d40) and (LT.{u}) (α-0x7f51acb86d40)
+Testing equality between α-0x7f51acb86d40 and α-0x7f51acb86d40
+Testing equality between α-0x7f51acb86d40 and α-0x7f51acb86d40
+Testing equality between Sort 0 and Sort 0
+Testing equality between (a._@.Init.Prelude._hyg.193 : α-0x7f51acb86d40) -> (Sort 0) and (a._@.Init.Prelude._hyg.2266 : α-0x7f51acb86d40) -> (Sort 0)
+Testing equality between (a._@.Init.Prelude._hyg.191 : α-0x7f51acb86d40) -> ((a._@.Init.Prelude._hyg.193 : α-0x7f51acb86d40) -> (Sort 0)) and (a._@.Init.Prelude._hyg.2264 : α-0x7f51acb86d40) -> ((a._@.Init.Prelude._hyg.2266 : α-0x7f51acb86d40) -> (Sort 0))
+Testing equality between (self : (LT.{u}) (α-0x7f51acb86d40)) -> ((a._@.Init.Prelude._hyg.191 : α-0x7f51acb86d40) -> ((a._@.Init.Prelude._hyg.193 : α-0x7f51acb86d40) -> (Sort 0))) and (self : (LT.{u}) (α-0x7f51acb86d40)) -> ((a._@.Init.Prelude._hyg.2264 : α-0x7f51acb86d40) -> ((a._@.Init.Prelude._hyg.2266 : α-0x7f51acb86d40) -> (Sort 0)))
+Testing equality between (α : Sort 1 + u) -> ((self : (LT.{u}) (db0)) -> ((a._@.Init.Prelude._hyg.191 : db1) -> ((a._@.Init.Prelude._hyg.193 : db2) -> (Sort 0)))) and (α : Sort 1 + u) -> ((self : (LT.{u}) (db0)) -> ((a._@.Init.Prelude._hyg.2264 : db1) -> ((a._@.Init.Prelude._hyg.2266 : db2) -> (Sort 0))))
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+ADDING DEFINITION : Nat.lt
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Sort 0 and Sort 0
+Testing equality between (m : Nat.{}) -> (Sort 0) and (a._@.Init.Prelude._hyg.4106 : Nat.{}) -> (Sort 0)
+Testing equality between (n : Nat.{}) -> ((m : Nat.{}) -> (Sort 0)) and (n : Nat.{}) -> ((a._@.Init.Prelude._hyg.4106 : Nat.{}) -> (Sort 0))
+ADDING DEFINITION : instLTNat
+Testing equality between Sort 1 and Sort 1
+Testing equality between Sort 1 and Sort 1
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Sort 0 and Sort 0
+Testing equality between (a._@.Init.Prelude._hyg.193 : Nat.{}) -> (Sort 0) and (a._@.Init.Prelude._hyg.4106 : Nat.{}) -> (Sort 0)
+Testing equality between (a._@.Init.Prelude._hyg.191 : Nat.{}) -> ((a._@.Init.Prelude._hyg.193 : Nat.{}) -> (Sort 0)) and (n : Nat.{}) -> ((a._@.Init.Prelude._hyg.4106 : Nat.{}) -> (Sort 0))
+Testing equality between LT.{0} and LT.{0}
+Testing equality between (LT.{0}) (Nat.{}) and (LT.{0}) (Nat.{})
+Testing equality between Sort 1 and Sort 1
+Testing equality between LT.{0} and LT.{0}
+Testing equality between (LT.{0}) (Nat.{}) and (LT.{0}) (Nat.{})
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Nat.{} and Nat.{}
+Testing equality between Sort 2 + w and Sort 2 + w
+Testing equality between Sort 2 + w and Sort 2 + w
+Testing equality between Sort 1 + u and Sort 1 + u
+Testing equality between Sort 1 + v and Sort 1 + v
+Testing equality between (outParam.{2 + w}) (Sort 1 + w) and (outParam.{2 + w}) (Sort 1 + w)
+ADDING DEFINITION : HPow.hPow
+Testing equality between Sort 2 + w and Sort 2 + w

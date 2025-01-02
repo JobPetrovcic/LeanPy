@@ -1,4 +1,5 @@
 from typing import Type
+from Structures.Environment.LocalContext import LocalContext
 from Structures.Expression.Expression import Expression
 
 
@@ -16,8 +17,8 @@ class ExpectedDifferentExpressionError(KernelError):
         super().__init__(f"Expected expression of type {expected.__name__} but got {got.__name__}")
 
 class ExpectedDifferentTypesError(KernelError):
-    def __init__(self, expected : Expression, got : Expression):
-        super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}")
+    def __init__(self, expected : Expression, got : Expression, local_context : LocalContext | None = None):
+        super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}" + (f"\nLocal context:\n{local_context}" if local_context is not None else ""))
 
 class ProjectionError(KernelError):
     def __init__(self, message : str):

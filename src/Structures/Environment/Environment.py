@@ -20,7 +20,7 @@ class Environment:
         self.init_bases()
         self.name_dict : Dict[Name, Declaration ] = {}
     
-    # SPECIAL STRUCTURES : Nat, String, Quot (TODO : List)
+    # SPECIAL STRUCTURES : Nat, String, Quot, List
 
     def create_name_from_str(self, name_str : str) -> Name:
         """ Creates a name from a string. """

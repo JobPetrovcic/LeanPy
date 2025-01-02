@@ -157,7 +157,7 @@ class ExpressionToPython:
             constructor_names_str = f"[{', '.join([self.get_name(n) for n in decl.constructor_names])}]"
             return f"InductiveType(info={self.get_declaration_info_value_str(decl.info)}, is_recursive={decl.is_recursive}, num_params={decl.num_params}, num_indices={decl.num_indices}, all_inductive_names={all_inductive_names_str}, constructor_names={constructor_names_str})"
         elif isinstance(decl, Constructor):
-            return f"Constructor(info={self.get_declaration_info_value_str(decl.info)}, inductive_name={self.get_name(decl.inductive_name)}, num_params={decl.num_params}, num_fields={decl.num_fields})"
+            return f"Constructor(info={self.get_declaration_info_value_str(decl.info)}, c_index={decl.c_index}, inductive_name={self.get_name(decl.inductive_name)}, num_params={decl.num_params}, num_fields={decl.num_fields})"
         elif isinstance(decl, Recursor):
             recursion_rules_str = f"[{', '.join([self.get_recursion_rule_value_str(r, python_name + '_rec_rule' + str(i)) for i, r in enumerate(decl.recursion_rules)])}]"
             return f"Recursor(info={self.get_declaration_info_value_str(decl.info)}, num_params={decl.num_params}, num_indices={decl.num_indices}, num_motives={decl.num_motives}, num_minors={decl.num_minors}, recursion_rules={recursion_rules_str}, isK={decl.isK})"
