@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
 
@@ -165,7 +165,7 @@ def instantiate_bvar(body : Expression, val : Expression) -> Expression:
         return None
     return replace_expression_w_depth(body, intantiation_fn, 0)
 
-def instantiate_bvars(body : Expression, vals : List[Expression]) -> Expression:
+def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Expression:
     """
     Replaces the outermost bound variables in the given expression with the given free variables. Throws an error if it finds an unbound bvar index.
     """
@@ -177,7 +177,6 @@ def instantiate_bvars(body : Expression, vals : List[Expression]) -> Expression:
         return None
     return replace_expression_w_depth(body, instantiation_fn, 0)
 
-
 @typechecked
 def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     # turns fvar into a bound variable with de Bruijn index depth
@@ -188,6 +187,15 @@ def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
         return None
     
     return replace_expression_w_depth(body, abstraction_fn, 0)
+
+def abstract_multiple_bvar(fvars : List[FVar], body : Expression) -> Expression:
+    """ Abstracts multiple free variables in the given expression. """
+    def replace_fn(expr : Expression, depth : int) -> Optional[Expression]:
+        if isinstance(expr, FVar):
+            for i, fvar in enumerate(fvars):
+                if fvar == expr: return BVar(dbj_id=depth + i)
+        return None
+    return replace_expression_w_depth(body, replace_fn, 0)
 
 def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression]]:
     """ If expr is of form (... ((f a1) a2) ... an), returns f, [a1, a2, ..., an]. """
@@ -235,6 +243,15 @@ def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:
     do_fn(expr, fn)
     return has_fvar
 
+def has_fvar(expr : Expression) -> bool:
+    """ Returns True if the given expression contains a free variable. """
+    has_fvar = False
+    def fn(expr : Expression):
+        nonlocal has_fvar
+        if isinstance(expr, FVar): has_fvar = True
+    do_fn(expr, fn)
+    return has_fvar
+
 def level_zip(lvl_params : List[LevelParam], lvl_values : List[Level]) -> LevelSubList:
     """ Checks if the two lists of levels have the same length and zips them together. """
     if len(lvl_params) != len(lvl_values): raise ValueError("Found different number of level parameters.")
@@ -272,3 +289,13 @@ class ReductionStatus(Enum):
     EQUAL = 1
     CONTINUE = 2
     UNKNOWN = 3
+
+def mark_used(expr : Expression, fvars : List[FVar], used : List[bool], le : int):
+    assert le <= len(fvars)
+    assert len(used) == len(fvars)
+    """ Marks the free variables in the given expression as used. """
+    def mark_fn(expr : Expression):
+        if isinstance(expr, FVar):
+            for i in range(le):
+                if fvars[i] == expr: used[i] = True
+    do_fn(expr, mark_fn)

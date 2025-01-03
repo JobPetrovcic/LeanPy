@@ -73,6 +73,11 @@ class Environment:
         self.Quot_mk_name = SubName(self.Quot_name, "mk")
         self.Quot_lift_name = SubName(self.Quot_name, "lift")
         self.Quot_ind_name = SubName(self.Quot_name, "ind")
+
+        # Bool constants
+        self.Bool_name = self.create_name_from_str("Bool")
+        self.Bool_true_name = SubName(self.Bool_name, "true")
+        self.Bool_false_name = SubName(self.Bool_name, "false")
                                         
 
     @typechecked

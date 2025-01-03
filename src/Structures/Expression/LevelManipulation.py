@@ -189,16 +189,7 @@ def is_any_max(level : Level) -> bool:
     return isinstance(level, LevelMax) or isinstance(level, LevelIMax)
 
 def is_equivalent(l : Level, r : Level) -> bool:
-    #print(f"Comparing {l} and {r}")
-    #nl = normalize(l)
-    #nr = normalize(r)
-
-    #print(f"Normalized {nl} and {nr}")
-    #print(equally_defined(nl, nr))
-    return True # TODO
-    ret = (l is r) or equally_defined(l, r) or equally_defined(normalize(l), normalize(r))
-    
-    return ret
+    return (l is r) or equally_defined(l, r) or equally_defined(normalize(l), normalize(r))
 
 def is_equivalent_list(l : List[Level], r : List[Level]) -> bool:
     if len(l) != len(r): return False

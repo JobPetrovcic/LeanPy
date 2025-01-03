@@ -59,7 +59,7 @@ class FVar(Expression):
         return hash(("FVar", hash(self.name)))
     
     def __str__(self) -> str:
-        return self.full_identifier()
+        return f"F{self.name}" + (f":= {self.val}" if self.val is not None else "")
 
 class Sort(Expression):
     @typechecked
@@ -100,7 +100,12 @@ class App(Expression):
         return hash(("App", hash(self.fn), hash(self.arg)))
     
     def __str__(self) -> str:
-        return f"({self.fn}) ({self.arg})"
+        args : List[Expression] = []
+        fn = self
+        while isinstance(fn, App):
+            args.append(fn.arg)
+            fn = fn.fn
+        return f"({fn} |> {'|> '.join(map(str, args))})"
 
 class Pi(Expression):
     @typechecked

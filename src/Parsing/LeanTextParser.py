@@ -289,7 +289,7 @@ class LeanFormatParser:
         if hint == "O":
             rhint = OpaqueHint()
         elif hint == "R":
-            n = LeanFormatParser.process_types(parts[0], [int])[0]
+            n = LeanFormatParser.process_types(parts[:1], [int])[0]
             rhint = Regular(n)
             parts = parts[1:]
         elif hint == "A":
