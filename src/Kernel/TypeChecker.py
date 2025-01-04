@@ -2,6 +2,7 @@ from typing import List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
 from Kernel.Analysis import has_fvar_not_in_context, print_neg
+from Kernel.Cache.EquivManager import EquivManager
 from Kernel.Cache.Cache import InferCache, WHNFCache
 from Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
 from Structures.Environment.Declaration.DeclarationManipulation import is_structural_inductive
@@ -32,6 +33,8 @@ class TypeChecker:
         self.whnf_cache = WHNFCache()
         self.whnf_core_cache = WHNFCache()
         self.infer_cache = InferCache()
+
+        self.equiv_manager = EquivManager()
 
         self.environment = Environment()
         self.local_context = LocalContext()
@@ -112,26 +115,26 @@ class TypeChecker:
         else: raise ExpectedDifferentExpressionError(Pi, expr.__class__)
 
     @typechecked
-    def is_structure_like(self, decl_name : Name) -> bool: # DOES NOT CHANGE ANYTHING
+    def is_structure_like(self, decl_name : Name) -> bool:
         decl = self.environment.get_declaration_under_name(decl_name)
         if not isinstance(decl, InductiveType): return False
         return is_structural_inductive(decl) and decl.num_indices == 0 and not decl.is_recursive
     
     @typechecked
-    def is_prop(self, e : Expression): # DOES NOT CHANGE ANYTHING
+    def is_prop(self, e : Expression):
         inferred_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True)))
         return isinstance(inferred_type, Sort) and is_equivalent(inferred_type.level, self.environment.level_zero)
 
     # DEFINITIONAL EQUALITY
     @typechecked
-    def def_eq_sort(self, l : Sort, r : Sort) -> bool: # DOES NOT CHANGE ANYTHING
+    def def_eq_sort(self, l : Sort, r : Sort) -> bool:
         """Sorts are equal if their levels satisfy antisymmetry.
         The comparsion function does not change anything, so def_eq_sort is safe to use when passing by reference.
         """
         return is_equivalent(l.level, r.level)
 
     @typechecked
-    def def_eq_const(self, l : Const, r : Const) -> bool: # DOES NOT CHANGE ANYTHING
+    def def_eq_const(self, l : Const, r : Const) -> bool:
         """
         If the names are the same, and the level parameters are equal, then the constants are equal.
         Since nothing is changed, this function is safe to use when passing by reference.
@@ -142,21 +145,21 @@ class TypeChecker:
         return False
 
     @typechecked
-    def def_eq_app(self, l : App, r : App) -> bool: # DOES NOT CHANGE ANYTHING
+    def def_eq_app(self, l : App, r : App) -> bool:
         f_fn, f_args = unfold_app(l.fn)
         g_fn, g_args = unfold_app(r.fn)
-        if not self.def_eq_core(f_fn, g_fn):
+        if not self.def_eq(f_fn, g_fn):
             return False
         
         if len(f_args) != len(g_args): return False
         for f_arg, g_arg in zip(f_args, g_args):
-            if not self.def_eq_core(f_arg, g_arg):
+            if not self.def_eq(f_arg, g_arg):
                 return False
         return True
 
     @typechecked
-    def def_eq_pi(self, l: Pi, r: Pi) -> bool: # DOES NOT CHANGE ANYTHING
-        if not self.def_eq_core(l.arg_type, r.arg_type):
+    def def_eq_pi(self, l: Pi, r: Pi) -> bool:
+        if not self.def_eq(l.arg_type, r.arg_type):
             return False
         
         fvar, (l_n, r_n) = self.instantiate_fvar_multiple_bodies(
@@ -166,13 +169,13 @@ class TypeChecker:
             bodies=[l.body_type, r.body_type]
         )
 
-        result = self.def_eq_core(l_n, r_n) 
+        result = self.def_eq(l_n, r_n) 
         self.remove_fvar(fvar)
         return result
 
     @typechecked
-    def def_eq_lambda(self, l : Lambda, r : Lambda) -> bool: # DOES NOT CHANGE ANYTHING
-        if not self.def_eq_core(l.arg_type, r.arg_type):
+    def def_eq_lambda(self, l : Lambda, r : Lambda) -> bool:
+        if not self.def_eq(l.arg_type, r.arg_type):
             return False
         
         fvar, (l_n, r_n) = self.instantiate_fvar_multiple_bodies(
@@ -181,7 +184,7 @@ class TypeChecker:
             arg_val=None,
             bodies=[l.body, r.body], 
         )
-        ret = self.def_eq_core(l_n, r_n)
+        ret = self.def_eq(l_n, r_n)
         self.remove_fvar(fvar)
         return ret
 
@@ -200,7 +203,7 @@ class TypeChecker:
         if not self.is_structure_like(decl.inductive_name): return False
 
         # Third part: ensure that the types are equal
-        if not self.def_eq_core(
+        if not self.def_eq(
             self.infer_core(t, infer_only=(self.allow_loose_infer and True)),
             self.infer_core(s, infer_only=(self.allow_loose_infer and True)),
         ): return False
@@ -212,15 +215,15 @@ class TypeChecker:
             t_i_proj = Proj(type_name=decl.inductive_name, index=i-decl.num_params, struct=t)
 
             # compare the arguments
-            if not self.def_eq_core(t_i_proj, s_args[i]): return False
+            if not self.def_eq(t_i_proj, s_args[i]): return False
         return True
 
     @typechecked
-    def try_structural_eta_expansion(self, l : Expression, r : Expression) -> bool: # DOES NOT CHANGE ANYTHING
+    def try_structural_eta_expansion(self, l : Expression, r : Expression) -> bool:
         return self.try_structural_eta_expansion_core(l, r) or self.try_structural_eta_expansion_core(r, l)
     
     @typechecked
-    def try_eta_expansion_core(self, t : Expression, s : Expression) -> bool: # DOES NOT CHANGE ANYTHING
+    def try_eta_expansion_core(self, t : Expression, s : Expression) -> bool:
         """
         Tries to eta expand s: if s is a function, then by eta expansion, it is equal to the expression "fun x => s x".
         Always assumes that t and s were cloned beforehand.
@@ -232,10 +235,10 @@ class TypeChecker:
         if not isinstance(s_type, Pi): 
             return False
         new_s = Lambda(bname=s_type.bname, arg_type=s_type.arg_type, body=App(s, BVar(0)))
-        return self.def_eq_core(t, new_s)
+        return self.def_eq(t, new_s)
 
     @typechecked
-    def try_eta_expansion(self, t : Expression, s : Expression) -> bool: # DOES NOT CHANGE ANYTHING
+    def try_eta_expansion(self, t : Expression, s : Expression) -> bool:
         """
         Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y.
         Always assumes that x and y were cloned beforehand.
@@ -243,7 +246,9 @@ class TypeChecker:
         return self.try_eta_expansion_core(t, s) or self.try_eta_expansion_core(s, t)
     
     @typechecked
-    def def_eq_easy(self, l: Expression, r: Expression) -> Optional[bool]: # DOES NOT CHANGE ANYTHING
+    def def_eq_easy(self, l: Expression, r: Expression) -> Optional[bool]:
+        if self.equiv_manager.were_found_and_equiv(l, r): return True
+
         if isinstance(l, Sort) and isinstance(r, Sort): return self.def_eq_sort(l, r)
         elif isinstance(l, BVar) or isinstance(r, BVar): raise PanicError("BVar should have been substituted by now, when comparing expressions for definitional equality.")
         elif isinstance(l, FVar) and isinstance(r, FVar): return l is r
@@ -256,13 +261,13 @@ class TypeChecker:
         elif isinstance(l, StringLit) and isinstance(r, StringLit): return l.val == r.val
     
     @typechecked
-    def is_def_eq_proof_irrel(self, t : Expression, s : Expression) -> Optional[bool]: # DOES NOT CHANGE ANYTHING
+    def def_eq_proof_irrel(self, t : Expression, s : Expression) -> Optional[bool]:
         """ Proof irrelevance support for propositions. If two expressions have equal types, and the types are proposition, then the expressions are considered equal. """
         t_type = self.infer_core(t, infer_only=(self.allow_loose_infer and True))
         if not self.is_prop(t_type):
             return None
         s_type = self.infer_core(s, infer_only=(self.allow_loose_infer and True))
-        return self.def_eq_core(t_type, s_type)
+        return self.def_eq(t_type, s_type)
     
     @typechecked
     def def_eq_unit_like(self, t : Expression, s : Expression) -> bool:
@@ -301,7 +306,7 @@ class TypeChecker:
             is_easy = self.def_eq_easy(l_n, r_n)
             if is_easy is not None: return is_easy
 
-        is_proof_irr = self.is_def_eq_proof_irrel(l_n, r_n)
+        is_proof_irr = self.def_eq_proof_irrel(l_n, r_n)
         if is_proof_irr is not None: return is_proof_irr
 
         l_n_n, r_n_n, try_lazy = self.lazy_delta_reduction(l_n, r_n)
@@ -338,12 +343,17 @@ class TypeChecker:
 
         return False
     
+    def def_eq(self, l: Expression, r: Expression) -> bool:
+        ret = self.def_eq_core(l, r)
+        if ret: self.equiv_manager.add_equiv(l, r)
+        return ret
+    
     # REDUCTIONS
     @typechecked
     def beta_reduction(self, 
             f : Expression, #  ( ... ((f a_1) a_2) ... a_n -> f, [a_1, a_2, ..., a_n] outermost to innermost
             args : List[Expression]
-        ) -> Expression: # DOES NOT CHANGE ANYTHING
+        ) -> Expression:
         """
         Reduces the application by substituting the argument in the body.
         """
@@ -361,7 +371,7 @@ class TypeChecker:
         return fold_apps(inst_f, rest_args)
     
     @typechecked
-    def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression]]]: # DOES NOT CHANGE ANYTHING
+    def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression]]]:
         """Checks if the expression is delta reducible: if it is an application of a declaration, then it returns the declaration and the arguments. Otherwise, it returns None."""
         fn, args = unfold_app(expr)
         #print(f"checking if {fn} is a delta")
@@ -375,13 +385,13 @@ class TypeChecker:
         return fn, decl, args
 
     @typechecked
-    def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression: # DOES NOT CHANGE ANYTHING
+    def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression:
         assert fn.name == decl.info.name
         decl_val = self.environment.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params)
         return fold_apps(decl_val, args)
 
     @typechecked
-    def delta_reduction(self, expr : Expression) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def delta_reduction(self, expr : Expression) -> Optional[Expression]:
         """ Unfolds the applications of the expression. If the function is a declaration, then it unfolds it. """
         #print(f"delta reducing {expr}")
         is_d = self.is_delta(expr)
@@ -392,7 +402,7 @@ class TypeChecker:
         return ret
     
     @typechecked
-    def reduce_proj_core(self, proj_struct : Expression, idx : int) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def reduce_proj_core(self, proj_struct : Expression, idx : int) -> Optional[Expression]:
         """ If we have a projection of an expression that is an application of a constructor, then we reduce it to the corresponding argument of the constructor. 
         
         For example, proj 0 (Prod.mk (A) (B) (a : A) (b : B)) would be reduced to a. Note that in this case A B are parameters of the constructor, and a and b are the actual arguments, used in the projection.
@@ -409,7 +419,7 @@ class TypeChecker:
         return proj_struct_args[constructor_decl.num_params + idx]
     
     @typechecked
-    def reduce_proj(self, proj : Proj, cheap_rec :bool, cheap_proj : bool) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def reduce_proj(self, proj : Proj, cheap_rec :bool, cheap_proj : bool) -> Optional[Expression]:
         idx = proj.index
         c = proj.struct
         # use whnf to unfold the definitions if cheap_proj is False
@@ -427,7 +437,7 @@ class TypeChecker:
 
     #@profile
     @typechecked
-    def lazy_delta_reduction_step(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, ReductionStatus]: # DOES NOT CHANGE ANYTHING
+    def lazy_delta_reduction_step(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, ReductionStatus]:
         id_t = self.is_delta(t_n)
         id_s = self.is_delta(s_n)
 
@@ -467,9 +477,7 @@ class TypeChecker:
     
     #@profile
     @typechecked
-    def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]: # DOES NOT CHANGE ANYTHING
-        #print(f"Starting lazy delta reduction between {t_n} and {s_n}")
-        
+    def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]:
         while True:
             if isinstance(t_n, NatLit) or isinstance(s_n, NatLit): 
                 nat_t = self.reduce_nat_lit(t_n) 
@@ -488,7 +496,7 @@ class TypeChecker:
             else: raise PanicError("Unknown reduction status.")
 
     @typechecked
-    def lazy_delta_proj_reduction(self, t_n : Expression, s_n : Expression, idx : int) -> bool: # DOES NOT CHANGE ANYTHING
+    def lazy_delta_proj_reduction(self, t_n : Expression, s_n : Expression, idx : int) -> bool:
         while True:
             t_n, s_n, status = self.lazy_delta_reduction_step(t_n, s_n)
             if status is ReductionStatus.CONTINUE: continue
@@ -502,7 +510,7 @@ class TypeChecker:
                 return self.def_eq_core(t_n, s_n)
 
     @typechecked
-    def reduce_nat_lit(self, e : Expression) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def reduce_nat_lit(self, e : Expression) -> Optional[Expression]:
         if has_fvars(e): return None
         
         fn, args = unfold_app(e)
@@ -558,14 +566,14 @@ class TypeChecker:
 
     # INDUCTIVE
     @typechecked
-    def get_first_constructor(self, inductive_name : Name) -> Optional[Constructor]: # DOES NOT CHANGE ANYTHING
+    def get_first_constructor(self, inductive_name : Name) -> Optional[Constructor]:
         decl = self.environment.get_declaration_under_name(inductive_name)
         if not isinstance(decl, InductiveType): return None
         if decl.number_of_constructors() == 0: return None
         return self.environment.get_constructor(decl.constructor_names[0])
     
     @typechecked
-    def expand_eta_struct(self, e_type : Expression, e : Expression): # DOES NOT CHANGE ANYTHING
+    def expand_eta_struct(self, e_type : Expression, e : Expression):
         fn, args = unfold_app(e_type)
         if not isinstance(fn, Const): return e
 
@@ -580,7 +588,7 @@ class TypeChecker:
     
     # inductive stuff
     @typechecked
-    def to_constructor_when_structure(self, inductive_name : Name, e : Expression) -> Expression: # DOES NOT CHANGE ANYTHING
+    def to_constructor_when_structure(self, inductive_name : Name, e : Expression) -> Expression:
         if not self.is_structure_like(inductive_name): return e
         f = get_app_function(e)
         if isinstance(f, Const) and isinstance(self.environment.get_declaration_under_name(f.name), Constructor): return e
@@ -595,7 +603,7 @@ class TypeChecker:
     
     # inductive stuff
     @typechecked
-    def mk_nullary_constructor(self, type_e : Expression, num_params : int) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def mk_nullary_constructor(self, type_e : Expression, num_params : int) -> Optional[Expression]:
         d, args = unfold_app(type_e)
         if not isinstance(d, Const): return None
         constructor = self.get_first_constructor(d.name)
@@ -604,7 +612,7 @@ class TypeChecker:
         return fold_apps(Const(name=constructor.info.name, lvl_params=d.lvl_params), args)
 
     @typechecked
-    def to_constructor_when_K(self, recursor : Recursor, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def to_constructor_when_K(self, recursor : Recursor, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
         """See https://stackoverflow.com/questions/39239363/what-is-axiom-k
         For datatypes that support K-axiom, given `e` an element of that type, we convert (if possible)
         to the default constructor. For example, if `e : a = a`, then this method returns `eq.refl a` """
@@ -620,12 +628,12 @@ class TypeChecker:
         if not new_constructor_app: return e
         new_type = self.infer_core(new_constructor_app, infer_only=(self.allow_loose_infer and True))
 
-        if not self.def_eq_core(app_type, new_type): return e
+        if not self.def_eq(app_type, new_type): return e
         return new_constructor_app
     
     # QUOTIENT
     @typechecked
-    def quot_reduce_rec(self, e : Expression) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def quot_reduce_rec(self, e : Expression) -> Optional[Expression]:
         fn, args = unfold_app(e)
         if not isinstance(fn, Const): return None
         mk_pos = 0 # the position of the Quot r argument
@@ -660,11 +668,11 @@ class TypeChecker:
         return r
 
     @typechecked
-    def reduce_recursor(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def reduce_recursor(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]:
         # First check if it is a quotient recursor and can be reduced
         r = self.quot_reduce_rec(e)
         if r is not None:
-            assert self.def_eq_core(self.infer_core(e, infer_only=False), self.infer_core(r, infer_only=False))
+            assert self.def_eq(self.infer_core(e, infer_only=False), self.infer_core(r, infer_only=False))
             return r
 
         # Second unfold the application and get the recursor
@@ -718,7 +726,7 @@ class TypeChecker:
         return rhs
     
     @typechecked
-    def whnf_fvar(self, fvar : FVar, cheap_rec : bool, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def whnf_fvar(self, fvar : FVar, cheap_rec : bool, cheap_proj : bool) -> Expression:
         fvar_val = self.get_value_of_fvar(fvar) 
         if fvar_val is None:
             return fvar
@@ -726,7 +734,7 @@ class TypeChecker:
             return self.whnf_core(fvar_val, cheap_rec=cheap_rec, cheap_proj=cheap_proj) 
 
     @typechecked
-    def whnf_core(self, expr : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def whnf_core(self, expr : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
         if isinstance(expr, BVar) or isinstance(expr, Sort) or isinstance(expr, Pi) or isinstance(expr, Lambda) or isinstance(expr, NatLit) or isinstance(expr, StringLit) or isinstance(expr, Const): return expr
         elif isinstance(expr, FVar):
             if not expr.is_let: return expr # the fvar has no val that can be reduced to
@@ -768,7 +776,7 @@ class TypeChecker:
         return r
     
     @typechecked
-    def whnf(self, init_expr : Expression) -> Expression: # DOES NOT CHANGE ANYTHING
+    def whnf(self, init_expr : Expression) -> Expression:
         """
         More powerful version of whnf_core that aggressively unfolds definitions.
         """
@@ -797,11 +805,11 @@ class TypeChecker:
 
     # TYPE INFERENCE
     @typechecked
-    def infer_fvar(self, fvar : FVar): # DOES NOT CHANGE ANYTHING
+    def infer_fvar(self, fvar : FVar):
         return self.get_type_of_fvar(fvar)
     
     @typechecked
-    def infer_app(self, app : App, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_app(self, app : App, infer_only : bool) -> Expression:
         if infer_only:
             # If infer_only is true we only check that the type of fn is a pi type and keep substituting the arguments into the function type's body_type. We don't check that arguments match the function type's domain.
             fn, args = unfold_app(app)
@@ -814,7 +822,7 @@ class TypeChecker:
                     val=arg
                 )
             return fn_type
-        else: # DOES NOT CHANGE ANYTHING
+        else:
             # the function should be a pi type
             fn_type = self.ensure_pi(self.infer_core(app.fn, infer_only=(self.allow_loose_infer and infer_only)))
             
@@ -822,18 +830,18 @@ class TypeChecker:
             inferred_arg_type = self.infer_core(app.arg, infer_only=(self.allow_loose_infer and infer_only))
 
             # the domain of the function should be equal to the type of the argument
-            if not self.def_eq_core(fn_type.arg_type, inferred_arg_type):
+            if not self.def_eq(fn_type.arg_type, inferred_arg_type):
                 raise ExpectedDifferentTypesError(fn_type.arg_type, inferred_arg_type)
             
             infered_type = self.instantiate(body=fn_type.body_type, val=app.arg)
             return infered_type
     
     @typechecked
-    def infer_sort(self, sort : Sort) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_sort(self, sort : Sort) -> Expression:
         return Sort(LevelSucc(sort.level))
 
     @typechecked
-    def infer_pi(self, pi : Pi, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_pi(self, pi : Pi, infer_only : bool) -> Expression:
         lhs = self.ensure_sort(self.infer_core(pi.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
 
         fvar, inst_body_type = self.instantiate_fvar(
@@ -850,7 +858,7 @@ class TypeChecker:
         return Sort(LevelIMax(lhs.level, rhs.level))
     
     @typechecked
-    def ensure_sort(self, e : Expression) -> Sort: # DOES NOT CHANGE ANYTHING
+    def ensure_sort(self, e : Expression) -> Sort:
         if isinstance(e, Sort): return e
         whnfd_e = self.whnf(e)
         if isinstance(whnfd_e, Sort): return whnfd_e
@@ -877,14 +885,14 @@ class TypeChecker:
         return infered_pi
     
     @typechecked
-    def infer_const(self, c : Const) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_const(self, c : Const) -> Expression:
         # this always clones the type from the environment
         if len(c.lvl_params) != len(self.environment.get_declaration_under_name(c.name).info.lvl_params):
             raise PanicError("The number of level parameters of the constant does not match the number of level parameters in the environment.")
         return self.environment.get_constant_type(c)
     
     @typechecked
-    def make_let_binding(self, fvars : List[FVar], b : Expression) -> Expression: # DOES NOT CHANGE ANYTHING
+    def make_let_binding(self, fvars : List[FVar], b : Expression) -> Expression:
         r = abstract_multiple_bvar(fvars, b)
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
@@ -898,11 +906,11 @@ class TypeChecker:
         return r
 
     @typechecked
-    def infer_let(self, e : Let, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_let(self, e : Let, infer_only : bool) -> Expression:
         if not infer_only:
             self.ensure_sort(self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
             inferred_val_type = self.infer_core(e.val, infer_only=(self.allow_loose_infer and infer_only))
-            if not self.def_eq_core(inferred_val_type, e.arg_type):
+            if not self.def_eq(inferred_val_type, e.arg_type):
                 raise ExpectedDifferentTypesError(inferred_val_type, e.arg_type)
 
         fvar, inst_body = self.instantiate_fvar( # for let expression we use fvars; it is up to the wnhf to further unfold the var later
@@ -926,7 +934,7 @@ class TypeChecker:
         return inferred_type
     
     @typechecked
-    def proj_get_constructor(self, proj : Proj, infer_only : bool) -> Optional[Tuple[Const, InductiveType, Constructor, List[Expression]]]: # DOES NOT CHANGE ANYTHING
+    def proj_get_constructor(self, proj : Proj, infer_only : bool) -> Optional[Tuple[Const, InductiveType, Constructor, List[Expression]]]:
         """Returns the inductive type constant, the corresponding constructor, and the arguments to the constructor."""
         proj_name = proj.type_name
         struct_type = self.whnf(self.infer_core(proj.struct, infer_only=(self.allow_loose_infer and infer_only)))
@@ -944,7 +952,7 @@ class TypeChecker:
         return inductive_fn, inductive_decl, constructor_decl, args
 
     @typechecked
-    def infer_proj(self, proj : Proj, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_proj(self, proj : Proj, infer_only : bool) -> Expression:
         proj_index = proj.index
 
         pos_cons = self.proj_get_constructor(proj, infer_only=(self.allow_loose_infer and infer_only))
@@ -987,15 +995,15 @@ class TypeChecker:
         return constructor_type.arg_type
 
     @typechecked
-    def infer_nat_lit(self, n : NatLit) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_nat_lit(self, n : NatLit) -> Expression:
         return Const(self.environment.Nat_name, [])
     
     @typechecked
-    def infer_string_lit(self, s : StringLit) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_string_lit(self, s : StringLit) -> Expression:
         return Const(self.environment.String_name, [])
 
     @typechecked
-    def infer_core(self, expr : Expression, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer_core(self, expr : Expression, infer_only : bool) -> Expression:
         """
         The main TC function: infers the type of an expression. If inference fails it raises an error. 
         Note that infer_core (infer_core expr) results in a Sort expression.
@@ -1029,7 +1037,7 @@ class TypeChecker:
         return inferred_type
     
     @typechecked
-    def infer(self, expr : Expression) -> Expression: # DOES NOT CHANGE ANYTHING
+    def infer(self, expr : Expression) -> Expression:
         if not self.local_context.is_empty():
             raise PanicError(f"Local context is not empty when inferring: {self.local_context}")
         #rprint(f"CHECKING NEW EXPRESSION {expr}")
@@ -1040,7 +1048,7 @@ class TypeChecker:
 
     # CHECKING DECLARATIONS
     @typechecked
-    def check_declaration_info(self, info : DeclarationInfo): # DOES NOT CHANGE ANYTHING
+    def check_declaration_info(self, info : DeclarationInfo):
         #print(f"CHECKING DECLARATION {info.name}")
         #print(f"INFO TYPE : {info.type}")
         if not are_unique_level_params(info.lvl_params):
@@ -1054,37 +1062,37 @@ class TypeChecker:
             raise EnvironmentError(f"Type of declaration info {info} is not a sort.")
 
     @typechecked
-    def add_definition(self, name : Name, d : Definition): # DOES NOT CHANGE ANYTHING
+    def add_definition(self, name : Name, d : Definition):
         #rprint(f"ADDING DEFINITION : {name}")
         self.check_declaration_info(d.info)
         #rprint(f"VALUE : {d.value}")
 
         infered_type = self.infer(d.value)
-        if not self.def_eq_core(infered_type, d.info.type):
+        if not self.def_eq(infered_type, d.info.type):
             raise DeclarationError(f"Definition {name} has type {d.info.type} but inferred type {infered_type}")
         self.environment.add_declaration(name, d)
 
         #rprint(f"ADDED DEFINITION : {name}")
     
     @typechecked
-    def add_theorem(self, name : Name, t : Theorem): # DOES NOT CHANGE ANYTHING
+    def add_theorem(self, name : Name, t : Theorem):
         #rprint(f"ADDING THEOREM : {name}")
         self.check_declaration_info(t.info)
 
         infered_type = self.infer(t.value)
-        if not self.def_eq_core(infered_type, t.info.type):
+        if not self.def_eq(infered_type, t.info.type):
             raise DeclarationError(f"Theorem {name} has type {t.info.type} but inferred type {infered_type}")
         self.environment.add_declaration(name, t)
 
         #rprint(f"ADDED THEOREM : {name}")
 
     @typechecked
-    def add_opaque(self, name : Name, o : Opaque): # DOES NOT CHANGE ANYTHING
+    def add_opaque(self, name : Name, o : Opaque):
         #rprint(f"ADDING OPAQUE : {name}")
         self.check_declaration_info(o.info)
 
         inferred_type = self.infer(o.value)
-        if not self.def_eq_core(inferred_type, o.info.type):
+        if not self.def_eq(inferred_type, o.info.type):
             raise DeclarationError(f"Opaque {name} has type {o.info.type} but inferred type {inferred_type}")
         
         self.environment.add_declaration(name, o)
@@ -1092,7 +1100,7 @@ class TypeChecker:
         #rprint(f"ADDED OPAQUE : {name}")
 
     @typechecked
-    def add_axiom(self, name : Name, a : Axiom): # DOES NOT CHANGE ANYTHING
+    def add_axiom(self, name : Name, a : Axiom):
         #rprint(f"ADDING AXIOM : {name}")
         self.check_declaration_info(a.info)
         self.environment.add_declaration(name, a)
@@ -1100,7 +1108,7 @@ class TypeChecker:
         #rprint(f"ADDED AXIOM : {name}")
     
     @typechecked
-    def add_inductive(self, name : Name, ind : InductiveType): # DOES NOT CHANGE ANYTHING
+    def add_inductive(self, name : Name, ind : InductiveType):
         #rprint(f"ADDING INDUCTIVE : {name}")
         assert name == ind.info.name, "Sanity check failed: name does not match info name."
         
@@ -1110,7 +1118,7 @@ class TypeChecker:
         #rprint(f"ADDED INDUCTIVE : {name}")
 
     @typechecked
-    def add_constructor(self, name : Name, constructor : Constructor): # DOES NOT CHANGE ANYTHING
+    def add_constructor(self, name : Name, constructor : Constructor):
         #rprint(f"ADDING CONSTRUCTOR: {name}")
         self.environment.add_declaration(name, constructor)
         self.check_inductive_declaration_infos(constructor.inductive_name)
@@ -1118,7 +1126,7 @@ class TypeChecker:
         #rprint(f"ADDED CONSTRUCTOR : {name}")
 
     @typechecked
-    def number_of_added_constructors(self, inductive_decl : InductiveType) -> int: # DOES NOT CHANGE ANYTHING
+    def number_of_added_constructors(self, inductive_decl : InductiveType) -> int:
         count = 0
         for constructor_name in inductive_decl.constructor_names:
             if self.environment.exists_declaration_under_name(constructor_name):
@@ -1165,7 +1173,7 @@ class TypeChecker:
         self.environment.checking_inductive = False # CHANGES INDUCTIVE, BUT THIS IS OK
 
     @typechecked
-    def add_recursor(self, name : Name, recursor : Recursor): # DOES NOT CHANGE ANYTHING
+    def add_recursor(self, name : Name, recursor : Recursor):
         #rprint(f"ADDING RECURSOR : {name}")
         self.check_declaration_info(recursor.info)
         self.environment.add_declaration(name, recursor) # add the recursor to the environment before checking the recursion rules, since they refer to the recursor
@@ -1182,7 +1190,7 @@ class TypeChecker:
         #rprint(f"ADDED RECURSOR : {name}")
 
     @typechecked
-    def add_quotient(self, name : Name, q : Quot): # DOES NOT CHANGE ANYTHING
+    def add_quotient(self, name : Name, q : Quot):
         #rprint(f"ADDING QUOTIENT : {name}")
         self.check_declaration_info(q.info)
         self.environment.add_declaration(name, q)
@@ -1190,7 +1198,7 @@ class TypeChecker:
         #rprint(f"ADDED QUOTIENT : {name}")
 
     @typechecked
-    def add_declaration(self, name : Name, decl : Declaration): # DOES NOT CHANGE ANYTHING
+    def add_declaration(self, name : Name, decl : Declaration):
         if isinstance(decl, Definition): self.add_definition(name, decl)
         elif isinstance(decl, Theorem): self.add_theorem(name, decl)
         elif isinstance(decl, Opaque): self.add_opaque(name, decl)
