@@ -182,7 +182,7 @@ def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     # turns fvar into a bound variable with de Bruijn index depth
     def abstraction_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if isinstance(expr, FVar):
-            if expr == fvar:
+            if expr is fvar:
                 return BVar(dbj_id=depth)
         return None
     
@@ -193,7 +193,7 @@ def abstract_multiple_bvar(fvars : List[FVar], body : Expression) -> Expression:
     def replace_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if isinstance(expr, FVar):
             for i, fvar in enumerate(fvars):
-                if fvar == expr: return BVar(dbj_id=depth + i)
+                if fvar is expr: return BVar(dbj_id=depth + i)
         return None
     return replace_expression_w_depth(body, replace_fn, 0)
 
@@ -239,7 +239,7 @@ def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:
     has_fvar = False
     def fn(expr : Expression):
         nonlocal has_fvar
-        if isinstance(expr, FVar) and expr == fvar: has_fvar = True
+        if isinstance(expr, FVar) and (expr is fvar): has_fvar = True
     do_fn(expr, fn)
     return has_fvar
 
@@ -289,13 +289,3 @@ class ReductionStatus(Enum):
     EQUAL = 1
     CONTINUE = 2
     UNKNOWN = 3
-
-def mark_used(expr : Expression, fvars : List[FVar], used : List[bool], le : int):
-    assert le <= len(fvars)
-    assert len(used) == len(fvars)
-    """ Marks the free variables in the given expression as used. """
-    def mark_fn(expr : Expression):
-        if isinstance(expr, FVar):
-            for i in range(le):
-                if fvars[i] == expr: used[i] = True
-    do_fn(expr, mark_fn)

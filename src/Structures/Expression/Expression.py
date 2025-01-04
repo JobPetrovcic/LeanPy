@@ -24,6 +24,17 @@ class Expression:
     @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError(f"Method __str__ not implemented for clas {self.__class__.__name__}")
+    
+    @abstractmethod
+    def totally_equal(self, other : 'Expression') -> bool:
+        raise NotImplementedError(f"Method __eq__ not implemented for class {self.__class__.__name__}")
+    
+    def __eq__(self, other : object) -> bool:
+        if self is other: return True
+        if not isinstance(other, Expression): return False
+        # compare the hashes first
+        if hash(self) != hash(other): return False
+        return self.totally_equal(other)
 
 class BVar(Expression):
     @typechecked
@@ -37,6 +48,10 @@ class BVar(Expression):
     
     def __str__(self, depth : int = 0, is_start_of_newline : bool = True) -> str:
         return f"db{self.dbj_id}"
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, BVar) and self.dbj_id == other.dbj_id
 
 class FVar(Expression):
     @typechecked
@@ -56,10 +71,15 @@ class FVar(Expression):
 
     @override
     def get_hash(self) -> int:
-        return hash(("FVar", hash(self.name)))
+        # just the hash of the pointer
+        return hash(("FVar", id(self)))
     
     def __str__(self) -> str:
         return f"F{self.name}" + (f":= {self.val}" if self.val is not None else "")
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return self is other
 
 class Sort(Expression):
     @typechecked
@@ -74,6 +94,10 @@ class Sort(Expression):
     def __str__(self) -> str:
         return f"Sort {self.level}"
     
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, Sort) and self.level.totally_equal(other.level)
+    
 class Const(Expression):
     @typechecked
     def __init__(self, name : Name, lvl_params : List[Level]):
@@ -87,6 +111,10 @@ class Const(Expression):
     
     def __str__(self) -> str:
         return f"{self.name}.{{{', '.join(map(str, self.lvl_params))}}}"
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, Const) and self.name == other.name and len(self.lvl_params) == len(other.lvl_params) and all([l1.totally_equal(l2) for l1, l2 in zip(self.lvl_params, other.lvl_params)])
     
 class App(Expression):
     @typechecked
@@ -106,6 +134,10 @@ class App(Expression):
             args.append(fn.arg)
             fn = fn.fn
         return f"({fn} |> {'|> '.join(map(str, args))})"
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, App) and self.fn.totally_equal(other.fn) and self.arg.totally_equal(other.arg)
 
 class Pi(Expression):
     @typechecked
@@ -122,6 +154,10 @@ class Pi(Expression):
     def __str__(self) -> str:
         return f"({self.bname} : {self.arg_type}) -> ({self.body_type})"
     
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, Pi) and self.arg_type.totally_equal(other.arg_type) and self.body_type.totally_equal(other.body_type) # don't need to check bname
+    
 class Lambda(Expression):
     @typechecked
     def __init__(self, bname : Name, arg_type : Expression, body : Expression):
@@ -136,6 +172,10 @@ class Lambda(Expression):
     
     def __str__(self) -> str:
         return f"fun ({self.bname} : {self.arg_type}) => ({self.body})"
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, Lambda) and self.arg_type.totally_equal(other.arg_type) and self.body.totally_equal(other.body) # don't need to check bname
 
 class Let(Expression):
     @typechecked
@@ -152,6 +192,10 @@ class Let(Expression):
     
     def __str__(self) -> str:
         return f"(let {self.bname} : {self.arg_type} := {self.val}) in ({self.body})"
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, Let) and self.arg_type.totally_equal(other.arg_type) and self.val.totally_equal(other.val) and self.body.totally_equal(other.body) # don't need to check bname
 
 class Proj(Expression):
     @typechecked
@@ -166,6 +210,10 @@ class Proj(Expression):
     
     def __str__(self) -> str:
         return f"({self.struct}).{self.index}"
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, Proj) and self.type_name == other.type_name and self.index == other.index and self.struct.totally_equal(other.struct) # check the name since it refers to the structure we are projecting
 
 class NatLit(Expression):
     @typechecked
@@ -180,6 +228,10 @@ class NatLit(Expression):
     
     def __str__(self) -> str:
         return str(self.val)
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, NatLit) and self.val == other.val
 
 class StringLit(Expression):
     @typechecked
@@ -193,5 +245,9 @@ class StringLit(Expression):
 
     def __str__(self) -> str:
         return f'"{self.val}"'
+    
+    @typechecked
+    def totally_equal(self, other : 'Expression') -> bool:
+        return isinstance(other, StringLit) and self.val == other.val
 
 __all__ = ['Expression', 'BVar', 'FVar', 'Sort', 'Const', 'App', 'Pi', 'Lambda', 'Let', 'Proj', 'NatLit', 'StringLit']

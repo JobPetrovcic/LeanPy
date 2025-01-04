@@ -40,7 +40,7 @@ def make_imax(l : Level, r : Level) -> Level:
         return r
     elif isinstance(l, LevelZero):
         return r
-    elif equally_defined(l, r):
+    elif l.totally_equal(r):
         return l
     else:
         return LevelIMax(l, r)
@@ -51,19 +51,6 @@ def push_max_args(l : Level, lst : List[Level]) -> None:
         push_max_args(l.rhs, lst)
     else:
         lst.append(l)
-
-def equally_defined(l : Level, r : Level) -> bool:
-    if l.__class__ != r.__class__: return False
-    if hash(l) != hash(r): return False
-    if l is r: return True
-    
-    if isinstance(l, LevelZero) and isinstance(r, LevelZero): return True
-    elif isinstance(l, LevelParam) and isinstance(r, LevelParam): return l.name == r.name
-    elif isinstance(l, LevelMax) and isinstance(r, LevelMax): return equally_defined(l.lhs, r.lhs) and equally_defined(l.rhs, r.rhs)
-    elif isinstance(l, LevelIMax) and isinstance(r, LevelIMax): return equally_defined(l.lhs, r.lhs) and equally_defined(l.rhs, r.rhs)
-    elif isinstance(l, LevelSucc) and isinstance(r, LevelSucc): return equally_defined(l.anc, r.anc)
-
-    raise PanicError("Unreachable code reached in equally_defined")
 
 lvl_class_to_int : Dict[type[Level], int]= {
     LevelZero: 0,
@@ -77,21 +64,21 @@ def is_norm_lt(a : Level, b : Level) -> bool:
     if a is b: return False
     l1, o1 = to_offset(a)
     l2, o2 = to_offset(b)
-    if equally_defined(l1, l2): return o1 < o2
+    if l1.totally_equal(l2): return o1 < o2
 
     if l1.__class__ != l2.__class__: return lvl_class_to_int[l1.__class__] < lvl_class_to_int[l2.__class__]
 
     if isinstance(l1, LevelZero) or isinstance(l1, LevelSucc): raise PanicError("Unreachable code reached in is_norm_lt")
     elif isinstance(l1, LevelParam) and isinstance(l2, LevelParam): return str(l1.name) < str(l2.name)
     elif (isinstance(l1, LevelMax) and isinstance(l2, LevelMax)) or (isinstance(l1, LevelIMax) and isinstance(l2, LevelIMax)):
-        if equally_defined(l1.lhs, l2.lhs): return is_norm_lt(l1.rhs, l2.rhs)
+        if l1.lhs.totally_equal(l2.lhs): return is_norm_lt(l1.rhs, l2.rhs)
         else: return is_norm_lt(l1.lhs, l2.lhs)
     raise PanicError("Unreachable code reached in is_norm_lt")
 
 def lt_compare(a : Level, b : Level) -> int:
     if is_norm_lt(a, b): return -1
     if is_norm_lt(b, a): return 1
-    assert equally_defined(a, b)
+    assert a.totally_equal(b)
     return 0
 
 key_lt = functools.cmp_to_key(lt_compare)
@@ -102,15 +89,15 @@ def is_explicit(l : Level) -> bool:
 
 def make_max_pair(l1 : Level, l2 : Level) -> Level:
     if is_explicit(l1) and is_explicit(l2): return l1 if to_offset(l1)[1] >= to_offset(l2)[1] else l2
-    elif equally_defined(l1, l2): return l1
+    elif l1.totally_equal(l2): return l1
     elif isinstance(l1, LevelZero): return l2
     elif isinstance(l2, LevelZero): return l1
-    elif isinstance(l2, LevelMax) and (l2.lhs == l1 or l2.rhs == l1): return l2
-    elif isinstance(l1, LevelMax) and (l1.lhs == l2 or l1.rhs == l2): return l1
+    elif isinstance(l2, LevelMax) and (l2.lhs.totally_equal(l1) or l2.rhs.totally_equal(l1)): return l2
+    elif isinstance(l1, LevelMax) and (l1.lhs.totally_equal(l2) or l1.rhs.totally_equal(l2)): return l1
     else:
         p1 = to_offset(l1)
         p2 = to_offset(l2)
-        if p1[0] == p2[0]:
+        if p1[0].totally_equal(p2[0]):
             assert p1[1] != p2[1]
             return l1 if p1[1] > p2[1] else l2
         else:
@@ -162,7 +149,7 @@ def normalize(l : Level) -> Level:
         for i in range(i, len(args)):
             q = to_offset(args[i])
             args[i] = q[0]
-            if p[0] == q[0]:
+            if p[0].totally_equal(q[0]):
                 if p[1] < q[1]:
                     p = q # if we found a larger one we save it
                     rargs.pop()
@@ -189,7 +176,7 @@ def is_any_max(level : Level) -> bool:
     return isinstance(level, LevelMax) or isinstance(level, LevelIMax)
 
 def is_equivalent(l : Level, r : Level) -> bool:
-    return (l is r) or equally_defined(l, r) or equally_defined(normalize(l), normalize(r))
+    return (l is r) or l.totally_equal(r) or normalize(l).totally_equal(normalize(r))
 
 def is_equivalent_list(l : List[Level], r : List[Level]) -> bool:
     if len(l) != len(r): return False

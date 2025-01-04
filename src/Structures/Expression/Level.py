@@ -7,8 +7,8 @@ class Level:
         raise NotImplementedError("Method __str__ not implemented for abstract class Level")
 
     @typechecked
-    def defEq(self, other: 'Level') -> bool:
-        raise NotImplementedError("Method defEq not implemented for abstract class Level")
+    def totally_equal(self, other: 'Level') -> bool:
+        raise NotImplementedError("Method totally_equal not implemented for abstract class Level")
     
     def __hash__(self) -> int:
         if not hasattr(self, 'hash'):
@@ -25,7 +25,7 @@ class LevelZero(Level):
     def __str__(self) -> str:
         return "0"
 
-    def defEq(self, other: 'Level') -> bool:
+    def totally_equal(self, other: 'Level') -> bool:
         return isinstance(other, LevelZero)
 
     def get_hash(self) -> int:
@@ -50,8 +50,8 @@ class LevelSucc(Level):
         else:
             return f"{o} + {r}"
 
-    def defEq(self, other: 'Level') -> bool:
-        return isinstance(other, LevelSucc) and self.anc.defEq(other.anc)
+    def totally_equal(self, other: 'Level') -> bool:
+        return isinstance(other, LevelSucc) and self.anc.totally_equal(other.anc)
     
     def get_hash(self) -> int:
         return hash((self.anc, "Succ"))
@@ -68,8 +68,8 @@ class LevelMax(Level):
     def __str__(self) -> str:
         return f"Max({self.lhs}, {self.rhs})"
 
-    def defEq(self, other: 'Level') -> bool:
-        return isinstance(other, LevelMax) and self.lhs.defEq(other.lhs) and self.rhs.defEq(other.rhs)
+    def totally_equal(self, other: 'Level') -> bool:
+        return isinstance(other, LevelMax) and self.lhs.totally_equal(other.lhs) and self.rhs.totally_equal(other.rhs)
     
     def get_hash(self) -> int:
         return hash((self.lhs, self.rhs, "Max"))
@@ -86,8 +86,8 @@ class LevelIMax(Level):
     def __str__(self) -> str:
         return f"IMax({self.lhs}, {self.rhs})"
 
-    def defEq(self, other: 'Level') -> bool:
-        return isinstance(other, LevelIMax) and self.lhs.defEq(other.lhs) and self.rhs.defEq(other.rhs)
+    def totally_equal(self, other: 'Level') -> bool:
+        return isinstance(other, LevelIMax) and self.lhs.totally_equal(other.lhs) and self.rhs.totally_equal(other.rhs)
     
     def get_hash(self) -> int:
         return hash((self.lhs, self.rhs, "IMax"))
@@ -104,8 +104,8 @@ class LevelParam(Level):
         return f"{self.name}"
     
     @typechecked
-    def defEq(self, other: 'Level') -> bool:
-        return isinstance(other, LevelParam) and self.name.defEq(other.name)
+    def totally_equal(self, other: 'Level') -> bool:
+        return isinstance(other, LevelParam) and self.name==other.name
     
     def get_hash(self) -> int:
         return hash(("Param", self.name))
