@@ -1,13 +1,15 @@
 from typing import List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
+from Kernel.Analysis import has_fvar_not_in_context
+from Kernel.Cache import InferCache, WHNFCache
 from Structures.Environment.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
 from Structures.Environment.DeclarationManipulation import is_structural_inductive
 from Structures.Environment.Environment import Environment
 from Structures.Environment.LocalContext import LocalContext
 from Structures.Environment.NatReduction import *
 from Structures.Expression.Expression import *
-from Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, do_fn, fold_apps, has_fvar, has_loose_bvars, has_specific_fvar, instantiate_bvar, has_fvars, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
+from Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, fold_apps, has_fvar, has_loose_bvars, has_specific_fvar, instantiate_bvar, has_fvars, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
 from Structures.Expression.Level import *
 from Structures.Expression.LevelManipulation import is_equivalent, is_equivalent_list, are_unique_level_params
 from Kernel.KernelErrors import ExpectedDifferentExpressionError, ExpectedDifferentTypesError, PanicError, ProjectionError, EnvironmentError, DeclarationError, RecursorError
@@ -15,23 +17,19 @@ from Structures.Name import Name
 import warnings
 
 import sys
-sys.setrecursionlimit(10**6)
- 
-allow_loose_infer = False # if False, then infer_only=False in infer_core for all calls
-
+sys.setrecursionlimit(10**9)
 
 #TODO:
 # - special cases for Nat and String literals
 
-@typechecked
-def has_fvar_not_in_context(body : Expression, context : LocalContext):
-    """ Raises an error if the given expression contains a free variable not in the given context. """
-    def fn(expr : Expression):
-        if isinstance(expr, FVar) and expr not in context.fvars: raise ValueError(f"In body\n\t{body}\n\n found free variable\n\t{expr}\n\n not in context {context}")
-    do_fn(body, fn)
-
 class TypeChecker:
-    def __init__(self):
+    def __init__(self, allow_loose_infer : bool = False):
+        self.allow_loose_infer = allow_loose_infer
+
+        self.whnf_cache = WHNFCache()
+        self.whnf_core_cache = WHNFCache()
+        self.infer_cache = InferCache()
+
         self.environment = Environment()
         self.local_context = LocalContext()
 
@@ -106,7 +104,7 @@ class TypeChecker:
         if isinstance(expr, Pi): 
             return expr
         
-        expr = self.whnf(expr, unfold_definition=True)
+        expr = self.whnf(expr)
         if  isinstance(expr, Pi): return expr
         else: raise ExpectedDifferentExpressionError(Pi, expr.__class__)
 
@@ -118,7 +116,7 @@ class TypeChecker:
     
     @typechecked
     def is_prop(self, e : Expression): # DOES NOT CHANGE ANYTHING
-        inferred_type = self.whnf(self.infer_core(e, infer_only=(allow_loose_infer and True)), unfold_definition=True)
+        inferred_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True)))
         return isinstance(inferred_type, Sort) and is_equivalent(inferred_type.level, self.environment.level_zero)
     
     # NATIVE REDUCTIONS: natural number and string literals are converted to applications of constructors
@@ -245,8 +243,8 @@ class TypeChecker:
 
         # Third part: ensure that the types are equal
         if not self.def_eq_core(
-            self.infer_core(t, infer_only=(allow_loose_infer and True)),
-            self.infer_core(s, infer_only=(allow_loose_infer and True)),
+            self.infer_core(t, infer_only=(self.allow_loose_infer and True)),
+            self.infer_core(s, infer_only=(self.allow_loose_infer and True)),
         ): return False
 
         # Fourth part: ensure that the arguments are equal:
@@ -272,7 +270,7 @@ class TypeChecker:
         if not (isinstance(t, Lambda) and (not isinstance(s, Lambda))): 
             return False
         
-        s_type = self.whnf(self.infer_core(s, infer_only=(allow_loose_infer and False)), unfold_definition=True)
+        s_type = self.whnf(self.infer_core(s, infer_only=(self.allow_loose_infer and False)))
         if not isinstance(s_type, Pi): 
             return False
         new_s = Lambda(bname=s_type.bname, arg_type=s_type.arg_type, body=App(s, BVar(0)))
@@ -302,15 +300,15 @@ class TypeChecker:
     @typechecked
     def is_def_eq_proof_irrel(self, t : Expression, s : Expression) -> Optional[bool]: # DOES NOT CHANGE ANYTHING
         """ Proof irrelevance support for propositions. If two expressions have equal types, and the types are proposition, then the expressions are considered equal. """
-        t_type = self.infer_core(t, infer_only=(allow_loose_infer and True))
+        t_type = self.infer_core(t, infer_only=(self.allow_loose_infer and True))
         if not self.is_prop(t_type):
             return None
-        s_type = self.infer_core(s, infer_only=(allow_loose_infer and True))
+        s_type = self.infer_core(s, infer_only=(self.allow_loose_infer and True))
         return self.def_eq_core(t_type, s_type)
     
     @typechecked
     def def_eq_unit_like(self, t : Expression, s : Expression) -> bool:
-        t_type = self.whnf(self.infer_core(t, infer_only=(allow_loose_infer and True)), unfold_definition=True)
+        t_type = self.whnf(self.infer_core(t, infer_only=(self.allow_loose_infer and True)))
         inductive_const = get_app_function(t_type)
 
         if not isinstance(inductive_const, Const): return False
@@ -319,7 +317,7 @@ class TypeChecker:
         constructor = self.get_first_constructor(inductive_const.name)
         if constructor is None: return False
         if constructor.num_fields != 0: return False
-        return self.def_eq_core(t_type, self.infer_core(s, infer_only=(allow_loose_infer and True)))
+        return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_loose_infer and True)))
     
     @typechecked
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
@@ -327,7 +325,7 @@ class TypeChecker:
 
         # TODO might need to optimize has_fvar by caching
         if not has_fvar(l) and isinstance(r, Const) and r.name == self.environment.Bool_true_name:
-            whnfd_l = self.whnf(l, unfold_definition=True)
+            whnfd_l = self.whnf(l)
             if isinstance(whnfd_l, Const) and whnfd_l.name == self.environment.Bool_true_name:
                 return True
         
@@ -455,7 +453,7 @@ class TypeChecker:
     def reduce_proj(self, proj : Proj, cheap_proj : bool) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
         idx = proj.index
         c = proj.struct
-        c = self.whnf_core(c, cheap_proj=cheap_proj) if cheap_proj else self.whnf(c, unfold_definition=True)
+        c = self.whnf_core(c, cheap_proj=cheap_proj) if cheap_proj else self.whnf(c)
         return self.reduce_proj_core(c, idx)
     
     @typechecked
@@ -553,14 +551,14 @@ class TypeChecker:
             if fn.name == self.environment.Nat_zero_name: return NatLit(0)
         if len(args) == 1:
             if fn.name == self.environment.Nat_succ_name:
-                arg = self.whnf(args[0], unfold_definition=True)
+                arg = self.whnf(args[0])
                 if isinstance(arg, NatLit): return NatLit(arg.val + 1)
                 if isinstance(arg, Const) and arg.name == self.environment.Nat_zero_name: return NatLit(1)
                 return None
         if len(args) == 2:
-            arg1 = self.whnf(args[0], unfold_definition=True)
+            arg1 = self.whnf(args[0])
             if not isinstance(arg1, NatLit): return None
-            arg2 = self.whnf(args[1], unfold_definition=True)
+            arg2 = self.whnf(args[1])
             if not isinstance(arg2, NatLit): return None
             
             name = fn.name
@@ -611,7 +609,7 @@ class TypeChecker:
         f = get_app_function(e)
         if isinstance(f, Const) and isinstance(self.environment.get_declaration_under_name(f.name), Constructor): return e
 
-        e_type = self.whnf(self.infer_core(e, infer_only=(allow_loose_infer and True)), unfold_definition=False)
+        e_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True))) # TODO: cheap_rec
 
         e_type_fn = get_app_function(e_type)
         if not (isinstance(e_type_fn, Const) and e_type_fn.name == inductive_name): return e 
@@ -635,7 +633,7 @@ class TypeChecker:
         For datatypes that support K-axiom, given `e` an element of that type, we convert (if possible)
         to the default constructor. For example, if `e : a = a`, then this method returns `eq.refl a` """
         assert recursor.isK, "Cannot apply K-axiom to a recursor that is not K."
-        app_type = self.whnf(self.infer_core(e, infer_only=(allow_loose_infer and True)), unfold_definition=True)
+        app_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True)))
         app_type_inductive, _ = unfold_app(app_type)
 
         if not isinstance(app_type_inductive, Const): return e
@@ -643,7 +641,7 @@ class TypeChecker:
 
         new_constructor_app = self.mk_nullary_constructor(app_type, recursor.num_params)
         if not new_constructor_app: return e
-        new_type = self.infer_core(new_constructor_app, infer_only=(allow_loose_infer and True))
+        new_type = self.infer_core(new_constructor_app, infer_only=(self.allow_loose_infer and True))
 
         if not self.def_eq_core(app_type, new_type): return e
         return new_constructor_app
@@ -666,7 +664,7 @@ class TypeChecker:
         else: return None
 
         if len(args) <= mk_pos: return None
-        mk = self.whnf(args[mk_pos], unfold_definition=True) # whnf to expose the Quot_mk
+        mk = self.whnf(args[mk_pos]) # whnf to expose the Quot_mk
         #print(self.local_context)
 
         assert isinstance(mk, App)
@@ -707,7 +705,7 @@ class TypeChecker:
         if rec_decl.isK:
             major = self.to_constructor_when_K(rec_decl, major)
 
-        major = self.whnf(major, unfold_definition=True)
+        major = self.whnf(major)
         if isinstance(major, NatLit):
             major = self.nat_lit_to_constructor(major)
         elif isinstance(major, StringLit):
@@ -751,12 +749,14 @@ class TypeChecker:
             return self.whnf_core(fvar_val, cheap_proj=cheap_proj) 
 
     @typechecked
-    def whnf_core(self, expr : Expression, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def whnf_core(self, expr : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
         if isinstance(expr, BVar) or isinstance(expr, Sort) or isinstance(expr, Pi) or isinstance(expr, Lambda) or isinstance(expr, NatLit) or isinstance(expr, StringLit) or isinstance(expr, Const): return expr
         elif isinstance(expr, FVar):
             if not expr.is_let: return expr # the fvar has no val that can be reduced to
         
-        # TODO: caching
+        cached_whnfed_expr = self.whnf_core_cache.get(expr)
+        if cached_whnfed_expr is not None: return cached_whnfed_expr
+
         r = None
         if isinstance(expr, FVar):
             return self.whnf_fvar(expr, cheap_proj=cheap_proj)
@@ -765,17 +765,17 @@ class TypeChecker:
             if pos_red is None:
                 r = expr
             else:
-                r = self.whnf_core(pos_red, cheap_proj=cheap_proj)     
+                r = self.whnf_core(pos_red, cheap_rec=cheap_rec, cheap_proj=cheap_proj)     
         elif isinstance(expr, App):
             raw_fn, raw_args = unfold_app(expr)
             
-            fn = self.whnf_core(raw_fn, cheap_proj=cheap_proj)
+            fn = self.whnf_core(raw_fn, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
             if isinstance(fn, Lambda):
                 r = self.whnf_core(self.beta_reduction(fn, raw_args), cheap_proj=cheap_proj)
             elif fn is raw_fn:
-                r = self.reduce_recursor(expr)
+                r = self.reduce_recursor(expr, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
                 if r is not None: 
-                    red = self.whnf_core(r, cheap_proj=cheap_proj)
+                    red = self.whnf_core(r, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
                     return red
                 else: return expr
             else:
@@ -786,24 +786,34 @@ class TypeChecker:
         if r is None:
             raise PanicError(f"Expr of type {expr.__class__.__name__} could not be matched, this should not happen.")
 
+        if not cheap_proj: self.whnf_core_cache.put(expr, r)
+
         return r
     
     @typechecked
-    def whnf(self, expr : Expression, unfold_definition : bool) -> Expression: # DOES NOT CHANGE ANYTHING
-        if isinstance(expr, BVar) or isinstance(expr, Sort) or isinstance(expr, Pi) or isinstance(expr, Lambda) or isinstance(expr, NatLit) or isinstance(expr, StringLit): return expr # easy, non-reducible cases
+    def whnf(self, init_expr : Expression) -> Expression: # DOES NOT CHANGE ANYTHING
+        if isinstance(init_expr, BVar) or isinstance(init_expr, Sort) or isinstance(init_expr, Pi) or isinstance(init_expr, Lambda) or isinstance(init_expr, NatLit) or isinstance(init_expr, StringLit): return init_expr # easy, non-reducible cases
+
+        # we don't check cache results for trivial cases
+        cached_whnfed_expr = self.whnf_cache.get(init_expr)
+        if cached_whnfed_expr is not None: return cached_whnfed_expr
 
         # harder cases
-        expr = self.whnf_core(expr, cheap_proj=False)
-        while unfold_definition:
-
+        expr = init_expr
+        while True:
+            expr = self.whnf_core(expr, cheap_proj=False)
             r_expr = self.reduce_nat_lit(expr)
-            if r_expr is not None: expr = r_expr
+            if r_expr is not None: 
+                # cache the result of nat_lit reduction
+                self.whnf_cache.put(expr, r_expr)
+                return r_expr
             else:
                 unfolded = self.delta_reduction(expr)
-                if unfolded is None: break
-                expr = self.whnf_core(unfolded, cheap_proj=False) 
-
-        return expr
+                if unfolded is None:
+                    # cache the result if it was NOT delta reduced
+                    self.whnf_cache.put(init_expr, expr)
+                    return expr
+                expr = unfolded
 
     # TYPE INFERENCE
     @typechecked
@@ -815,7 +825,7 @@ class TypeChecker:
         if infer_only:
             # If infer_only is true we only check that the type of fn is a pi type and keep substituting the arguments into the function type's body_type. We don't check that arguments match the function type's domain.
             fn, args = unfold_app(app)
-            fn_type = self.infer_core(fn, infer_only=(allow_loose_infer and infer_only))
+            fn_type = self.infer_core(fn, infer_only=(self.allow_loose_infer and infer_only))
             for arg in args:
                 fn_type = self.ensure_pi(fn_type)
                 
@@ -826,10 +836,10 @@ class TypeChecker:
             return fn_type
         else: # DOES NOT CHANGE ANYTHING
             # the function should be a pi type
-            fn_type = self.ensure_pi(self.infer_core(app.fn, infer_only=(allow_loose_infer and infer_only)))
+            fn_type = self.ensure_pi(self.infer_core(app.fn, infer_only=(self.allow_loose_infer and infer_only)))
             
             # get the type of the argument
-            inferred_arg_type = self.infer_core(app.arg, infer_only=(allow_loose_infer and infer_only))
+            inferred_arg_type = self.infer_core(app.arg, infer_only=(self.allow_loose_infer and infer_only))
 
             # the domain of the function should be equal to the type of the argument
             if not self.def_eq_core(fn_type.arg_type, inferred_arg_type):
@@ -844,7 +854,7 @@ class TypeChecker:
 
     @typechecked
     def infer_pi(self, pi : Pi, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
-        lhs = self.ensure_sort(self.infer_core(pi.arg_type, infer_only=(allow_loose_infer and infer_only)))
+        lhs = self.ensure_sort(self.infer_core(pi.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
 
         fvar, inst_body_type = self.instantiate_fvar(
             bname=pi.bname, 
@@ -852,7 +862,7 @@ class TypeChecker:
             arg_val=None,
             body=pi.body_type, 
         )
-        rhs = self.ensure_sort(self.infer_core(inst_body_type, infer_only=(allow_loose_infer and infer_only)))
+        rhs = self.ensure_sort(self.infer_core(inst_body_type, infer_only=(self.allow_loose_infer and infer_only)))
         if has_specific_fvar(rhs, fvar): # TODO : remove this after testing
             raise PanicError("FVar was not abstracted in the inferred type.")
         self.remove_fvar(fvar)
@@ -862,7 +872,7 @@ class TypeChecker:
     @typechecked
     def ensure_sort(self, e : Expression) -> Sort: # DOES NOT CHANGE ANYTHING
         if isinstance(e, Sort): return e
-        whnfd_e = self.whnf(e, unfold_definition=True)
+        whnfd_e = self.whnf(e)
         if isinstance(whnfd_e, Sort): return whnfd_e
         
         raise ExpectedDifferentExpressionError(Sort, whnfd_e.__class__)
@@ -870,7 +880,7 @@ class TypeChecker:
     @typechecked
     def infer_lambda(self, e : Lambda, infer_only : bool) -> Expression:
         if not infer_only:
-            self.ensure_sort(self.infer_core(e.arg_type, infer_only=(allow_loose_infer and infer_only))) # have to clone the arg_type since we are using it
+            self.ensure_sort(self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only))) # have to clone the arg_type since we are using it
         bname = e.bname
         fvar, inst_body = self.instantiate_fvar(
             bname=bname, 
@@ -878,7 +888,7 @@ class TypeChecker:
             arg_val=None,
             body=e.body 
         )
-        infered_body_type = self.infer_core(inst_body, infer_only=(allow_loose_infer and infer_only))
+        infered_body_type = self.infer_core(inst_body, infer_only=(self.allow_loose_infer and infer_only))
         infered_pi = Pi(bname, e.arg_type, self.abstract(fvar, infered_body_type))
 
         if has_specific_fvar(infered_pi, fvar): # TODO : remove this after testing
@@ -910,8 +920,8 @@ class TypeChecker:
     @typechecked
     def infer_let(self, e : Let, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
         if not infer_only:
-            self.ensure_sort(self.infer_core(e.arg_type, infer_only=(allow_loose_infer and infer_only)))
-            inferred_val_type = self.infer_core(e.val, infer_only=(allow_loose_infer and infer_only))
+            self.ensure_sort(self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
+            inferred_val_type = self.infer_core(e.val, infer_only=(self.allow_loose_infer and infer_only))
             if not self.def_eq_core(inferred_val_type, e.arg_type):
                 raise ExpectedDifferentTypesError(inferred_val_type, e.arg_type)
 
@@ -922,7 +932,7 @@ class TypeChecker:
             body=e.body, 
             is_let=True
         )
-        inferred_type = self.infer_core(inst_body, infer_only=(allow_loose_infer and infer_only))
+        inferred_type = self.infer_core(inst_body, infer_only=(self.allow_loose_infer and infer_only))
 
         if has_specific_fvar(inferred_type, fvar): # TODO : remove this after testing
             assert not has_specific_fvar(fvar.type, fvar), "The type of the fvar should not contain the fvar."
@@ -939,7 +949,7 @@ class TypeChecker:
     def proj_get_constructor(self, proj : Proj, infer_only : bool) -> Optional[Tuple[Const, InductiveType, Constructor, List[Expression]]]: # DOES NOT CHANGE ANYTHING
         """Returns the inductive type constant, the corresponding constructor, and the arguments to the constructor."""
         proj_name = proj.type_name
-        struct_type = self.whnf(self.infer_core(proj.struct, infer_only=(allow_loose_infer and infer_only)), unfold_definition=True)
+        struct_type = self.whnf(self.infer_core(proj.struct, infer_only=(self.allow_loose_infer and infer_only)))
         inductive_fn, args = unfold_app(struct_type)
         if not isinstance(inductive_fn, Const):
             return None
@@ -957,16 +967,16 @@ class TypeChecker:
     def infer_proj(self, proj : Proj, infer_only : bool) -> Expression: # DOES NOT CHANGE ANYTHING
         proj_index = proj.index
 
-        pos_cons = self.proj_get_constructor(proj, infer_only=(allow_loose_infer and infer_only))
+        pos_cons = self.proj_get_constructor(proj, infer_only=(self.allow_loose_infer and infer_only))
         if pos_cons is None: raise ProjectionError(f"Could not get constructor for projection {proj}")
 
-        #I_name         I_infro          c_info        (in the original code)
+        #I_name         I_info          c_info        (in the original code)
         inductive_name, inductive_decl, constructor, args = pos_cons 
         constructor_type = self.environment.get_declaration_type_with_substituted_level_params(constructor, inductive_name.lvl_params)
         assert inductive_decl.num_params == constructor.num_params, "Sanity check failed: number of parameters in inductive type and constructor do not match."
         
         for i in range(inductive_decl.num_params):
-            constructor_type = self.whnf(constructor_type, unfold_definition=True)
+            constructor_type = self.whnf(constructor_type)
             if not isinstance(constructor_type, Pi):
                 raise ProjectionError(f"Expected a Pi type when reducing parameters for constructor type but got {constructor_type.__class__}")
             if i >= len(args):
@@ -976,7 +986,7 @@ class TypeChecker:
 
         #is_prop_type = self.is_prop(constructor_type) TODO: see next TODO
         for i in range(proj_index):
-            constructor_type = self.whnf(constructor_type, unfold_definition=False)
+            constructor_type = self.whnf(constructor_type)
             if not isinstance(constructor_type, Pi):
                 raise ProjectionError(f"Expected a Pi type when reducing indices for constructor type but got {constructor_type.__class__}")
             
@@ -989,10 +999,11 @@ class TypeChecker:
                 val=Proj(inductive_name.name, i, proj.struct), 
             )
         
-        constructor_type = self.whnf(constructor_type, unfold_definition=False)
+        constructor_type = self.whnf(constructor_type)
         if not isinstance(constructor_type, Pi):
             raise ProjectionError(f"Expected a Pi type for projection index but got {constructor_type.__class__}")
 
+        # TODO: the lean kernel does some checks regarding prop here
         return constructor_type.arg_type
 
     @typechecked
@@ -1022,13 +1033,13 @@ class TypeChecker:
 
         if isinstance(expr, BVar): raise PanicError("BVar should have been substituted when inferring")
         elif isinstance(expr, FVar): inferred_type = self.infer_fvar(expr) # we should not clone the fvar since we are using "is" to compare
-        elif isinstance(expr, App): inferred_type = self.infer_app(expr, infer_only=(allow_loose_infer and infer_only))
+        elif isinstance(expr, App): inferred_type = self.infer_app(expr, infer_only=(self.allow_loose_infer and infer_only))
         elif isinstance(expr, Sort): inferred_type = self.infer_sort(expr)
         elif isinstance(expr, Const): inferred_type = self.infer_const(expr) # const always copies the type of the const from the environment
-        elif isinstance(expr, Lambda): inferred_type = self.infer_lambda(expr, infer_only=(allow_loose_infer and infer_only))
-        elif isinstance(expr, Pi): inferred_type = self.infer_pi(expr, infer_only=(allow_loose_infer and infer_only))
-        elif isinstance(expr, Let): inferred_type = self.infer_let(expr, infer_only=(allow_loose_infer and infer_only))
-        elif isinstance(expr, Proj): inferred_type = self.infer_proj(expr, infer_only=(allow_loose_infer and infer_only))
+        elif isinstance(expr, Lambda): inferred_type = self.infer_lambda(expr, infer_only=(self.allow_loose_infer and infer_only))
+        elif isinstance(expr, Pi): inferred_type = self.infer_pi(expr, infer_only=(self.allow_loose_infer and infer_only))
+        elif isinstance(expr, Let): inferred_type = self.infer_let(expr, infer_only=(self.allow_loose_infer and infer_only))
+        elif isinstance(expr, Proj): inferred_type = self.infer_proj(expr, infer_only=(self.allow_loose_infer and infer_only))
         elif isinstance(expr, NatLit): inferred_type = self.infer_nat_lit(expr) # this always inferred_type=s a new const
         elif isinstance(expr, StringLit): inferred_type = self.infer_string_lit(expr) # this always inferred_type=s a new const
         else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
@@ -1042,7 +1053,7 @@ class TypeChecker:
         if not self.local_context.is_empty():
             raise PanicError(f"Local context is not empty when inferring: {self.local_context}")
         #rprint(f"CHECKING NEW EXPRESSION {expr}")
-        inferred_type = self.infer_core(expr, infer_only=(allow_loose_infer and False))
+        inferred_type = self.infer_core(expr, infer_only=(self.allow_loose_infer and False))
 
         has_fvar_not_in_context(inferred_type, self.local_context) # TODO : remove this after testing
         return inferred_type
