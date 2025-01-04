@@ -146,7 +146,7 @@ def substitute_level_params_in_expression(body : Expression, params : LevelSubLi
 
 @typechecked
 def has_fvars(body : Expression) -> bool:
-    """ Returns True if the given expression does contains a free variable. """
+    """ Returns True if the given expression does contain a free variable. """
     has_fvar = False
     def fn(expr : Expression):
         nonlocal has_fvar

@@ -19,13 +19,21 @@ def print_function_name(func : Callable[[Any], Any]) -> Callable[[Any], Any]:
         return func(*args, **kwargs)
     return wrapper
 
-def print_neg(fn :Callable[[Any, Expression, Expression], Tuple[Expression, Expression, bool]]):
+def print_neg_verbose(fn :Callable[[Any, Expression, Expression], Tuple[Expression, Expression, bool]]):
     def wrapper(self_arg : Any, l : Expression, r : Expression):
         l_n, r_n, result = fn(self_arg, l, r)
         if not result:
             print(f"l_n type was {self_arg.infer_core(l_n, infer_only=False)}")
             print(f"r_n type was {self_arg.infer_core(r_n, infer_only=False)}")
             print(f"Negative test failed for {fn.__name__} with\n\t{l_n}\nand\n\t{r_n}")
+        return result
+    return wrapper
+
+def print_neg(fn :Callable[[Any, Expression, Expression], bool]):
+    def wrapper(self_arg : Any, l : Expression, r : Expression):
+        result = fn(self_arg, l, r)
+        if not result:
+            print(f"Negative test failed for {fn.__name__} with\n\t{l}\nand\n\t{r}")
         return result
     return wrapper
 

@@ -2,7 +2,7 @@ from typing import Dict, List
 
 from typeguard import typechecked
 
-from Structures.Environment.Declaration import Constructor, Declaration, Definition, InductiveType, Opaque, Quot, Theorem
+from Structures.Environment.Declaration.Declaration import Constructor, Declaration, Definition, InductiveType, Opaque, Quot, Theorem
 from Structures.Expression.Expression import Const, Expression, Sort
 from Structures.Expression.ExpressionManipulation import substitute_level_params_in_expression
 from Structures.Expression.Level import Level, LevelSucc, LevelZero
@@ -37,18 +37,22 @@ class Environment:
         self.Prop = Sort(self.level_zero)
         self.Type = Sort(self.level_one)
 
+        # Lean constants
+        self.Lean_name = self.create_name_from_str("Lean")
+
         # Nat constants
         self.Nat_name = self.create_name_from_str("Nat")
         self.Nat_zero_name = SubName(self.Nat_name, "zero")
         self.Nat_succ_name = SubName(self.Nat_name, "succ")
+
         self.Nat_add_name = SubName(self.Nat_name, "add")
         self.Nat_sub_name = SubName(self.Nat_name, "sub")
         self.Nat_mul_name = SubName(self.Nat_name, "mul")
         self.Nat_pow_name = SubName(self.Nat_name, "pow")
         self.Nat_gcd_name = SubName(self.Nat_name, "gcd")
         self.Nat_div_name = SubName(self.Nat_name, "div")
-        self.Nat_eq_name = SubName(self.Nat_name, "eq")
-        self.Nat_le_name = SubName(self.Nat_name, "le")
+        self.Nat_eq_name = SubName(self.Nat_name, "beq")
+        self.Nat_le_name = SubName(self.Nat_name, "ble")
         self.Nat_mod_name = SubName(self.Nat_name, "mod")
         self.Nat_beq_name = SubName(self.Nat_name, "beq")
         self.Nat_ble_name = SubName(self.Nat_name, "ble")
@@ -57,6 +61,8 @@ class Environment:
         self.Nat_lxor_name = SubName(self.Nat_name, "xor")
         self.Nat_shiftl_name = SubName(self.Nat_name, "shiftLeft")
         self.Nat_shiftr_name = SubName(self.Nat_name, "shiftRight")
+
+        self.Nat_reduce_name = SubName(self.Lean_name, "reduceNat")
 
         # String constants
         self.String_name = self.create_name_from_str("String")
@@ -78,8 +84,8 @@ class Environment:
         self.Bool_name = self.create_name_from_str("Bool")
         self.Bool_true_name = SubName(self.Bool_name, "true")
         self.Bool_false_name = SubName(self.Bool_name, "false")
+        self.Bool_reduce_name = SubName(self.Lean_name, "reduceBool")
                                         
-
     @typechecked
     def get_declaration_under_name(self, name : Name) -> Declaration:
         if name not in self.name_dict:

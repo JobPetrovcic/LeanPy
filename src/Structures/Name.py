@@ -17,7 +17,6 @@ class Name:
     
     def __hash__(self) -> int:
         return hash(self.__str__())
-    
 
 class Anonymous(Name):
     def __str__(self) -> str:
@@ -32,5 +31,5 @@ class SubName(Name):
     def __str__(self) -> str:
         if isinstance(self.anc, Anonymous): return self.name
         else: return f"{self.anc}.{self.name}"
-    
+
 __all__ = ['Name', 'Anonymous', 'SubName']

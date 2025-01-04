@@ -1,13 +1,16 @@
 from typing import List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
-from Kernel.Analysis import has_fvar_not_in_context
-from Kernel.Cache import InferCache, WHNFCache
-from Structures.Environment.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
-from Structures.Environment.DeclarationManipulation import is_structural_inductive
+from Kernel.Analysis import has_fvar_not_in_context, print_neg
+from Kernel.Cache.Cache import InferCache, WHNFCache
+from Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
+from Structures.Environment.Declaration.DeclarationManipulation import is_structural_inductive
 from Structures.Environment.Environment import Environment
 from Structures.Environment.LocalContext import LocalContext
 from Structures.Environment.NatReduction import *
+from Structures.Environment.NatReduction import nat_lit_to_constructor
+from Structures.Environment.NatReduction import str_lit_to_constructor
+from Structures.Environment.NatReduction import reduce_bin_nat_pred
 from Structures.Expression.Expression import *
 from Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, fold_apps, has_fvar, has_loose_bvars, has_specific_fvar, instantiate_bvar, has_fvars, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
 from Structures.Expression.Level import *
@@ -118,51 +121,6 @@ class TypeChecker:
     def is_prop(self, e : Expression): # DOES NOT CHANGE ANYTHING
         inferred_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True)))
         return isinstance(inferred_type, Sort) and is_equivalent(inferred_type.level, self.environment.level_zero)
-    
-    # NATIVE REDUCTIONS: natural number and string literals are converted to applications of constructors
-    @typechecked
-    def nat_lit_to_constructor(self, nat_lit : NatLit) -> Expression: # DOES NOT CHANGE ANYTHING
-        """ Returns the constructor form of the given natural literal. """
-        if nat_lit.val == 0: return Const(name=self.environment.Nat_zero_name, lvl_params=[])
-        return App(
-            Const(name=self.environment.Nat_succ_name, lvl_params=[]),
-            NatLit(nat_lit.val-1)
-        )
-    
-    @typechecked
-    def char_to_expression(self, c : str) -> Expression: # DOES NOT CHANGE ANYTHING
-        return App(
-            Const(name=self.environment.Char_name, lvl_params=[]),
-            NatLit(ord(c))
-        )
-
-    @typechecked
-    def str_to_char_list(self, s : str, ind : int = 0) -> Expression: # DOES NOT CHANGE ANYTHING
-        assert ind >= 0, "Index must be non-negative when converting a string literal to a constructor."
-        if ind == len(s): 
-            return App(
-                Const(name=self.environment.List_nil_name, lvl_params=[self.environment.level_one]),
-                Const(name=self.environment.Char_name, lvl_params=[])
-            )
-        else:
-            return  App(
-                App(
-                    App(
-                        Const(name=self.environment.List_cons_name, lvl_params=[self.environment.level_one]),
-                        Const(name=self.environment.Char_name, lvl_params=[])
-                    ),
-                    self.char_to_expression(s[ind])
-                ),
-                self.str_to_char_list(s, ind+1)
-            )
-
-    @typechecked
-    def str_lit_to_constructor(self, s : StringLit) -> Expression: # DOES NOT CHANGE ANYTHING
-        char_list = self.str_to_char_list(s.val, 0)
-        return App(
-            Const(name=self.environment.String_mk_name, lvl_params=[]),
-            char_list
-        )
 
     # DEFINITIONAL EQUALITY
     @typechecked
@@ -319,6 +277,7 @@ class TypeChecker:
         if constructor.num_fields != 0: return False
         return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_loose_infer and True)))
     
+    @print_neg
     @typechecked
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
         if l is r: return True
@@ -335,8 +294,8 @@ class TypeChecker:
         if isinstance(l, Const) and isinstance(r, Const):
             if self.def_eq_const(l, r): return True
 
-        l_n = self.whnf_core(l, cheap_proj=True)
-        r_n = self.whnf_core(r, cheap_proj=True)
+        l_n = self.whnf_core(l, cheap_rec=False, cheap_proj=True)
+        r_n = self.whnf_core(r, cheap_rec=False, cheap_proj=True)
      
         if (l_n is not l) or (r_n is not r):
             is_easy = self.def_eq_easy(l_n, r_n)
@@ -354,8 +313,8 @@ class TypeChecker:
         if isinstance(l_n_n, Proj) and isinstance(r_n_n, Proj) and l_n_n.index == r_n_n.index:
             if self.lazy_delta_proj_reduction(l_n_n.struct, r_n_n.struct, l_n_n.index): return True
 
-        l_n_n_n = self.whnf_core(l_n_n, cheap_proj=False)
-        r_n_n_n = self.whnf_core(r_n_n, cheap_proj=False)
+        l_n_n_n = self.whnf_core(l_n_n, cheap_rec=False, cheap_proj=False) # don't use cheap_proj now
+        r_n_n_n = self.whnf_core(r_n_n, cheap_rec=False, cheap_proj=False) # don't use cheap_proj now
 
         if (l_n_n_n is not l_n_n) or (r_n_n_n is not r_n_n): return self.def_eq_core(l_n_n_n, r_n_n_n)
 #
@@ -438,7 +397,7 @@ class TypeChecker:
         
         For example, proj 0 (Prod.mk (A) (B) (a : A) (b : B)) would be reduced to a. Note that in this case A B are parameters of the constructor, and a and b are the actual arguments, used in the projection.
         """
-        if isinstance(proj_struct, StringLit): proj_struct = self.str_lit_to_constructor(proj_struct)
+        if isinstance(proj_struct, StringLit): proj_struct = str_lit_to_constructor(self.environment, proj_struct)
         
         proj_struct_fn, proj_struct_args = unfold_app(proj_struct)
         if not isinstance(proj_struct_fn, Const): return None
@@ -450,17 +409,18 @@ class TypeChecker:
         return proj_struct_args[constructor_decl.num_params + idx]
     
     @typechecked
-    def reduce_proj(self, proj : Proj, cheap_proj : bool) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def reduce_proj(self, proj : Proj, cheap_rec :bool, cheap_proj : bool) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
         idx = proj.index
         c = proj.struct
-        c = self.whnf_core(c, cheap_proj=cheap_proj) if cheap_proj else self.whnf(c)
+        # use whnf to unfold the definitions if cheap_proj is False
+        c = self.whnf_core(c, cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_proj else self.whnf(c) 
         return self.reduce_proj_core(c, idx)
     
     @typechecked
     def try_unfold_proj_app(self, e : Expression) -> Optional[Expression]: 
         f = get_app_function(e)
         if not isinstance(f, Proj): return None
-        e_new = self.whnf_core(e, cheap_proj=False)
+        e_new = self.whnf_core(e, cheap_rec=False, cheap_proj=False)
         #print(f"unfolded proj {e} to {e_new}")
         if e_new is e: return None
         return e_new
@@ -476,7 +436,7 @@ class TypeChecker:
         elif (id_t is not None) and (id_s is None):
             s_new = self.try_unfold_proj_app(s_n)
             if s_new is not None: s_n = s_new
-            else: t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_proj=True)
+            else: t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_rec=False, cheap_proj=True)
         elif (id_t is None) and (id_s is not None):
             t_new = self.try_unfold_proj_app(t_n)
             if t_new is not None: 
@@ -484,19 +444,19 @@ class TypeChecker:
                 t_n = t_new
             else: 
                 #print(f"delta reducing {s_n}")
-                s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_proj=True)
+                s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
         elif (id_t is not None) and (id_s is not None):
             hint_compare = compare_reducibility_hints(id_t[1], id_s[1])
             if hint_compare < 0: # reduce t
                 #print(f"delta reducing hint {t_n}")
-                t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_proj=True)
+                t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_rec=False, cheap_proj=True)
             elif hint_compare > 0: # reduce s
                 #print(f"delta reducing hint {s_n}")
-                s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_proj=True)
+                s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
             else: # reduce both
                 #print(f"delta reducing both {t_n} and {s_n}")
-                t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_proj=True)
-                s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_proj=True)
+                t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_rec=False, cheap_proj=True)
+                s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
         else:
             raise PanicError("Unreachable code reached in lazy_delta_reduction_step.")
 
@@ -569,16 +529,32 @@ class TypeChecker:
             elif name == self.environment.Nat_gcd_name: return reduce_bin_nat_op(nat_gcd, arg1.val, arg2.val)
             elif name == self.environment.Nat_mod_name: return reduce_bin_nat_op(nat_mod, arg1.val, arg2.val)
             elif name == self.environment.Nat_div_name: return reduce_bin_nat_op(nat_div, arg1.val, arg2.val)
-            elif name == self.environment.Nat_eq_name: raise NotImplementedError("Nat_eq is not implemented yet.")
-            #return reduce_bin_nat_pred(nat_eq, arg1.val, arg2.val)
-            elif name == self.environment.Nat_le_name: raise NotImplementedError("Nat_le is not implemented yet.")
-            #return reduce_bin_nat_pred(nat_le, arg1.val, arg2.val)
+            elif name == self.environment.Nat_eq_name: return reduce_bin_nat_pred(self.environment, nat_beq, arg1.val, arg2.val)
+            elif name == self.environment.Nat_le_name: return reduce_bin_nat_pred(self.environment,nat_ble, arg1.val, arg2.val)
             elif name == self.environment.Nat_land_name: return reduce_bin_nat_op(nat_land, arg1.val, arg2.val)
             elif name == self.environment.Nat_lor_name: return reduce_bin_nat_op(nat_lor, arg1.val, arg2.val)
-            elif name == self.environment.Nat_lxor_name: return reduce_bin_nat_op(nat_lxor, arg1.val, arg2.val)
+            elif name == self.environment.Nat_lxor_name: return reduce_bin_nat_op(nat_xor, arg1.val, arg2.val)
             elif name == self.environment.Nat_shiftl_name: return reduce_bin_nat_op(nat_shiftl, arg1.val, arg2.val)
             elif name == self.environment.Nat_shiftr_name: return reduce_bin_nat_op(nat_shiftr, arg1.val, arg2.val)
             return e
+
+    #def reduce_native(self, e : Expression) -> Optional[Expression]:
+    #    if not isinstance(e, App): return None
+    #    if not isinstance(e.arg, Const): return None
+    #    if isinstance(e.fn, Const) and e.fn.name == self.environment.Bool_reduce_name:
+    #        object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
+    #        if (!lean_is_scalar(r)) {
+    #            lean_dec_ref(r);
+    #            throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceBool'");
+    #        }
+    #        return lean_unbox(r) == 0 ? some_expr(mk_bool_false()) : some_expr(mk_bool_true());
+    #    if isinstance(e.fn, Const) and e.fn.name == self.environment.Nat_reduce_name:
+    #        object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
+    #        if (lean_is_scalar(r) || lean_is_mpz(r)) {
+    #            return some_expr(mk_lit(literal(nat(r))));
+    #        } else {
+    #            throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceNat'");
+    #        }
 
     # INDUCTIVE
     @typechecked
@@ -628,12 +604,13 @@ class TypeChecker:
         return fold_apps(Const(name=constructor.info.name, lvl_params=d.lvl_params), args)
 
     @typechecked
-    def to_constructor_when_K(self, recursor : Recursor, e : Expression) -> Expression: # DOES NOT CHANGE ANYTHING
+    def to_constructor_when_K(self, recursor : Recursor, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
         """See https://stackoverflow.com/questions/39239363/what-is-axiom-k
         For datatypes that support K-axiom, given `e` an element of that type, we convert (if possible)
         to the default constructor. For example, if `e : a = a`, then this method returns `eq.refl a` """
         assert recursor.isK, "Cannot apply K-axiom to a recursor that is not K."
-        app_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True)))
+        app_type = self.infer_core(e, infer_only=(self.allow_loose_infer and True))
+        app_type = self.whnf_core(app_type, cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_rec else self.whnf(app_type)
         app_type_inductive, _ = unfold_app(app_type)
 
         if not isinstance(app_type_inductive, Const): return e
@@ -683,7 +660,7 @@ class TypeChecker:
         return r
 
     @typechecked
-    def reduce_recursor(self, e : Expression) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
+    def reduce_recursor(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]: # DOES NOT CHANGE ANYTHING
         # First check if it is a quotient recursor and can be reduced
         r = self.quot_reduce_rec(e)
         if r is not None:
@@ -703,13 +680,13 @@ class TypeChecker:
         major = rec_args[major_index]
 
         if rec_decl.isK:
-            major = self.to_constructor_when_K(rec_decl, major)
+            major = self.to_constructor_when_K(rec_decl, major, cheap_rec=cheap_rec, cheap_proj=cheap_proj) # TODO cheap_rec
 
-        major = self.whnf(major)
+        major = self.whnf_core(major, cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_rec else self.whnf(major) 
         if isinstance(major, NatLit):
-            major = self.nat_lit_to_constructor(major)
+            major = nat_lit_to_constructor(self.environment, major)
         elif isinstance(major, StringLit):
-            major = self.str_lit_to_constructor(major)
+            major = str_lit_to_constructor(self.environment, major)
         else:
             major = self.to_constructor_when_structure(rec_decl.get_major_induct(), major)
         
@@ -741,12 +718,12 @@ class TypeChecker:
         return rhs
     
     @typechecked
-    def whnf_fvar(self, fvar : FVar, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
+    def whnf_fvar(self, fvar : FVar, cheap_rec : bool, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
         fvar_val = self.get_value_of_fvar(fvar) 
         if fvar_val is None:
             return fvar
         else:
-            return self.whnf_core(fvar_val, cheap_proj=cheap_proj) 
+            return self.whnf_core(fvar_val, cheap_rec=cheap_rec, cheap_proj=cheap_proj) 
 
     @typechecked
     def whnf_core(self, expr : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression: # DOES NOT CHANGE ANYTHING
@@ -759,9 +736,9 @@ class TypeChecker:
 
         r = None
         if isinstance(expr, FVar):
-            return self.whnf_fvar(expr, cheap_proj=cheap_proj)
+            return self.whnf_fvar(expr, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         elif isinstance(expr, Proj):
-            pos_red = self.reduce_proj(expr, cheap_proj=cheap_proj) 
+            pos_red = self.reduce_proj(expr, cheap_rec=cheap_rec, cheap_proj=cheap_proj) 
             if pos_red is None:
                 r = expr
             else:
@@ -771,7 +748,7 @@ class TypeChecker:
             
             fn = self.whnf_core(raw_fn, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
             if isinstance(fn, Lambda):
-                r = self.whnf_core(self.beta_reduction(fn, raw_args), cheap_proj=cheap_proj)
+                r = self.whnf_core(self.beta_reduction(fn, raw_args), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
             elif fn is raw_fn:
                 r = self.reduce_recursor(expr, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
                 if r is not None: 
@@ -779,9 +756,9 @@ class TypeChecker:
                     return red
                 else: return expr
             else:
-                r = self.whnf_core(fold_apps(fn, raw_args), cheap_proj=cheap_proj)
+                r = self.whnf_core(fold_apps(fn, raw_args), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         elif isinstance(expr, Let):
-            r = self.whnf_core(instantiate_bvar(body=expr.body, val=expr.val), cheap_proj=cheap_proj)
+            r = self.whnf_core(instantiate_bvar(body=expr.body, val=expr.val), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         
         if r is None:
             raise PanicError(f"Expr of type {expr.__class__.__name__} could not be matched, this should not happen.")
@@ -792,6 +769,9 @@ class TypeChecker:
     
     @typechecked
     def whnf(self, init_expr : Expression) -> Expression: # DOES NOT CHANGE ANYTHING
+        """
+        More powerful version of whnf_core that aggressively unfolds definitions.
+        """
         if isinstance(init_expr, BVar) or isinstance(init_expr, Sort) or isinstance(init_expr, Pi) or isinstance(init_expr, Lambda) or isinstance(init_expr, NatLit) or isinstance(init_expr, StringLit): return init_expr # easy, non-reducible cases
 
         # we don't check cache results for trivial cases
@@ -801,19 +781,19 @@ class TypeChecker:
         # harder cases
         expr = init_expr
         while True:
-            expr = self.whnf_core(expr, cheap_proj=False)
+            expr = self.whnf_core(expr, cheap_rec=False, cheap_proj=False)
             r_expr = self.reduce_nat_lit(expr)
             if r_expr is not None: 
                 # cache the result of nat_lit reduction
                 self.whnf_cache.put(expr, r_expr)
                 return r_expr
-            else:
-                unfolded = self.delta_reduction(expr)
-                if unfolded is None:
-                    # cache the result if it was NOT delta reduced
-                    self.whnf_cache.put(init_expr, expr)
-                    return expr
-                expr = unfolded
+            
+            unfolded = self.delta_reduction(expr)
+            if unfolded is None:
+                # cache the result if it was NOT delta reduced
+                self.whnf_cache.put(init_expr, expr)
+                return expr
+            expr = unfolded
 
     # TYPE INFERENCE
     @typechecked

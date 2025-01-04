@@ -1,5 +1,5 @@
 from typeguard import typechecked
-from Structures.Environment.Declaration import *
+from Structures.Environment.Declaration.Declaration import *
 
 @typechecked
 def is_structural_inductive(inductive : InductiveType) -> bool:

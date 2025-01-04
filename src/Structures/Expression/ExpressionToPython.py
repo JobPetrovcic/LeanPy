@@ -1,5 +1,5 @@
 from typing import Dict, List, Tuple
-from Structures.Environment.Declaration import *
+from Structures.Environment.Declaration.Declaration import *
 from Structures.Environment.ReducibilityHint import *
 from Structures.Expression.Expression import *
 from Structures.Expression.Level import *

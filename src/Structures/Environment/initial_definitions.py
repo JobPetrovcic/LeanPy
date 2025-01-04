@@ -1,7 +1,7 @@
 from Structures.Name import *
 from Structures.Expression.Level import *
 from Structures.Expression.Expression import *
-from Structures.Environment.Declaration import *
+from Structures.Environment.Declaration.Declaration import *
 from Structures.Environment.ReducibilityHint import *
           
 from Structures.Environment.Environment import Environment

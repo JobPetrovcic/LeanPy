@@ -3,7 +3,7 @@ from typing import Any, Iterator, List, Sequence, Tuple
 
 from typeguard import typechecked
 
-from Structures.Environment.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, RecursionRule, Recursor, Theorem
+from Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, RecursionRule, Recursor, Theorem
 from Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
 from Structures.Expression.Expression import *
 from Structures.Expression.Level import *

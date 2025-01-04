@@ -10,15 +10,13 @@ from Structures.Name import *
 class Expression:
     @typechecked
     def __init__(self):
-        self.hash = None
+        self.hash = self.get_hash()
         
     @abstractmethod
     def get_hash(self) -> int:
         raise NotImplementedError(f"Method get_hash not implemented for class {self.__class__.__name__}")
     
     def __hash__(self) -> int:
-        if self.hash is None:
-            self.hash = self.get_hash()
         return self.hash
 
     @abstractmethod
