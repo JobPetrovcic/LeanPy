@@ -5,7 +5,7 @@ from LeanPy.Structures.Expression.Level import *
 
 
 from typeguard import typechecked
-from LeanPy.Kernel.KernelErrors import PanicError
+from LeanPy.Kernel.KernelErrors import PanicError, UnfinishedError
 from LeanPy.Structures.Expression.Level import *
     
 def to_offset(level : Level) -> Tuple[Level, int]:
@@ -112,6 +112,7 @@ def make_max(args : List[Level]) -> Level:
     return cur
 
 def normalize(l : Level) -> Level:
+    if isinstance(l, LevelMVar): raise UnfinishedError()
     r, offset = to_offset(l)
     if isinstance(r, LevelSucc): raise PanicError("Unreachable code reached in normalize")
     elif isinstance(r, LevelZero) or isinstance(r, LevelParam): return l
@@ -176,9 +177,12 @@ def is_any_max(level : Level) -> bool:
     return isinstance(level, LevelMax) or isinstance(level, LevelIMax)
 
 def is_equivalent(l : Level, r : Level) -> bool:
+    if l.num_mvars > 0: raise UnfinishedError()
+    if r.num_mvars > 0: raise UnfinishedError()
     return (l is r) or l.totally_equal(r) or normalize(l).totally_equal(normalize(r))
 
 def is_equivalent_list(l : List[Level], r : List[Level]) -> bool:
+    # if lengths are not equal, they are not equivalent even if mvars were not resolved
     if len(l) != len(r): return False
     for i in range(len(l)):
         if not is_equivalent(l[i], r[i]): 

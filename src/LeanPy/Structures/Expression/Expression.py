@@ -11,10 +11,24 @@ class Expression:
     @typechecked
     def __init__(self):
         self.hash = self.get_hash()
-        
+        self.update_bookkeeping()
+
+    def update_bookkeeping(self):
+        self.hash = self.get_hash()
+
+        self.num_fvars = self.get_num_fvars()
+        self.num_bvars = self.get_num_bvars()
+        self.num_mvars = self.get_num_mvars()
+
+        self.num_lvl_mvars = self.get_lvl_mvars()
+
+    def get_num_fvars(self) -> int: raise NotImplementedError(f"Method get_num_fvars not implemented for class {self.__class__.__name__}")
+    def get_num_bvars(self) -> int: raise NotImplementedError(f"Method get_num_bvars not implemented for class {self.__class__.__name__}")
+    def get_num_mvars(self) -> int: raise NotImplementedError(f"Method get_num_mvars not implemented for class {self.__class__.__name__}")
+    def get_lvl_mvars(self) -> int: raise NotImplementedError(f"Method get_lvl_mvars not implemented for class {self.__class__.__name__}")
+
     @abstractmethod
-    def get_hash(self) -> int:
-        raise NotImplementedError(f"Method get_hash not implemented for class {self.__class__.__name__}")
+    def get_hash(self) -> int: raise NotImplementedError(f"Method get_hash not implemented for class {self.__class__.__name__}")
     
     def __hash__(self) -> int:
         return self.hash
@@ -41,8 +55,11 @@ class BVar(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("BVar", self.dbj_id))
+    def get_hash(self) -> int: return hash(("BVar", self.dbj_id))
+    def get_num_fvars(self): return 0
+    def get_num_bvars(self): return 1
+    def get_num_mvars(self): return 0
+    def get_lvl_mvars(self): return 0
     
     def __str__(self, depth : int = 0, is_start_of_newline : bool = True) -> str:
         return f"db{self.dbj_id}"
@@ -68,9 +85,11 @@ class FVar(Expression):
         return f"{'let ' if self.is_let else ''}{self.full_identifier()} : ({self.type}) := ({self.val})"
 
     @override
-    def get_hash(self) -> int:
-        # just the hash of the pointer
-        return hash(("FVar", id(self)))
+    def get_hash(self) -> int: return hash(("FVar", id(self)))
+    def get_num_fvars(self): return 1
+    def get_num_bvars(self): return 0
+    def get_num_mvars(self): return 0
+    def get_lvl_mvars(self): return 0
     
     def __str__(self) -> str:
         return f"F{self.name}" + (f":= {self.val}" if self.val is not None else "")
@@ -86,9 +105,12 @@ class Sort(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("Sort", self.level))
-    
+    def get_hash(self) -> int: return hash(("Sort", self.level))
+    def get_num_fvars(self): return 0
+    def get_num_bvars(self): return 0
+    def get_num_mvars(self): return 0
+    def get_lvl_mvars(self): return self.level.num_mvars
+
     def __str__(self) -> str:
         return f"Sort {self.level}"
     
@@ -104,8 +126,11 @@ class Const(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("Const", hash(self.name)))
+    def get_hash(self) -> int: return hash(("Const", hash(self.name)))
+    def get_num_fvars(self): return 0
+    def get_num_bvars(self): return 0
+    def get_num_mvars(self): return 0
+    def get_lvl_mvars(self): return sum([lvl.num_mvars for lvl in self.lvl_params])
     
     def __str__(self) -> str:
         return f"{self.name}.{{{', '.join(map(str, self.lvl_params))}}}"
@@ -122,8 +147,11 @@ class App(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("App", hash(self.fn), hash(self.arg)))
+    def get_hash(self) -> int: return hash(("App", hash(self.fn), hash(self.arg)))
+    def get_num_fvars(self): return self.fn.num_fvars + self.arg.num_fvars
+    def get_num_bvars(self): return self.fn.num_bvars + self.arg.num_bvars
+    def get_num_mvars(self): return self.fn.num_mvars + self.arg.num_mvars
+    def get_lvl_mvars(self): return self.fn.num_lvl_mvars + self.arg.num_lvl_mvars
     
     def __str__(self) -> str:
         args : List[Expression] = []
@@ -146,8 +174,11 @@ class Pi(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("Pi", hash(self.arg_type), hash(self.body_type)))
+    def get_hash(self) -> int: return hash(("Pi", hash(self.arg_type), hash(self.body_type)))
+    def get_num_fvars(self): return self.arg_type.num_fvars + self.body_type.num_fvars
+    def get_num_bvars(self): return self.arg_type.num_bvars + self.body_type.num_bvars
+    def get_num_mvars(self): return self.arg_type.num_mvars + self.body_type.num_mvars
+    def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.body_type.num_lvl_mvars
     
     def __str__(self) -> str:
         return f"({self.bname} : {self.arg_type}) -> ({self.body_type})"
@@ -165,8 +196,11 @@ class Lambda(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("Lambda", hash(self.arg_type), hash(self.body)))
+    def get_hash(self) -> int: return hash(("Lambda", hash(self.arg_type), hash(self.body)))
+    def get_num_fvars(self): return self.arg_type.num_fvars + self.body.num_fvars
+    def get_num_bvars(self): return self.arg_type.num_bvars + self.body.num_bvars
+    def get_num_mvars(self): return self.arg_type.num_mvars + self.body.num_mvars
+    def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.body.num_lvl_mvars
     
     def __str__(self) -> str:
         return f"fun ({self.bname} : {self.arg_type}) => ({self.body})"
@@ -185,8 +219,11 @@ class Let(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("Let", hash(self.bname), hash(self.arg_type), hash(self.val), hash(self.body)))
+    def get_hash(self) -> int: return hash(("Let", hash(self.bname), hash(self.arg_type), hash(self.val), hash(self.body)))
+    def get_num_fvars(self): return self.arg_type.num_fvars + self.val.num_fvars + self.body.num_fvars
+    def get_num_bvars(self): return self.arg_type.num_bvars + self.val.num_bvars + self.body.num_bvars
+    def get_num_mvars(self): return self.arg_type.num_mvars + self.val.num_mvars + self.body.num_mvars
+    def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.val.num_lvl_mvars + self.body.num_lvl_mvars
     
     def __str__(self) -> str:
         return f"(let {self.bname} : {self.arg_type} := {self.val}) in ({self.body})"
@@ -203,8 +240,10 @@ class Proj(Expression):
         self.struct = struct
         Expression.__init__(self)
     
-    def get_hash(self) -> int:
-        return hash(("Proj", hash(self.type_name), self.index, hash(self.struct)))
+    def get_hash(self) -> int: return hash(("Proj", hash(self.type_name), self.index, hash(self.struct)))
+    def get_num_fvars(self): return self.struct.num_fvars
+    def get_num_bvars(self): return self.struct.num_bvars
+    def get_num_mvars(self): return self.struct.num_mvars
     
     def __str__(self) -> str:
         return f"({self.struct}).{self.index}"
@@ -221,8 +260,11 @@ class NatLit(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("NatLit", self.val))
+    def get_hash(self) -> int: return hash(("NatLit", self.val))
+    def get_num_fvars(self): return 0
+    def get_num_bvars(self): return 0
+    def get_num_mvars(self): return 0
+    def get_lvl_mvars(self): return 0
     
     def __str__(self) -> str:
         return str(self.val)
@@ -238,8 +280,11 @@ class StringLit(Expression):
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int:
-        return hash(("StringLit", self.val))
+    def get_hash(self) -> int: return hash(("StringLit", self.val))
+    def get_num_fvars(self): return 0
+    def get_num_bvars(self): return 0
+    def get_num_mvars(self): return 0
+    def get_lvl_mvars(self): return 0
 
     def __str__(self) -> str:
         return f'"{self.val}"'
@@ -247,5 +292,18 @@ class StringLit(Expression):
     @typechecked
     def totally_equal(self, other : 'Expression') -> bool:
         return isinstance(other, StringLit) and self.val == other.val
+    
+class MVar(Expression):
+    def __init__(self):
+        Expression.__init__(self)
+    
+    @override
+    def get_hash(self) -> int:return hash("MVar")
+    def get_num_fvars(self): return 0
+    def get_num_bvars(self): return 0
+    def get_num_mvars(self): return 1
+    def get_lvl_mvars(self): return 0
+    
+    def __str__(self) -> str: return "MVar"
 
-__all__ = ['Expression', 'BVar', 'FVar', 'Sort', 'Const', 'App', 'Pi', 'Lambda', 'Let', 'Proj', 'NatLit', 'StringLit']
+__all__ = ['Expression', 'BVar', 'FVar', 'Sort', 'Const', 'App', 'Pi', 'Lambda', 'Let', 'Proj', 'NatLit', 'StringLit', 'MVar']

@@ -6,6 +6,7 @@ from typeguard import typechecked
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import Level, LevelParam
 from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
+from LeanPy.Kernel.KernelErrors import UnfinishedError
 
 # for fvars we are relying on total equality
 @typechecked
@@ -160,6 +161,7 @@ def instantiate_bvar(body : Expression, val : Expression) -> Expression:
     Replaces the outermost bound variable in the given expression with the given free variable. Throws an error if it finds an unbound bvar index.
     """
     def intantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
+        if isinstance(expr, MVar): raise UnfinishedError()
         if isinstance(expr, BVar): 
             if expr.dbj_id == depth: return val
         return None
@@ -170,6 +172,7 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
     Replaces the outermost bound variables in the given expression with the given free variables. Throws an error if it finds an unbound bvar index.
     """
     def instantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
+        if isinstance(expr, MVar): raise UnfinishedError()
         if isinstance(expr, BVar): 
             if expr.dbj_id >= depth: 
                 if expr.dbj_id - depth < len(vals): return vals[expr.dbj_id - depth]
@@ -181,6 +184,7 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
 def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     # turns fvar into a bound variable with de Bruijn index depth
     def abstraction_fn(expr : Expression, depth : int) -> Optional[Expression]:
+        if isinstance(expr, MVar): raise PanicError("MVars should never be present when abstracting.")
         if isinstance(expr, FVar):
             if expr is fvar:
                 return BVar(dbj_id=depth)
@@ -225,13 +229,6 @@ def fold_apps(fn : Expression, args : List[Expression]) -> Expression:
     for arg in args:
         result = App(fn=result, arg=arg)
     return result
-
-#@typechecked
-#def clone_expression(expr : Expression) -> Expression:
-#    """ Clones the given expression. """
-#    def clone_fn(expr : Expression) -> Optional[Expression]:
-#        return None
-#    return replace_expression(expr, clone_fn)
 
 @typechecked
 def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:
