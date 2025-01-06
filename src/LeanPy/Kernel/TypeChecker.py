@@ -32,7 +32,7 @@ class TypeChecker:
 
         self.whnf_cache = WHNFCache()
         self.whnf_core_cache = WHNFCache()
-        self.infer_cache = InferCache()
+        self.infer_cache = [InferCache(), InferCache()]
 
         self.equiv_manager = EquivManager()
 
@@ -1169,6 +1169,10 @@ class TypeChecker:
 
         has_fvar_not_in_context(expr, self.local_context) # TODO : remove this after testing
 
+        # check if expression is already in infer_cache (separate cache for infer_only)
+        cached_inferred_type = self.infer_cache[infer_only].get(expr)
+        if cached_inferred_type is not None: return cached_inferred_type
+
         if isinstance(expr, BVar): raise PanicError("BVar should have been substituted when inferring")
         elif isinstance(expr, FVar): inferred_type = self.infer_fvar(expr) # we should not clone the fvar since we are using "is" to compare
         elif isinstance(expr, App): inferred_type = self.infer_app(expr, infer_only=(self.allow_loose_infer and infer_only))
@@ -1183,6 +1187,9 @@ class TypeChecker:
         else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
         
         has_fvar_not_in_context(inferred_type, self.local_context) # TODO : remove this after testing
+
+        # cache the result
+        self.infer_cache[infer_only].put(expr, inferred_type)
 
         return inferred_type
     
