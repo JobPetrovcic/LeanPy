@@ -131,6 +131,7 @@ class App(Expression):
         while isinstance(fn, App):
             args.append(fn.arg)
             fn = fn.fn
+        args = list(reversed(args))
         return f"({fn} |> {'|> '.join(map(str, args))})"
     
     @typechecked
