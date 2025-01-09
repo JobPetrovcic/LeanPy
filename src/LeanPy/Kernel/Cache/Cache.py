@@ -1,5 +1,5 @@
 from typing import Dict, Generic, Optional, Tuple, TypeVar
-from Structures.Expression.Expression import Expression
+from LeanPy.Structures.Expression.Expression import Expression
 
 class MapCache:
     def __init__(self):
@@ -23,7 +23,6 @@ class InferCache(MapCache):
 class WHNFCache(MapCache):
     def __init__(self):
         super().__init__()
-
 
 T = TypeVar("T")
 class PairCache(Generic[T]):

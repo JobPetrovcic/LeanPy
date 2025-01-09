@@ -1,9 +1,11 @@
+from abc import abstractmethod
 from typeguard import typechecked
 
 from LeanPy.Structures.Name import Name
 
 class Level:
     def __init__(self):
+        self.is_external = False
         self.update_bookkeeping()
     
     def update_bookkeeping(self):
@@ -13,7 +15,7 @@ class Level:
     def __str__(self) -> str:
         raise NotImplementedError("Method __str__ not implemented for abstract class Level")
 
-    @typechecked
+    @abstractmethod
     def totally_equal(self, other: 'Level') -> bool:
         raise NotImplementedError("Method totally_equal not implemented for abstract class Level")
     
@@ -22,6 +24,9 @@ class Level:
     def get_hash(self) -> int: raise NotImplementedError("Method get_hash not implemented for abstract class Level")
 
 class LevelZero(Level):
+    def __init__(self):
+        Level.__init__(self)
+        
     def __str__(self) -> str:
         return "0"
 
@@ -35,6 +40,7 @@ class LevelSucc(Level):
     @typechecked
     def __init__(self, anc: Level):
         self.anc = anc
+        Level.__init__(self)
     
     def __str__(self) -> str:
         r = self
@@ -58,6 +64,7 @@ class LevelMax(Level):
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
+        Level.__init__(self)
     
     def __str__(self) -> str:
         return f"Max({self.lhs}, {self.rhs})"
@@ -73,6 +80,7 @@ class LevelIMax(Level):
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
+        Level.__init__(self)
     
     def __str__(self) -> str:
         return f"IMax({self.lhs}, {self.rhs})"
@@ -87,6 +95,7 @@ class LevelParam(Level):
     @typechecked
     def __init__(self, name: Name):
         self.name = name
+        Level.__init__(self)
     
     def __str__(self) -> str:
         return f"{self.name}"

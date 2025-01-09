@@ -7,7 +7,6 @@ Three classes of errors are defined here:
  - PanicError: This error is thrown when something that should never happen happens: reaching cases that should be unreachable, etc.    
  - KernelError: This error is thrown when the kernel operated correctly but the input was incorrect therefore the expression  is not well-typed.
  - UnfinishedError: This error is thrown when the kernel operated correctly, the expression was well-typed up to the point the kernel encountered an unfinished expression.
-
 """
 
 # Panic Errors
@@ -44,6 +43,10 @@ class DeclarationError(KernelError):
 class RecursorError(KernelError):
     def __init__(self, message : str):
         super().__init__(message)
+
+class FoundUnsubstitutedBVarError(KernelError):
+    def __init__(self):
+        super().__init__("Found unsubstituted BVar")
 
 # Unfinished Errors
 class UnfinishedError(Exception):

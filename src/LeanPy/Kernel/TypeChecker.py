@@ -1,9 +1,9 @@
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
 from LeanPy.Kernel.Analysis import has_fvar_not_in_context, print_neg
 from LeanPy.Kernel.Cache.EquivManager import EquivManager
-from LeanPy.Kernel.Cache.Cache import InferCache, WHNFCache
+from LeanPy.Kernel.Cache.Cache import InferCache, PairCache, WHNFCache
 from LeanPy.Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
 from LeanPy.Structures.Environment.Declaration.DeclarationManipulation import is_structural_inductive
 from LeanPy.Structures.Environment.Environment import Environment
@@ -16,7 +16,7 @@ from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, fold_apps, has_fvar, has_loose_bvars, has_specific_fvar, instantiate_bvar, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.LevelManipulation import is_equivalent, is_equivalent_list, are_unique_level_params
-from LeanPy.Kernel.KernelErrors import ExpectedDifferentExpressionError, ExpectedDifferentTypesError, PanicError, ProjectionError, EnvironmentError, DeclarationError, RecursorError, UnfinishedError
+from LeanPy.Kernel.KernelErrors import ExpectedDifferentExpressionError, ExpectedDifferentTypesError, PanicError, ProjectionError, EnvironmentError, DeclarationError,  RecursorError, UnfinishedError, FoundUnsubstitutedBVarError
 from LeanPy.Structures.Name import Name
 import warnings
 
@@ -27,12 +27,14 @@ sys.setrecursionlimit(10**9)
 # - special cases for Nat and String literals
 
 class TypeChecker:
-    def __init__(self, allow_loose_infer : bool = False):
+    def __init__(self, handle_external: Callable[[Expression, Expression], None], allow_loose_infer : bool = False):
         self.allow_loose_infer = allow_loose_infer
+        self.handle_external = handle_external # handle_external is called when an external expression is correctly type checked; used mainly for rewarding the agent
 
         self.whnf_cache = WHNFCache()
         self.whnf_core_cache = WHNFCache()
         self.infer_cache = [InferCache(), InferCache()]
+        self.instantiation_cache = PairCache[Expression]()
 
         self.equiv_manager = EquivManager()
 
@@ -60,7 +62,9 @@ class TypeChecker:
         Replace the outermost bound variable in the body with the value. Clones the body(!).
         """
         # instantiate_bvar will throw an error if mvars are present in the body
-        return instantiate_bvar(body, val)
+        inst_body = instantiate_bvar(body, val)
+        #self.instantiation_cache.put(body, val, inst_body) TODO : there is gonna be a big problem with local context here, so fix that before enabling this
+        return inst_body
     
     @typechecked
     def instantiate_multiple(self, body : Expression, vals : Sequence[Expression]) -> Expression:
@@ -329,7 +333,7 @@ class TypeChecker:
         # t_ype is definitely without mvars, so we can proceed
         return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_loose_infer and True)))
     
-    @print_neg
+    #@print_neg
     @typechecked
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
         if isinstance(l, MVar) or isinstance(r, MVar): raise UnfinishedError() # they should not be actual MVars, however, their subexpressions might contain MVars
@@ -688,7 +692,7 @@ class TypeChecker:
         if isinstance(f, Const) and isinstance(self.environment.get_declaration_under_name(f.name), Constructor): return e
 
         # if e has mvars, then infer_core will throw an error
-        e_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True))) # TODO: cheap_rec
+        e_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True)))
         # at this point e_type and e are definitely without mvars
         # we can proceed normally
 
@@ -1167,13 +1171,13 @@ class TypeChecker:
         """
         if isinstance(expr, MVar): raise UnfinishedError()
 
-        has_fvar_not_in_context(expr, self.local_context) # TODO : remove this after testing
+        #has_fvar_not_in_context(expr, self.local_context) # TODO : remove this after testing
 
         # check if expression is already in infer_cache (separate cache for infer_only)
         cached_inferred_type = self.infer_cache[infer_only].get(expr)
         if cached_inferred_type is not None: return cached_inferred_type
 
-        if isinstance(expr, BVar): raise PanicError("BVar should have been substituted when inferring")
+        if isinstance(expr, BVar): raise FoundUnsubstitutedBVarError()
         elif isinstance(expr, FVar): inferred_type = self.infer_fvar(expr) # we should not clone the fvar since we are using "is" to compare
         elif isinstance(expr, App): inferred_type = self.infer_app(expr, infer_only=(self.allow_loose_infer and infer_only))
         elif isinstance(expr, Sort): inferred_type = self.infer_sort(expr)
@@ -1186,12 +1190,17 @@ class TypeChecker:
         elif isinstance(expr, StringLit): inferred_type = self.infer_string_lit(expr) # this always inferred_type=s a new const
         else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
         
-        has_fvar_not_in_context(inferred_type, self.local_context) # TODO : remove this after testing
+        #has_fvar_not_in_context(inferred_type, self.local_context) # TODO : remove this after testing
 
         # cache the result
         self.infer_cache[infer_only].put(expr, inferred_type)
+        self.bookkeep_external(expr, inferred_type)
 
         return inferred_type
+    
+    def bookkeep_external(self, expr : Expression, inferred_type : Expression):
+        if expr.is_external:
+            self.handle_external(expr, inferred_type)
     
     @typechecked
     def infer(self, expr : Expression) -> Expression:
@@ -1366,3 +1375,6 @@ class TypeChecker:
         elif isinstance(decl, Recursor): self.add_recursor(name, decl)
         elif isinstance(decl, Quot): self.add_quotient(name, decl)
         else: raise ValueError(f"Unknown declaration type {decl.__class__.__name__}")
+    
+    def available_declarations(self) -> List[Name]:
+        return self.environment.available_declarations()

@@ -160,3 +160,9 @@ class Environment:
         if name in self.name_dict:
             raise ValueError(f"Name {name} already exists in environment.")
         self.name_dict[name] = decl
+
+    def available_declarations(self) -> List[Name]:
+        return list(self.name_dict.keys())
+    
+    def __len__(self) -> int:
+        return len(self.name_dict)

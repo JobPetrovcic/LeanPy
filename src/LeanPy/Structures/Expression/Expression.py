@@ -11,6 +11,7 @@ class Expression:
     @typechecked
     def __init__(self):
         self.hash = self.get_hash()
+        self.is_external = False
         self.update_bookkeeping()
 
     def update_bookkeeping(self):
