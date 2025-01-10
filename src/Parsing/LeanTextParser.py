@@ -541,6 +541,11 @@ class LeanFormatParser:
     def from_file(file_path : str):
         with open(file_path, "r") as file:
             return LeanFormatParser(file)
+    
+    @staticmethod
+    def load_type_checking_environment(file_path : str) -> TypeChecker:
+        parsed = LeanFormatParser.from_file(file_path)
+        return parsed.type_checker
 
 def hex_list_to_string(hex_list : List[int]) -> str:
     """Converts a list of integers representing a hexadecimal-encoded UTF-8 string to a string."""
