@@ -17,9 +17,9 @@ class FormatError(Exception):
         self.message = message
 
 class LeanFormatParser:
-    def __init__(self, lean_format_lines: str | Iterator[str]):
+    def __init__(self, lean_format_lines: str | Iterator[str], *type_checker_args: Any):
         # split lines
-        self.type_checker = TypeChecker()
+        self.type_checker = TypeChecker(*type_checker_args)
         
         if isinstance(lean_format_lines, str):
             lean_format_lines = iter(lean_format_lines.split("\n"))
