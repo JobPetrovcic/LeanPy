@@ -13,10 +13,10 @@ from LeanPy.Structures.Environment.NatReduction import nat_lit_to_constructor
 from LeanPy.Structures.Environment.NatReduction import str_lit_to_constructor
 from LeanPy.Structures.Environment.NatReduction import reduce_bin_nat_pred
 from LeanPy.Structures.Expression.Expression import *
-from LeanPy.Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, fold_apps, has_fvar, has_loose_bvars, has_specific_fvar, instantiate_bvar, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
+from LeanPy.Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, fold_apps, has_loose_bvars, has_specific_fvar, instantiate_bvar, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.LevelManipulation import is_equivalent, is_equivalent_list, are_unique_level_params
-from LeanPy.Kernel.KernelErrors import ExpectedDifferentExpressionError, ExpectedDifferentTypesError, PanicError, ProjectionError, EnvironmentError, DeclarationError,  RecursorError, UnfinishedError, FoundUnsubstitutedBVarError
+from LeanPy.Kernel.KernelErrors import ExpectedDifferentExpressionError, ExpectedDifferentExpressionsError, PanicError, ProjectionError, EnvironmentError, DeclarationError,  RecursorError, UnfinishedError, FoundUnsubstitutedBVarError
 from LeanPy.Structures.Name import Name
 import warnings
 
@@ -27,9 +27,13 @@ sys.setrecursionlimit(10**9)
 # - special cases for Nat and String literals
 
 class TypeChecker:
-    def __init__(self, handle_external: Callable[[Expression, Expression], None], allow_loose_infer : bool = False):
+    @typechecked
+    def __init__(self, handle_external: Callable[[Expression, Expression], None] | None = None, allow_loose_infer : bool = False, environment : Environment | None = None):
         self.allow_loose_infer = allow_loose_infer
-        self.handle_external = handle_external # handle_external is called when an external expression is correctly type checked; used mainly for rewarding the agent
+        if handle_external is None:
+            self.handle_external = lambda e, t: None
+        else:
+            self.handle_external = handle_external # handle_external is called when an external expression is correctly type checked; used mainly for rewarding the agent
 
         self.whnf_cache = WHNFCache()
         self.whnf_core_cache = WHNFCache()
@@ -38,7 +42,10 @@ class TypeChecker:
 
         self.equiv_manager = EquivManager()
 
-        self.environment = Environment()
+        if environment is None:
+            self.environment = Environment()
+        else:
+            self.environment = environment
         self.local_context = LocalContext()
 
     # LOCAL CONTEXT INTERACTIONS
@@ -159,6 +166,7 @@ class TypeChecker:
         """
         # mvars can only be present in the level parameters, and is_equivalent_list will throw an error if mvars are present in the levels
         if l.name == r.name:
+            if len(l.lvl_params) != len(r.lvl_params): raise ValueError("Level parameters for a constant should be the same length.")
             if is_equivalent_list(l.lvl_params, r.lvl_params): return True
             else: warnings.warn(f"Constants {l} and {r} have the same name but different level parameters : {[str(lvl) for lvl in l.lvl_params]} and {[str(lvl) for lvl in r.lvl_params]}")
         return False
@@ -960,7 +968,7 @@ class TypeChecker:
 
             # the domain of the function should be equal to the type of the argument
             if not self.def_eq(fn_type.arg_type, inferred_arg_type):
-                raise ExpectedDifferentTypesError(fn_type.arg_type, inferred_arg_type)
+                raise ExpectedDifferentExpressionsError(fn_type.arg_type, inferred_arg_type)
             
             infered_type = self.instantiate(body=fn_type.body_type, val=app.arg)
             return infered_type
@@ -1061,7 +1069,7 @@ class TypeChecker:
             self.ensure_sort(self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
             inferred_val_type = self.infer_core(e.val, infer_only=(self.allow_loose_infer and infer_only))
             if not self.def_eq(inferred_val_type, e.arg_type):
-                raise ExpectedDifferentTypesError(inferred_val_type, e.arg_type)
+                raise ExpectedDifferentExpressionsError(inferred_val_type, e.arg_type)
 
         fvar, inst_body = self.instantiate_fvar( # for let expression we use fvars; it is up to the wnhf to further unfold the var later
             bname=e.bname,
@@ -1116,7 +1124,7 @@ class TypeChecker:
         for i in range(inductive_decl.num_params):
             constructor_type = self.whnf(constructor_type)
             if not isinstance(constructor_type, Pi):
-                raise ProjectionError(f"Expected a Pi type when reducing parameters for constructor type but got {constructor_type.__class__}")
+                raise ExpectedDifferentExpressionError(f"Expected a Pi type when reducing parameters for constructor type but got {constructor_type.__class__}")
             if i >= len(args):
                 raise ProjectionError(f"Ran out of arguments for parameters when reducing constructor type.")
             
@@ -1126,7 +1134,7 @@ class TypeChecker:
         for i in range(proj_index):
             constructor_type = self.whnf(constructor_type)
             if not isinstance(constructor_type, Pi):
-                raise ProjectionError(f"Expected a Pi type when reducing indices for constructor type but got {constructor_type.__class__}")
+                raise ExpectedDifferentExpressionError(Pi, constructor_type.__class__)
             
             # TODO: the lean 4 code checks if the type has loose bvars (but how can this happen?). If is_prop_type it then ensures that the body remains a prop
             if has_loose_bvars(constructor_type):
@@ -1139,8 +1147,8 @@ class TypeChecker:
         
         constructor_type = self.whnf(constructor_type)
         if not isinstance(constructor_type, Pi):
-            raise ProjectionError(f"Expected a Pi type for projection index but got {constructor_type.__class__}")
-
+            raise ExpectedDifferentExpressionError(Pi, constructor_type.__class__)
+        
         # TODO: the lean kernel does some checks regarding prop here
         return constructor_type.arg_type
 
@@ -1175,7 +1183,9 @@ class TypeChecker:
 
         # check if expression is already in infer_cache (separate cache for infer_only)
         cached_inferred_type = self.infer_cache[infer_only].get(expr)
-        if cached_inferred_type is not None: return cached_inferred_type
+        if cached_inferred_type is not None:
+            self.bookkeep_external(expr, cached_inferred_type)
+            return cached_inferred_type
 
         if isinstance(expr, BVar): raise FoundUnsubstitutedBVarError()
         elif isinstance(expr, FVar): inferred_type = self.infer_fvar(expr) # we should not clone the fvar since we are using "is" to compare
@@ -1193,6 +1203,7 @@ class TypeChecker:
         #has_fvar_not_in_context(inferred_type, self.local_context) # TODO : remove this after testing
 
         # cache the result
+        assert expr.num_mvars == 0 # TODO: remove for optimization
         self.infer_cache[infer_only].put(expr, inferred_type)
         self.bookkeep_external(expr, inferred_type)
 
@@ -1200,15 +1211,27 @@ class TypeChecker:
     
     def bookkeep_external(self, expr : Expression, inferred_type : Expression):
         if expr.is_external:
-            self.handle_external(expr, inferred_type)
+            if expr.was_rewarded == False:
+                self.handle_external(expr, inferred_type)
+                expr.was_rewarded = True
     
+    def clear_caches(self):
+        self.whnf_cache.clear()
+        self.whnf_core_cache.clear()
+        self.infer_cache[False].clear()
+        self.infer_cache[True].clear()
+        self.instantiation_cache.clear()
+
     @typechecked
-    def infer(self, expr : Expression) -> Expression:
+    def infer(self, expr : Expression, clear_caches: bool = False) -> Expression:
         if isinstance(expr, MVar): raise UnfinishedError()
 
+        # prepare the context and caches
         if not self.local_context.is_empty():
             raise PanicError(f"Local context is not empty when inferring: {self.local_context}")
-        #rprint(f"CHECKING NEW EXPRESSION {expr}")
+        if clear_caches: self.clear_caches()
+        
+        # infer the type
         inferred_type = self.infer_core(expr, infer_only=(self.allow_loose_infer and False))
 
         has_fvar_not_in_context(inferred_type, self.local_context) # TODO : remove this after testing

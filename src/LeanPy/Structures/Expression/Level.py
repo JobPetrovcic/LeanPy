@@ -6,6 +6,7 @@ from LeanPy.Structures.Name import Name
 class Level:
     def __init__(self):
         self.is_external = False
+        self.was_rewarded = False
         self.update_bookkeeping()
     
     def update_bookkeeping(self):

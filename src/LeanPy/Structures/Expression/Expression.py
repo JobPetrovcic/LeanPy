@@ -12,6 +12,7 @@ class Expression:
     def __init__(self):
         self.hash = self.get_hash()
         self.is_external = False
+        self.was_rewarded = False
         self.update_bookkeeping()
 
     def update_bookkeeping(self):
@@ -246,6 +247,7 @@ class Proj(Expression):
     def get_num_fvars(self): return self.struct.num_fvars
     def get_num_bvars(self): return self.struct.num_bvars
     def get_num_mvars(self): return self.struct.num_mvars
+    def get_lvl_mvars(self): return self.struct.num_lvl_mvars
     
     def __str__(self) -> str:
         return f"({self.struct}).{self.index}"
