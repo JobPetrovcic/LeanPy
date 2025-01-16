@@ -117,7 +117,7 @@ def normalize(l : Level) -> Level:
     elif isinstance(r, LevelZero) or isinstance(r, LevelParam): return l
     elif isinstance(r, LevelIMax):
         im = make_imax(normalize(r.lhs), normalize(r.rhs))
-        if not isinstance(im, LevelIMax): im = normalize(im)
+        if not isinstance(im, LevelIMax): im = normalize(im) # this is not in the original code and I am unsure why not
         return from_offset(im, offset)
     elif isinstance(r, LevelMax):
         todo : List[Level] = []
@@ -143,23 +143,23 @@ def normalize(l : Level) -> Level:
                 i += 1
         rargs.append(args[i])
     
-
-        p = to_offset(args[i]) # the largest current level
+        pp = to_offset(args[i]) # the largest current level
         i += 1
         for i in range(i, len(args)):
             q = to_offset(args[i])
-            args[i] = q[0]
-            if p[0].totally_equal(q[0]):
-                if p[1] < q[1]:
-                    p = q # if we found a larger one we save it
+            if pp[0].totally_equal(q[0]):
+                if pp[1] < q[1]:
+                    pp = q # if we found a larger one we save it
                     rargs.pop()
                     rargs.append(args[i])
             else:
-                p = q
+                pp = q
                 rargs.append(args[i])
+        
         for i in range(len(rargs)):
-            rargs[i] = from_offset(to_offset(rargs[i])[0], p[1])
-        return make_max(rargs)
+            rargs[i] = from_offset(rargs[i], offset)
+        ret = make_max(rargs)
+        return ret
     raise PanicError("Unreachable code reached in normalize")
 
 def are_unique_level_params(levels : Sequence[Level]) -> bool:
