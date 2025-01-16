@@ -86,6 +86,7 @@ class LeanFormatParser:
 
     @typechecked
     def add_content_to_hierarchical_name(self, hid : int, decl : Declaration):
+        self.decleration_count += 1
         if hid == 0:
             raise FormatError("The root hierarchical name is anonymous and should not get any content")
         self.type_checker.add_declaration(self.get_hierarchical_name(hid), decl) 
@@ -185,6 +186,7 @@ class LeanFormatParser:
 
     # EXPRESSIONS
     def add_expression(self, eid : int, expression : Expression):
+        self.expression_count += 1
         assert eid >= 0, "Expression id must be non-negative"
         if eid != len(self.expressions):
             raise FormatError("The next expression id must be the next in the List")
@@ -561,6 +563,8 @@ class LeanFormatParser:
             # TODO: check that this is probably not needed
             raise NotImplementedError("Prefix types are not supported")
         else: raise ValueError(f"None of the tags {parts[0]} and {parts[1]} are known")
+
+        #print(self.expression_count/self.decleration_count if self.decleration_count != 0 else 0)
 
     @staticmethod
     def from_file(file_path : str, **type_checker_args):

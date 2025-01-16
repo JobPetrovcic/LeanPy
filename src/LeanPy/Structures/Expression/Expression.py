@@ -135,7 +135,10 @@ class Const(Expression):
     def get_lvl_mvars(self): return sum([lvl.num_mvars for lvl in self.lvl_params])
     
     def __str__(self) -> str:
-        return f"{self.name}.{{{', '.join(map(str, self.lvl_params))}}}"
+        const_str = f"@{self.name}"
+        if len(self.lvl_params) == 0: return const_str
+        params_str = f"{{{', '.join(map(str, self.lvl_params))}}}"
+        return f"{const_str}.{params_str}"
     
     @typechecked
     def totally_equal(self, other : 'Expression') -> bool:
@@ -162,7 +165,7 @@ class App(Expression):
             args.append(fn.arg)
             fn = fn.fn
         args = list(reversed(args))
-        return f"({fn} |> {'|> '.join(map(str, args))})"
+        return f"({fn} {' '.join(map(str, args))})"
     
     @typechecked
     def totally_equal(self, other : 'Expression') -> bool:

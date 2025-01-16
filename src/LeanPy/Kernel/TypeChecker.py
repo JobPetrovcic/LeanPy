@@ -21,7 +21,7 @@ from LeanPy.Structures.Name import Name
 import warnings
 
 import sys
-sys.setrecursionlimit(10**9)
+sys.setrecursionlimit(10**4)
 
 #TODO:
 # - special cases for Nat and String literals
@@ -50,20 +50,24 @@ class TypeChecker:
 
     # LOCAL CONTEXT INTERACTIONS
     @typechecked
+    #@profile
     def remove_fvar(self, fvar: FVar):
         self.local_context.remove_fvar(fvar)
     
     @typechecked
+    #@profile
     def get_type_of_fvar(self, fvar : FVar) -> Expression:
         # has no mvars, see create_fvar
         return self.local_context.get_fvar_type(fvar)
     
     @typechecked
+    #@profile
     def get_value_of_fvar(self, fvar : FVar) -> Optional[Expression]:
         # has no mvars, see create_fvar
         return self.local_context.get_fvar_value(fvar)
     
     @typechecked
+    #@profile
     def instantiate(self, body : Expression, val : Expression) -> Expression:
         """
         Replace the outermost bound variable in the body with the value. Clones the body(!).
@@ -74,6 +78,7 @@ class TypeChecker:
         return inst_body
     
     @typechecked
+    #@profile
     def instantiate_multiple(self, body : Expression, vals : Sequence[Expression]) -> Expression:
         """
         Replace the outermost bound variables in the body with the values. Clones the body(!).
@@ -83,6 +88,7 @@ class TypeChecker:
         return instantiate_bvars(body, vals)
     
     @typechecked
+    #@profile
     def create_fvar(self, name: Name, type: Expression, val : Optional[Expression], is_let : bool) -> FVar:
         if type.num_mvars > 0: raise PanicError("Type of fvar should in no case have mvars.")
         if val is not None and val.num_mvars > 0: raise PanicError("Value of fvar should in no case have mvars.")
@@ -92,6 +98,7 @@ class TypeChecker:
         return fvar
 
     @typechecked
+    #@profile
     def instantiate_fvar(
             self, 
             bname : Name, 
@@ -105,6 +112,7 @@ class TypeChecker:
         return fvar, self.instantiate(body, fvar)
     
     @typechecked
+    #@profile
     def instantiate_fvar_multiple_bodies(
             self, 
             bname : Name, 
@@ -117,6 +125,7 @@ class TypeChecker:
         return fvar, [self.instantiate(body, fvar) for body in bodies]
     
     @typechecked
+    #@profile
     def abstract(self, fvar : FVar, expr : Expression) -> Expression: # CHECKED
         """Abstracts the outermost bound variable in the given expression."""
         # remove the fvar from the local context
@@ -127,6 +136,7 @@ class TypeChecker:
     
     # HELPERS
     @typechecked
+    #@profile
     def ensure_pi(self, expr : Expression) -> Pi: # CHECKED
         if expr.num_mvars > 0: raise PanicError("When ensuring pi, the expression should not have mvars. This is the responsibility of the function calling ensure_pi.")
         if isinstance(expr, MVar): raise UnfinishedError()
@@ -138,12 +148,14 @@ class TypeChecker:
         else: raise ExpectedDifferentExpressionError(Pi, expr.__class__)
 
     @typechecked
+    #@profile
     def is_structure_like(self, decl_name : Name) -> bool:
         decl = self.environment.get_declaration_under_name(decl_name)
         if not isinstance(decl, InductiveType): return False
         return is_structural_inductive(decl) and decl.num_indices == 0 and not decl.is_recursive
     
     @typechecked
+    #@profile
     def is_prop(self, e : Expression):
         # infer_core will throw an error if mvars are present in the expression
         inferred_type = self.whnf(self.infer_core(e, infer_only=(self.allow_loose_infer and True)))
@@ -151,6 +163,7 @@ class TypeChecker:
 
     # DEFINITIONAL EQUALITY
     @typechecked
+    #@profile
     def def_eq_sort(self, l : Sort, r : Sort) -> bool:
         """Sorts are equal if their levels satisfy antisymmetry.
         The comparsion function does not change anything, so def_eq_sort is safe to use when passing by reference.
@@ -159,6 +172,7 @@ class TypeChecker:
         return is_equivalent(l.level, r.level)
 
     @typechecked
+    #@profile
     def def_eq_const(self, l : Const, r : Const) -> bool:
         """
         If the names are the same, and the level parameters are equal, then the constants are equal.
@@ -172,6 +186,7 @@ class TypeChecker:
         return False
 
     @typechecked
+    #@profile
     def def_eq_app(self, l : App, r : App) -> bool:
         f_fn, f_args = unfold_app(l.fn)
         g_fn, g_args = unfold_app(r.fn)
@@ -189,6 +204,7 @@ class TypeChecker:
         return True
 
     @typechecked
+    #@profile
     def def_eq_pi(self, l: Pi, r: Pi) -> bool:
         # if l or r has mvars, then def_eq will throw an error
         if not self.def_eq(l.arg_type, r.arg_type):
@@ -208,6 +224,7 @@ class TypeChecker:
         return result
 
     @typechecked
+    #@profile
     def def_eq_lambda(self, l : Lambda, r : Lambda) -> bool:
         # if l or r has mvars, then def_eq will throw an error
         if not self.def_eq(l.arg_type, r.arg_type):
@@ -227,6 +244,7 @@ class TypeChecker:
         return ret
 
     @typechecked
+    #@profile
     def try_structural_eta_expansion_core(self, t : Expression, s : Expression) -> bool: # CHECKED
         # First part: deconstruct s, ensure it is an application of a constructor
         s_fn, s_args = unfold_app(s)
@@ -260,11 +278,13 @@ class TypeChecker:
         return True
 
     @typechecked
+    #@profile
     def try_structural_eta_expansion(self, l : Expression, r : Expression) -> bool:
         # try_structural_eta_expansion_core will throw an error if mvars are present in the expressions
         return self.try_structural_eta_expansion_core(l, r) or self.try_structural_eta_expansion_core(r, l)
     
     @typechecked
+    #@profile
     def try_eta_expansion_core(self, t : Expression, s : Expression) -> bool:
         """
         Tries to eta expand s: if s is a function, then by eta expansion, it is equal to the expression "fun x => s x".
@@ -283,6 +303,7 @@ class TypeChecker:
         return self.def_eq(t, new_s)
 
     @typechecked
+    #@profile
     def try_eta_expansion(self, t : Expression, s : Expression) -> bool:
         """
         Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y.
@@ -292,6 +313,7 @@ class TypeChecker:
         return self.try_eta_expansion_core(t, s) or self.try_eta_expansion_core(s, t)
     
     @typechecked
+    #@profile
     def def_eq_easy(self, l: Expression, r: Expression) -> Optional[bool]:
         if isinstance(l, MVar) or isinstance(r, MVar): raise UnfinishedError() # they should not be actual MVars, however, their subexpressions might contain MVars
         # even if mvars are present in the subexpressions some more work can be done
@@ -311,6 +333,7 @@ class TypeChecker:
         elif isinstance(l, StringLit) and isinstance(r, StringLit): return l.val == r.val
     
     @typechecked
+    #@profile
     def def_eq_proof_irrel(self, t : Expression, s : Expression) -> Optional[bool]:
         """ Proof irrelevance support for propositions. If two expressions have equal types, and the types are proposition, then the expressions are considered equal. """
         # infer_core will throw an error if mvars are present in the expressions
@@ -324,6 +347,7 @@ class TypeChecker:
         return self.def_eq(t_type, s_type)
     
     @typechecked
+    #@profile
     def def_eq_unit_like(self, t : Expression, s : Expression) -> bool:
         # if t has mvars, then infer_core will throw an error
         t_type = self.whnf(self.infer_core(t, infer_only=(self.allow_loose_infer and True)))
@@ -343,6 +367,7 @@ class TypeChecker:
     
     #@print_neg
     @typechecked
+    #@profile
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
         if isinstance(l, MVar) or isinstance(r, MVar): raise UnfinishedError() # they should not be actual MVars, however, their subexpressions might contain MVars
         # even if mvars are present in the subexpressions some more work can be done
@@ -421,6 +446,7 @@ class TypeChecker:
     
     # REDUCTIONS
     @typechecked
+    #@profile
     def beta_reduction(self, 
             f : Expression, #  ( ... ((f a_1) a_2) ... a_n -> f, [a_1, a_2, ..., a_n] outermost to innermost
             args : List[Expression]
@@ -444,6 +470,7 @@ class TypeChecker:
         return fold_apps(inst_f, rest_args)
     
     @typechecked
+    #@profile
     def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression]]]:
         """Checks if the expression is delta reducible: if it is an application of a declaration, then it returns the declaration and the arguments. Otherwise, it returns None."""
         # is_delta is called from whnf_core or lazy_delta_reduction, so we can assume that expr is without mvars
@@ -461,6 +488,7 @@ class TypeChecker:
         return fn, decl, args
 
     @typechecked
+    #@profile
     def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression:
         # delta_reduction_core is called from delta_reduction, so we can assume that fn, decl and args are without mvars
         assert fn.name == decl.info.name
@@ -468,6 +496,7 @@ class TypeChecker:
         return fold_apps(decl_val, args)
 
     @typechecked
+    #@profile
     def delta_reduction(self, expr : Expression) -> Optional[Expression]:
         """ Unfolds the applications of the expression. If the function is a declaration, then it unfolds it. """
         #print(f"delta reducing {expr}")
@@ -479,6 +508,7 @@ class TypeChecker:
         return ret
     
     @typechecked
+    #@profile
     def reduce_proj_core(self, proj_struct : Expression, idx : int) -> Optional[Expression]:
         """ If we have a projection of an expression that is an application of a constructor, then we reduce it to the corresponding argument of the constructor. 
         
@@ -499,6 +529,7 @@ class TypeChecker:
         return proj_struct_args[constructor_decl.num_params + idx]
     
     @typechecked
+    #@profile
     def reduce_proj(self, proj : Proj, cheap_rec :bool, cheap_proj : bool) -> Optional[Expression]:
         # reduce_proj is called from whnf_core, so we can assume that proj is without mvars
         assert proj.num_mvars == 0 # TODO: remove for optimization
@@ -510,6 +541,7 @@ class TypeChecker:
         return self.reduce_proj_core(c, idx)
     
     @typechecked
+    #@profile
     def try_unfold_proj_app(self, e : Expression) -> Optional[Expression]: 
         # try_unfold_proj_app is called from lazy_delta_reduction, so we can assume that e is without mvars
         assert e.num_mvars == 0 # TODO: remove for optimization
@@ -517,12 +549,12 @@ class TypeChecker:
         f = get_app_function(e)
         if not isinstance(f, Proj): return None
         e_new = self.whnf_core(e, cheap_rec=False, cheap_proj=False)
-        #print(f"unfolded proj {e} to {e_new}")
         if e_new is e: return None
         return e_new
 
-    #@profile
+    ##@profile
     @typechecked
+    #@profile
     def lazy_delta_reduction_step(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, ReductionStatus]:
         # lazy_delta_reduction_step is called only from lazy_delta_reduction, so we can assume that t_n and s_n are without mvars
         assert t_n.num_mvars == 0 # TODO: remove for optimization
@@ -565,23 +597,31 @@ class TypeChecker:
             return t_n, s_n, (ReductionStatus.EQUAL if is_easy else ReductionStatus.NOT_EQUAL)
         else: return t_n, s_n, ReductionStatus.CONTINUE
     
-    #@profile
+    ##@profile
     @typechecked
+    #@profile
     def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]:
         # lazy_delta_reduction is called only from the part of def_eq_core where we know that t_n and s_n are without mvars
         assert t_n.num_mvars == 0 # TODO: remove for optimization
         assert s_n.num_mvars == 0 # TODO: remove for optimization
 
         while True:
-            if isinstance(t_n, NatLit) or isinstance(s_n, NatLit): 
+            if not has_fvar(t_n) and not has_fvar(s_n): # TODO: this should be optimized by using a counter for fvars
                 nat_t = self.reduce_nat_lit(t_n) 
                 if nat_t is not None: 
                     return t_n, s_n, self.def_eq_core(nat_t, s_n)
                 nat_s = self.reduce_nat_lit(s_n)
-                if nat_s is not None: return t_n, s_n, self.def_eq_core(t_n, nat_s)
+                if nat_s is not None: 
+                    return t_n, s_n, self.def_eq_core(t_n, nat_s)
+            
+            native_t = self.reduce_native(t_n)
+            if native_t is not None:
+                return t_n, s_n, self.def_eq_core(native_t, s_n)
+            native_s = self.reduce_native(s_n)
+            if native_s is not None:
+                return t_n, s_n, self.def_eq_core(t_n, native_s)
 
             t_n, s_n, status = self.lazy_delta_reduction_step(t_n, s_n)
-            #print(f"Reduced to {t_n} and {s_n}")
 
             if status == ReductionStatus.CONTINUE: continue
             elif status == ReductionStatus.EQUAL: return t_n, s_n, True
@@ -590,6 +630,7 @@ class TypeChecker:
             else: raise PanicError("Unknown reduction status.")
 
     @typechecked
+    #@profile
     def lazy_delta_proj_reduction(self, t_n : Expression, s_n : Expression, idx : int) -> bool:
         # lazy_delta_proj_reduction is called only from the part of def_eq_core where we know that t_n and s_n are without mvars
         assert t_n.num_mvars == 0 # TODO: remove for optimization
@@ -608,6 +649,7 @@ class TypeChecker:
                 return self.def_eq_core(t_n, s_n)
 
     @typechecked
+    #@profile
     def reduce_nat_lit(self, e : Expression) -> Optional[Expression]:
         # reduce_nat_lit is called from lazy_delta_reduction, so we can assume that e is without mvars
         assert e.num_mvars == 0 # TODO: remove for optimization
@@ -617,7 +659,7 @@ class TypeChecker:
         
         fn, args = unfold_app(e)
         if not isinstance(fn, Const): return None
-        if len(args) == 0:
+        if len(args) == 0: # TODO: why does not lean kernel do this?
             if fn.name == self.environment.Nat_zero_name: return NatLit(0)
         if len(args) == 1:
             if fn.name == self.environment.Nat_succ_name:
@@ -646,28 +688,31 @@ class TypeChecker:
             elif name == self.environment.Nat_lxor_name: return reduce_bin_nat_op(nat_xor, arg1.val, arg2.val)
             elif name == self.environment.Nat_shiftl_name: return reduce_bin_nat_op(nat_shiftl, arg1.val, arg2.val)
             elif name == self.environment.Nat_shiftr_name: return reduce_bin_nat_op(nat_shiftr, arg1.val, arg2.val)
-            return e
+        return None
 
-    #def reduce_native(self, e : Expression) -> Optional[Expression]:
-    #    if not isinstance(e, App): return None
-    #    if not isinstance(e.arg, Const): return None
-    #    if isinstance(e.fn, Const) and e.fn.name == self.environment.Bool_reduce_name:
-    #        object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
-    #        if (!lean_is_scalar(r)) {
-    #            lean_dec_ref(r);
-    #            throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceBool'");
-    #        }
-    #        return lean_unbox(r) == 0 ? some_expr(mk_bool_false()) : some_expr(mk_bool_true());
-    #    if isinstance(e.fn, Const) and e.fn.name == self.environment.Nat_reduce_name:
-    #        object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
-    #        if (lean_is_scalar(r) || lean_is_mpz(r)) {
-    #            return some_expr(mk_lit(literal(nat(r))));
-    #        } else {
-    #            throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceNat'");
-    #        }
+    def reduce_native(self, e : Expression) -> Optional[Expression]:
+        if not isinstance(e, App): return None
+        if not isinstance(e.arg, Const): return None
+        if isinstance(e.fn, Const) and e.fn.name == self.environment.Bool_reduce_name:
+            raise NotImplementedError("TODO")
+            #object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
+            #if (!lean_is_scalar(r)) {
+            #    lean_dec_ref(r);
+            #    throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceBool'");
+            #}
+            #return lean_unbox(r) == 0 ? some_expr(mk_bool_false()) : some_expr(mk_bool_true());
+        if isinstance(e.fn, Const) and e.fn.name == self.environment.Nat_reduce_name:
+            raise NotImplementedError("TODO")
+            #object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
+            #if (lean_is_scalar(r) || lean_is_mpz(r)) {
+            #    return some_expr(mk_lit(literal(nat(r))));
+            #} else {
+            #    throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceNat'");
+            #}
 
     # INDUCTIVE
     @typechecked
+    #@profile
     def get_first_constructor(self, inductive_name : Name) -> Optional[Constructor]:
         decl = self.environment.get_declaration_under_name(inductive_name)
         if not isinstance(decl, InductiveType): return None
@@ -675,6 +720,7 @@ class TypeChecker:
         return self.environment.get_constructor(decl.constructor_names[0])
     
     @typechecked
+    #@profile
     def expand_eta_struct(self, e_type : Expression, e : Expression):
         # expand_eta_struct is called from to_constructor_when_structure, so we can assume that e_type and e are without mvars
         fn, args = unfold_app(e_type)
@@ -691,6 +737,7 @@ class TypeChecker:
     
     # inductive stuff
     @typechecked
+    #@profile
     def to_constructor_when_structure(self, inductive_name : Name, e : Expression) -> Expression:
         if not self.is_structure_like(inductive_name): return e
         f = get_app_function(e)
@@ -712,6 +759,7 @@ class TypeChecker:
     
     # inductive stuff
     @typechecked
+    #@profile
     def mk_nullary_constructor(self, type_e : Expression, num_params : int) -> Optional[Expression]:
         # mk_nullary_constructor is called from to_constructor_when_K, so we can assume that type_e is without mvars
         assert type_e.num_mvars == 0 # TODO: remove for optimization
@@ -724,6 +772,7 @@ class TypeChecker:
         return fold_apps(Const(name=constructor.info.name, lvl_params=d.lvl_params), args)
 
     @typechecked
+    #@profile
     def to_constructor_when_K(self, recursor : Recursor, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
         """See https://stackoverflow.com/questions/39239363/what-is-axiom-k
         For datatypes that support K-axiom, given `e` an element of that type, we convert (if possible)
@@ -748,6 +797,7 @@ class TypeChecker:
     
     # QUOTIENT
     @typechecked
+    #@profile
     def quot_reduce_rec(self, e : Expression) -> Optional[Expression]:
         # quot_reduce_rec is called from whnf_core, so we can assume that e is without mvars
         assert e.num_mvars == 0 # TODO: remove for optimization
@@ -786,6 +836,7 @@ class TypeChecker:
         return r
 
     @typechecked
+    #@profile
     def reduce_recursor(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]:
         # reduce_recursor is called from whnf_core, so we can assume that e is without mvars
         assert e.num_mvars == 0 # TODO: remove for optimization
@@ -847,6 +898,7 @@ class TypeChecker:
         return rhs
     
     @typechecked
+    #@profile
     def whnf_fvar(self, fvar : FVar, cheap_rec : bool, cheap_proj : bool) -> Expression:
         fvar_val = self.get_value_of_fvar(fvar) 
         if fvar_val is None:
@@ -855,6 +907,7 @@ class TypeChecker:
             return self.whnf_core(fvar_val, cheap_rec=cheap_rec, cheap_proj=cheap_proj) 
 
     @typechecked
+    #@profile
     def whnf_core(self, expr : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
         if expr.num_mvars > 0: raise UnfinishedError()
 
@@ -899,6 +952,7 @@ class TypeChecker:
         return r
     
     @typechecked
+    #@profile
     def whnf(self, init_expr : Expression) -> Expression:
         """
         More powerful version of whnf_core that aggressively unfolds definitions.
@@ -916,6 +970,12 @@ class TypeChecker:
         expr = init_expr
         while True:
             expr = self.whnf_core(expr, cheap_rec=False, cheap_proj=False)
+
+            v = self.reduce_native(expr)
+            if v is not None:
+                self.whnf_cache.put(init_expr, v)
+                return v
+
             r_expr = self.reduce_nat_lit(expr)
             if r_expr is not None: 
                 # cache the result of nat_lit reduction
@@ -931,11 +991,13 @@ class TypeChecker:
 
     # TYPE INFERENCE
     @typechecked
+    #@profile
     def infer_fvar(self, fvar : FVar):
         # contains no mvar; see create_fvar
         return self.get_type_of_fvar(fvar)
     
     @typechecked
+    #@profile
     def infer_app(self, app : App, infer_only : bool) -> Expression:
         if infer_only:
             # If infer_only is true we only check that the type of fn is a pi type and keep substituting the arguments into the function type's body_type. We don't check that arguments match the function type's domain.
@@ -974,11 +1036,13 @@ class TypeChecker:
             return infered_type
     
     @typechecked
+    #@profile
     def infer_sort(self, sort : Sort) -> Expression:
         if sort.level.num_mvars > 0: raise UnfinishedError()
         return Sort(LevelSucc(sort.level))
 
     @typechecked
+    #@profile
     def infer_pi(self, pi : Pi, infer_only : bool) -> Expression:
         # if pi.arg_type contains mvars, then infer_core will throw an error
         lhs = self.ensure_sort(self.infer_core(pi.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
@@ -1000,6 +1064,7 @@ class TypeChecker:
         return Sort(LevelIMax(lhs.level, rhs.level))
     
     @typechecked
+    #@profile
     def ensure_sort(self, e : Expression) -> Sort:
         # it is up to function calling ensure sort to ensure that e has no mvars
         assert e.num_mvars == 0 # TODO: remove for optimization
@@ -1011,6 +1076,7 @@ class TypeChecker:
         raise ExpectedDifferentExpressionError(Sort, whnfd_e.__class__)
     
     @typechecked
+    #@profile
     def infer_lambda(self, e : Lambda, infer_only : bool) -> Expression:
         if not infer_only:
             # if e.arg_type contains mvars, then infer_core will throw an error
@@ -1038,6 +1104,7 @@ class TypeChecker:
         return infered_pi
     
     @typechecked
+    #@profile
     def infer_const(self, c : Const) -> Expression:
         # does not matter if levels have mvars, this check should pass regardless
         if len(c.lvl_params) != len(self.environment.get_declaration_under_name(c.name).info.lvl_params):
@@ -1048,6 +1115,7 @@ class TypeChecker:
         return self.environment.get_constant_type(c)
     
     @typechecked
+    #@profile
     def make_let_binding(self, fvars : List[FVar], b : Expression) -> Expression:
         # it is up to the function calling make_let_binding to ensure that b has no mvars
 
@@ -1064,6 +1132,7 @@ class TypeChecker:
         return r
 
     @typechecked
+    #@profile
     def infer_let(self, e : Let, infer_only : bool) -> Expression:
         if not infer_only:
             self.ensure_sort(self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
@@ -1092,6 +1161,7 @@ class TypeChecker:
         return inferred_type
     
     @typechecked
+    #@profile
     def proj_get_constructor(self, proj : Proj, infer_only : bool) -> Optional[Tuple[Const, InductiveType, Constructor, List[Expression]]]:
         """Returns the inductive type constant, the corresponding constructor, and the arguments to the constructor."""
         proj_name = proj.type_name
@@ -1110,6 +1180,7 @@ class TypeChecker:
         return inductive_fn, inductive_decl, constructor_decl, args
 
     @typechecked
+    #@profile
     def infer_proj(self, proj : Proj, infer_only : bool) -> Expression:
         proj_index = proj.index
 
@@ -1153,16 +1224,19 @@ class TypeChecker:
         return constructor_type.arg_type
 
     @typechecked
+    #@profile
     def infer_nat_lit(self, n : NatLit) -> Expression:
         # no mvars in n
         return Const(self.environment.Nat_name, [])
     
     @typechecked
+    #@profile
     def infer_string_lit(self, s : StringLit) -> Expression:
         # no mvars in s
         return Const(self.environment.String_name, [])
 
     @typechecked
+    #@profile
     def infer_core(self, expr : Expression, infer_only : bool) -> Expression:
         """
         The main TC function: infers the type of an expression. If inference fails it raises an error. 
@@ -1239,6 +1313,7 @@ class TypeChecker:
 
     # CHECKING DECLARATIONS
     @typechecked
+    #@profile
     def check_declaration_info(self, info : DeclarationInfo):
         #print(f"CHECKING DECLARATION {info.name}")
         #print(f"INFO TYPE : {info.type}")
@@ -1259,6 +1334,7 @@ class TypeChecker:
             raise DeclarationError(f"Declaration {decl.info.name} has type {decl.info.type} but inferred type {inferred_type}")
 
     @typechecked
+    #@profile
     def add_definition(self, name : Name, d : Definition):
         #rprint(f"ADDING DEFINITION : {name}")
         self.check_declaration_info(d.info)
@@ -1270,8 +1346,9 @@ class TypeChecker:
         #rprint(f"ADDED DEFINITION : {name}")
     
     @typechecked
+    #@profile
     def add_theorem(self, name : Name, t : Theorem):
-        #rprint(f"ADDING THEOREM : {name}")
+        #print(f"ADDING THEOREM : {name}")
         self.check_declaration_info(t.info)
         self.check_declaration_value(t)
         
@@ -1280,6 +1357,7 @@ class TypeChecker:
         #rprint(f"ADDED THEOREM : {name}")
 
     @typechecked
+    #@profile
     def add_opaque(self, name : Name, o : Opaque):
         #rprint(f"ADDING OPAQUE : {name}")
         self.check_declaration_info(o.info)
@@ -1290,6 +1368,7 @@ class TypeChecker:
         #rprint(f"ADDED OPAQUE : {name}")
 
     @typechecked
+    #@profile
     def add_axiom(self, name : Name, a : Axiom):
         #rprint(f"ADDING AXIOM : {name}")
         self.check_declaration_info(a.info)
@@ -1298,6 +1377,7 @@ class TypeChecker:
         #rprint(f"ADDED AXIOM : {name}")
     
     @typechecked
+    #@profile
     def add_inductive(self, name : Name, ind : InductiveType):
         #rprint(f"ADDING INDUCTIVE : {name}")
         assert name == ind.info.name, "Sanity check failed: name does not match info name."
@@ -1308,6 +1388,7 @@ class TypeChecker:
         #rprint(f"ADDED INDUCTIVE : {name}")
 
     @typechecked
+    #@profile
     def add_constructor(self, name : Name, constructor : Constructor):
         #rprint(f"ADDING CONSTRUCTOR: {name}")
         self.environment.add_declaration(name, constructor)
@@ -1316,6 +1397,7 @@ class TypeChecker:
         #rprint(f"ADDED CONSTRUCTOR : {name}")
 
     @typechecked
+    #@profile
     def number_of_added_constructors(self, inductive_decl : InductiveType) -> int:
         count = 0
         for constructor_name in inductive_decl.constructor_names:
@@ -1326,6 +1408,7 @@ class TypeChecker:
         return count
     
     @typechecked
+    #@profile
     def check_inductive_declaration_infos(self, inductive : Name): # CHANGES INDUCTIVE, BUT THIS IS OK
         """
         Inductive types are special in that they are defined cyclically: the constructors and the inductive type refer to each other cyclically. Thus we cannot check them as they are added to the environment. Instead, we check them once each part of the inductive definition has been added to the environment. We mark the inductive type and its constructors as checked once they have been successfully checked.
@@ -1363,6 +1446,7 @@ class TypeChecker:
         self.environment.checking_inductive = False # CHANGES INDUCTIVE, BUT THIS IS OK
 
     @typechecked
+    #@profile
     def add_recursor(self, name : Name, recursor : Recursor):
         #rprint(f"ADDING RECURSOR : {name}")
         self.check_declaration_info(recursor.info)
@@ -1380,6 +1464,7 @@ class TypeChecker:
         #rprint(f"ADDED RECURSOR : {name}")
 
     @typechecked
+    #@profile
     def add_quotient(self, name : Name, q : Quot):
         #rprint(f"ADDING QUOTIENT : {name}")
         self.check_declaration_info(q.info)
@@ -1388,6 +1473,7 @@ class TypeChecker:
         #rprint(f"ADDED QUOTIENT : {name}")
 
     @typechecked
+    #@profile
     def add_declaration(self, name : Name, decl : Declaration):
         if isinstance(decl, Definition): self.add_definition(name, decl)
         elif isinstance(decl, Theorem): self.add_theorem(name, decl)

@@ -1,5 +1,5 @@
 from Structures.Expression.Level import *
-from Structures.Expression.LevelManipulation import lt_compare, make_imax, normalize, key_lt
+from Structures.Expression.LevelManipulation import from_offset, is_equivalent, lt_compare, make_imax, normalize, key_lt
 from Structures.Name import *
 
 def test_normalize1():
@@ -51,3 +51,30 @@ def test_max_norm():
     t = LevelIMax(LevelSucc(LevelParam(u)), LevelSucc(LevelZero()))
     nt = normalize(t)
     assert nt.totally_equal(LevelSucc(LevelParam(u))), f"Expected {LevelSucc(LevelParam(u))} but got {nt}"
+
+def test_from_offset():
+    u = create_name("u")
+    t = LevelParam(u)
+    nt = from_offset(t, 1)
+    assert nt.totally_equal(LevelSucc(LevelParam(u))), f"Expected {LevelSucc(LevelParam(u))} but got {nt}"
+
+def test_normalize5():
+    #  1 + Max(u_2, u_1) = Max 1+u_2 1+u_1
+    u_1 = create_name("u_1")
+    v_1 = create_name("v_1")
+
+    t1 = LevelSucc(LevelMax(LevelParam(u_1), LevelParam(v_1)))
+    nt1 = normalize(t1)
+    t2 = LevelMax(LevelSucc(LevelParam(u_1)), LevelSucc(LevelParam(v_1)))
+    nt2 = normalize(t2)
+    assert nt1.totally_equal(nt2), f"Expected {nt2} but got {nt1}"
+
+def test_normalize6():
+    # IMax(1 + u, IMax(1 + u, IMax(u, IMax(u, IMax(0, IMax(0, 0)))))) = 0
+    u = create_name("u")
+    t = LevelIMax(LevelSucc(LevelParam(u)), LevelIMax(LevelSucc(LevelParam(u)), LevelIMax(LevelParam(u), LevelIMax(LevelParam(u), LevelIMax(LevelZero(), LevelIMax(LevelZero(), LevelZero()))))))
+    print(t)
+    nt = normalize(t)
+    assert isinstance(nt, LevelZero), f"Expected {LevelZero()} but got {nt}"
+
+    assert is_equivalent(t, LevelZero()), f"Expected {nt} but got {t}"
