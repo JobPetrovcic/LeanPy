@@ -21,6 +21,8 @@ class FormatError(Exception):
 
 class LeanFormatParser:
     def __init__(self, lean_format_lines: str | Iterator[str], **type_checker_args: Any):
+        self.expression_count = 0
+        self.decleration_count = 0
         # split lines
         self.type_checker = TypeChecker(**type_checker_args)
         

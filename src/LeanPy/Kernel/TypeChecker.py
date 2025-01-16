@@ -1,7 +1,7 @@
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
-from LeanPy.Kernel.Analysis import has_fvar_not_in_context, print_neg
+from LeanPy.Kernel.Analysis import has_fvar_not_in_context
 from LeanPy.Kernel.Cache.EquivManager import EquivManager
 from LeanPy.Kernel.Cache.Cache import InferCache, PairCache, WHNFCache
 from LeanPy.Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
@@ -31,7 +31,7 @@ class TypeChecker:
     def __init__(self, handle_external: Callable[[Expression, Expression], None] | None = None, allow_loose_infer : bool = False, environment : Environment | None = None):
         self.allow_loose_infer = allow_loose_infer
         if handle_external is None:
-            self.handle_external = lambda e, t: None
+            self.handle_external : Callable[[Expression, Expression], None]= lambda e, t: None
         else:
             self.handle_external = handle_external # handle_external is called when an external expression is correctly type checked; used mainly for rewarding the agent
 
@@ -606,7 +606,7 @@ class TypeChecker:
         assert s_n.num_mvars == 0 # TODO: remove for optimization
 
         while True:
-            if not has_fvar(t_n) and not has_fvar(s_n): # TODO: this should be optimized by using a counter for fvars
+            if t_n.num_fvars > 0 and not s_n.num_fvars > 0:
                 nat_t = self.reduce_nat_lit(t_n) 
                 if nat_t is not None: 
                     return t_n, s_n, self.def_eq_core(nat_t, s_n)
@@ -1195,7 +1195,7 @@ class TypeChecker:
         for i in range(inductive_decl.num_params):
             constructor_type = self.whnf(constructor_type)
             if not isinstance(constructor_type, Pi):
-                raise ExpectedDifferentExpressionError(f"Expected a Pi type when reducing parameters for constructor type but got {constructor_type.__class__}")
+                raise ExpectedDifferentExpressionError(expected=Pi, got=constructor_type.__class__)
             if i >= len(args):
                 raise ProjectionError(f"Ran out of arguments for parameters when reducing constructor type.")
             
