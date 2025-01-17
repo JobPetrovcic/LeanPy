@@ -45,7 +45,7 @@ class TypeChecker:
         1. The punishment happens at the node that is being inferred, not its children. For example, if we are inferring an application, and both the function and argument are well-formed, but the arguments type is not equal to the domain of the function, then the punishment will be applied to the application, not the function or the argument.
         """
 
-        self.handle_external = False
+        self.handle_external = True
 
         self.allow_loose_infer = allow_loose_infer
 
