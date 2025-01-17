@@ -38,21 +38,17 @@ class TypeChecker:
         Initializes the type checker with the following arguments:
         - handle_external_correct_inference: a function that is called when an external expression is correctly type checked; used for rewarding the agent
         - handle_external_wrong_inference_check: a function that is called when a check during inference fails for that expression; used for punishing the agent
-        - handle_external_correct_external_expected_type_equality: a function that is called when an external expression is correctly type checked and the expected type is equal to the appropriate part of the expected type; used for rewarding the agent
-        - handle_external_wrong_external_expected_type_equality: a function that is called when an external expression is correctly type checked and but the expected type is not equal to the appropriate part of the expected type; used for punishing the agent
         - allow_loose_infer: a boolean that determines whether the type checker should allow loose inference; if True then the type checker will skip some unnecesarry checks during inference.
         - environment: the environment containing the constants that the type checker can use.
 
         Note: 
         1. The punishment happens at the node that is being inferred, not its children. For example, if we are inferring an application, and both the function and argument are well-formed, but the arguments type is not equal to the domain of the function, then the punishment will be applied to the application, not the function or the argument.
-
-        2. For checking equality of the inferred type and expected type, the type checker will use the def_eq function. This function reduces tries to compare the two expressions as much as it can, but sometimes it has to wait for the expressions to be completed (not containing placeholders - MVars). For example, when comparing two lambdas, it can reduce the comparison to the comparison of the arguments and the bodies. But when comparing two applications, comparing the functions and the arguments directly works, and the comparison must await the completion of the expressions after which whnf is called. Then can the comparison be completed.
-
         """
 
         self.handle_external = False
 
         self.allow_loose_infer = allow_loose_infer
+
         # inference handling
         if handle_external_correct_inference is None:
             self.handle_external_correct_inference : Callable[[Expression, Expression], None]= lambda e, t: None
