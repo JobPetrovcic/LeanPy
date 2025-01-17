@@ -28,13 +28,42 @@ sys.setrecursionlimit(10**4)
 
 class TypeChecker:
     @typechecked
-    def __init__(self, handle_external: Callable[[Expression, Expression], None] | None = None, allow_loose_infer : bool = False, environment : Environment | None = None):
-        self.allow_loose_infer = allow_loose_infer
-        if handle_external is None:
-            self.handle_external : Callable[[Expression, Expression], None]= lambda e, t: None
-        else:
-            self.handle_external = handle_external # handle_external is called when an external expression is correctly type checked; used mainly for rewarding the agent
+    def __init__(self, 
+        handle_external_correct_inference : Callable[[Expression, Expression], None] | None = None, 
+        handle_external_wrong_inference_check : Callable[[Expression], None] | None = None,
+        allow_loose_infer : bool = False, 
+        environment : Environment | None = None,
+    ):
+        """
+        Initializes the type checker with the following arguments:
+        - handle_external_correct_inference: a function that is called when an external expression is correctly type checked; used for rewarding the agent
+        - handle_external_wrong_inference_check: a function that is called when a check during inference fails for that expression; used for punishing the agent
+        - handle_external_correct_external_expected_type_equality: a function that is called when an external expression is correctly type checked and the expected type is equal to the appropriate part of the expected type; used for rewarding the agent
+        - handle_external_wrong_external_expected_type_equality: a function that is called when an external expression is correctly type checked and but the expected type is not equal to the appropriate part of the expected type; used for punishing the agent
+        - allow_loose_infer: a boolean that determines whether the type checker should allow loose inference; if True then the type checker will skip some unnecesarry checks during inference.
+        - environment: the environment containing the constants that the type checker can use.
 
+        Note: 
+        1. The punishment happens at the node that is being inferred, not its children. For example, if we are inferring an application, and both the function and argument are well-formed, but the arguments type is not equal to the domain of the function, then the punishment will be applied to the application, not the function or the argument.
+
+        2. For checking equality of the inferred type and expected type, the type checker will use the def_eq function. This function reduces tries to compare the two expressions as much as it can, but sometimes it has to wait for the expressions to be completed (not containing placeholders - MVars). For example, when comparing two lambdas, it can reduce the comparison to the comparison of the arguments and the bodies. But when comparing two applications, comparing the functions and the arguments directly works, and the comparison must await the completion of the expressions after which whnf is called. Then can the comparison be completed.
+
+        """
+
+        self.handle_external = False
+
+        self.allow_loose_infer = allow_loose_infer
+        # inference handling
+        if handle_external_correct_inference is None:
+            self.handle_external_correct_inference : Callable[[Expression, Expression], None]= lambda e, t: None
+        else:
+            self.handle_external_correct_inference = handle_external_correct_inference # handle_external_correct_inference is called when an external expression is correctly type checked; used mainly for rewarding the agent
+
+        if handle_external_wrong_inference_check is None:
+            self.handle_external_wrong_inference_check : Callable[[Expression], None] = lambda e: None
+        else:
+            self.handle_external_wrong_inference_check = handle_external_wrong_inference_check
+        
         self.whnf_cache = WHNFCache()
         self.whnf_core_cache = WHNFCache()
         self.infer_cache = [InferCache(), InferCache()]
@@ -47,6 +76,19 @@ class TypeChecker:
         else:
             self.environment = environment
         self.local_context = LocalContext()
+
+    def bookkeep_correct_external_inference(self, expr : Expression, inferred_type : Expression):
+        if self.handle_external:
+            if expr.is_external:
+                if expr.was_rewarded == False:
+                    self.handle_external_correct_inference(expr, inferred_type)
+                    expr.was_rewarded = True
+    
+    def bookkeep_wrong_external_inference(self, expr : Expression):
+        if self.handle_external:
+            if expr.is_external:
+                assert expr.was_rewarded == False, "The expression was wrongly rewarded. How can this happen?"
+                self.handle_external_wrong_inference_check(expr)
 
     # LOCAL CONTEXT INTERACTIONS
     @typechecked
@@ -137,15 +179,15 @@ class TypeChecker:
     # HELPERS
     @typechecked
     #@profile
-    def ensure_pi(self, expr : Expression) -> Pi: # CHECKED
-        if expr.num_mvars > 0: raise PanicError("When ensuring pi, the expression should not have mvars. This is the responsibility of the function calling ensure_pi.")
+    def is_pi(self, expr : Expression) -> Optional[Pi]: # CHECKED
+        if expr.num_mvars > 0: raise PanicError("When ensuring pi, the expression should not have mvars. This is the responsibility of the function calling is_pi.")
         if isinstance(expr, MVar): raise UnfinishedError()
         if isinstance(expr, Pi): 
             return expr
         
         expr = self.whnf(expr)
         if  isinstance(expr, Pi): return expr
-        else: raise ExpectedDifferentExpressionError(Pi, expr.__class__)
+        else: return None
 
     @typechecked
     #@profile
@@ -889,7 +931,9 @@ class TypeChecker:
         nparams = len(major_args) - rule.num_fields
         # apply fields from major premise
         selected_major_args = major_args[nparams: nparams + rule.num_fields]
-        if len(selected_major_args) != rule.num_fields: raise RecursorError("Major premise does not have the expected number of fields.")
+        if len(selected_major_args) != rule.num_fields: 
+            # maybe TODO: should we externally handle the expression, i.e. punish the agent?
+            raise RecursorError("Major premise does not have the expected number of fields.")
         rhs = fold_apps(rhs, selected_major_args) # reapply the indices' arguments back
 
         # the remaining arguments are not relevant for the recursor; they are just applied back to whatever we got from the reduction
@@ -1007,8 +1051,13 @@ class TypeChecker:
             fn_type = self.infer_core(fn, infer_only=(self.allow_loose_infer and infer_only))
             # at this point fn and fn_type are definitely without mvars
             for arg in args:
-                
-                fn_type = self.ensure_pi(fn_type)
+                possible_fn_type = self.is_pi(fn_type)
+
+                if possible_fn_type is None:
+                    # the function is not a pi type
+                    self.bookkeep_wrong_external_inference(app)
+                    raise ExpectedDifferentExpressionError(Pi, self.whnf(fn_type).__class__)
+                else: fn_type = possible_fn_type
 
                 if arg.num_mvars > 0: raise UnfinishedError()
                 # at this point arg is definitely without mvars
@@ -1020,7 +1069,13 @@ class TypeChecker:
         else:
             # the function should be a pi type
             # if app.fn contains mvars, then infer_core will throw an error
-            fn_type = self.ensure_pi(self.infer_core(app.fn, infer_only=(self.allow_loose_infer and infer_only)))
+            possible_fn_type = self.is_pi(self.infer_core(app.fn, infer_only=(self.allow_loose_infer and infer_only)))
+
+            if possible_fn_type is None:
+                # the function is not a pi type
+                self.bookkeep_wrong_external_inference(app)
+                raise ExpectedDifferentExpressionError(Pi, self.whnf(app.fn).__class__)
+            else: fn_type = possible_fn_type
             
             # get the type of the argument
             # if app.arg contains mvars, then infer_core will throw an error
@@ -1030,6 +1085,7 @@ class TypeChecker:
 
             # the domain of the function should be equal to the type of the argument
             if not self.def_eq(fn_type.arg_type, inferred_arg_type):
+                self.bookkeep_wrong_external_inference(app)
                 raise ExpectedDifferentExpressionsError(fn_type.arg_type, inferred_arg_type)
             
             infered_type = self.instantiate(body=fn_type.body_type, val=app.arg)
@@ -1045,7 +1101,13 @@ class TypeChecker:
     #@profile
     def infer_pi(self, pi : Pi, infer_only : bool) -> Expression:
         # if pi.arg_type contains mvars, then infer_core will throw an error
-        lhs = self.ensure_sort(self.infer_core(pi.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
+        arg_type_type = self.infer_core(pi.arg_type, infer_only=(self.allow_loose_infer and infer_only))
+        possible_lhs = self.is_sort(arg_type_type)
+
+        if possible_lhs is None:
+            self.bookkeep_wrong_external_inference(pi)
+            raise ExpectedDifferentExpressionError(Sort, self.whnf(arg_type_type).__class__)
+        else: lhs = possible_lhs
         # at this point pi.arg_type is definitely without mvars
 
         # if pi.body_type contains mvars, then infer_core will throw an error
@@ -1056,7 +1118,14 @@ class TypeChecker:
             body=pi.body_type, 
         )
         # at this point inst_body_type is definitely without mvars
-        rhs = self.ensure_sort(self.infer_core(inst_body_type, infer_only=(self.allow_loose_infer and infer_only)))
+        inst_body_type_type = self.infer_core(inst_body_type, infer_only=(self.allow_loose_infer and infer_only))
+        possible_rhs = self.is_sort(inst_body_type_type)
+
+        if possible_rhs is None:
+            self.bookkeep_wrong_external_inference(pi)
+            raise ExpectedDifferentExpressionError(Sort, self.whnf(inst_body_type_type).__class__)
+        else: rhs = possible_rhs
+
         if has_specific_fvar(rhs, fvar): # TODO : remove this after testing
             raise PanicError("FVar was not abstracted in the inferred type.")
         self.remove_fvar(fvar)
@@ -1065,22 +1134,27 @@ class TypeChecker:
     
     @typechecked
     #@profile
-    def ensure_sort(self, e : Expression) -> Sort:
+    def is_sort(self, e : Expression) -> Optional[Sort]:
         # it is up to function calling ensure sort to ensure that e has no mvars
         assert e.num_mvars == 0 # TODO: remove for optimization
 
         if isinstance(e, Sort): return e
         whnfd_e = self.whnf(e)
         if isinstance(whnfd_e, Sort): return whnfd_e
-        
-        raise ExpectedDifferentExpressionError(Sort, whnfd_e.__class__)
+
+        return None
     
     @typechecked
     #@profile
     def infer_lambda(self, e : Lambda, infer_only : bool) -> Expression:
         if not infer_only:
             # if e.arg_type contains mvars, then infer_core will throw an error
-            self.ensure_sort(self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only))) # have to clone the arg_type since we are using it
+            arg_type_type = self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only))
+            possible_sort = self.is_sort(arg_type_type) # have to clone the arg_type since we are using it
+            
+            if possible_sort is None:
+                self.bookkeep_wrong_external_inference(e)
+                raise ExpectedDifferentExpressionError(Sort, self.whnf(arg_type_type).__class__)
         
         # however if infer_only is true we have to check that the arg_type does not contain mvars
         if e.arg_type.num_mvars > 0: raise UnfinishedError()
@@ -1135,9 +1209,16 @@ class TypeChecker:
     #@profile
     def infer_let(self, e : Let, infer_only : bool) -> Expression:
         if not infer_only:
-            self.ensure_sort(self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only)))
+            arg_type_type = self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only))
+            possible_sort = self.is_sort(arg_type_type)
+
+            if possible_sort is None:
+                self.bookkeep_wrong_external_inference(e)
+                raise ExpectedDifferentExpressionError(Sort, self.whnf(arg_type_type).__class__)
+
             inferred_val_type = self.infer_core(e.val, infer_only=(self.allow_loose_infer and infer_only))
             if not self.def_eq(inferred_val_type, e.arg_type):
+                self.bookkeep_wrong_external_inference(e)
                 raise ExpectedDifferentExpressionsError(inferred_val_type, e.arg_type)
 
         fvar, inst_body = self.instantiate_fvar( # for let expression we use fvars; it is up to the wnhf to further unfold the var later
@@ -1185,7 +1266,9 @@ class TypeChecker:
         proj_index = proj.index
 
         pos_cons = self.proj_get_constructor(proj, infer_only=(self.allow_loose_infer and infer_only))
-        if pos_cons is None: raise ProjectionError(f"Could not get constructor for projection {proj}")
+        if pos_cons is None:
+            self.bookkeep_wrong_external_inference(proj) 
+            raise ProjectionError(f"Could not get constructor for projection {proj}")
 
         #I_name         I_info          c_info        (in the original code)
         inductive_name, inductive_decl, constructor, args = pos_cons 
@@ -1195,8 +1278,10 @@ class TypeChecker:
         for i in range(inductive_decl.num_params):
             constructor_type = self.whnf(constructor_type)
             if not isinstance(constructor_type, Pi):
+                self.bookkeep_wrong_external_inference(proj)
                 raise ExpectedDifferentExpressionError(expected=Pi, got=constructor_type.__class__)
             if i >= len(args):
+                self.bookkeep_wrong_external_inference(proj)
                 raise ProjectionError(f"Ran out of arguments for parameters when reducing constructor type.")
             
             constructor_type = self.instantiate(body=constructor_type.body_type, val=args[i])
@@ -1205,6 +1290,7 @@ class TypeChecker:
         for i in range(proj_index):
             constructor_type = self.whnf(constructor_type)
             if not isinstance(constructor_type, Pi):
+                self.bookkeep_wrong_external_inference(proj)
                 raise ExpectedDifferentExpressionError(Pi, constructor_type.__class__)
             
             # TODO: the lean 4 code checks if the type has loose bvars (but how can this happen?). If is_prop_type it then ensures that the body remains a prop
@@ -1218,6 +1304,7 @@ class TypeChecker:
         
         constructor_type = self.whnf(constructor_type)
         if not isinstance(constructor_type, Pi):
+            self.bookkeep_wrong_external_inference(proj)
             raise ExpectedDifferentExpressionError(Pi, constructor_type.__class__)
         
         # TODO: the lean kernel does some checks regarding prop here
@@ -1258,7 +1345,7 @@ class TypeChecker:
         # check if expression is already in infer_cache (separate cache for infer_only)
         cached_inferred_type = self.infer_cache[infer_only].get(expr)
         if cached_inferred_type is not None:
-            self.bookkeep_external(expr, cached_inferred_type)
+            self.bookkeep_correct_external_inference(expr, cached_inferred_type)
             return cached_inferred_type
 
         if isinstance(expr, BVar): raise FoundUnsubstitutedBVarError()
@@ -1279,15 +1366,9 @@ class TypeChecker:
         # cache the result
         assert expr.num_mvars == 0 # TODO: remove for optimization
         self.infer_cache[infer_only].put(expr, inferred_type)
-        self.bookkeep_external(expr, inferred_type)
+        self.bookkeep_correct_external_inference(expr, inferred_type)
 
         return inferred_type
-    
-    def bookkeep_external(self, expr : Expression, inferred_type : Expression):
-        if expr.is_external:
-            if expr.was_rewarded == False:
-                self.handle_external(expr, inferred_type)
-                expr.was_rewarded = True
     
     def clear_caches(self):
         self.whnf_cache.clear()
