@@ -378,11 +378,12 @@ class TypeChecker:
     # wrapper for def_eq_core: if the expressions are equal and and l or r is an expected type, then the type checker will reward the agent
     def def_eq_reward_wrapper(self, l : Expression, r : Expression):
         ret = self.def_eq_core(l, r)
-        if l.is_expected_type: l, r = r, l # swap the expressions
-        if r.is_expected_type:
-            assert not l.is_expected_type, "Unreachable code reached in def_eq_reward_wrapper."
-            if ret: self.bookkeep_correct_external_expected_type_equality(l, r)
-            else: self.bookkeep_wrong_external_expected_type_equality(l, r)
+        if self.handle_external:
+            if l.is_expected_type: l, r = r, l # swap the expressions
+            if r.is_expected_type:
+                assert not l.is_expected_type, "Unreachable code reached in def_eq_reward_wrapper."
+                if ret: self.bookkeep_correct_external_expected_type_equality(l, r)
+                else: self.bookkeep_wrong_external_expected_type_equality(l, r)
         return ret
     
     @typechecked
@@ -1255,7 +1256,9 @@ class TypeChecker:
         return inferred_type
 
     # CHECKING DECLARATIONS
-    def infer_and_compare(self, expr : Expression, expected_type : Expression, check_expected_type : bool = True) -> bool:
+    def infer_and_compare(self, expr : Expression, expected_type : Expression, check_expected_type : bool = True, should_check_external : bool = True) -> bool:
+        self.handle_external = should_check_external
+
         if check_expected_type:
             handle_external_save = self.handle_external
             self.handle_external = False
@@ -1285,7 +1288,7 @@ class TypeChecker:
             raise EnvironmentError(f"Type of declaration info {info} is not a sort.")
 
     def check_declaration_value(self, decl : Theorem | Definition | Opaque):
-        if not self.infer_and_compare(decl.value, decl.info.type):
+        if not self.infer_and_compare(decl.value, decl.info.type, should_check_external=False):
             raise DeclarationError(f"Declaration {decl.info.name} has type {decl.info.type} but inferred type {self.infer(decl.value)}.")
 
     @typechecked
