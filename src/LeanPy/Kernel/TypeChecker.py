@@ -209,7 +209,6 @@ class TypeChecker:
         If the names are the same, and the level parameters are equal, then the constants are equal.
         Since nothing is changed, this function is safe to use when passing by reference.
         """
-        # mvars can only be present in the level parameters, and is_equivalent_list will throw an error if mvars are present in the levels
         if l.name == r.name:
             if len(l.lvl_params) != len(r.lvl_params): raise ValueError("Level parameters for a constant should be the same length.")
             if is_equivalent_list(l.lvl_params, r.lvl_params): return True
@@ -220,15 +219,11 @@ class TypeChecker:
     def def_eq_app(self, l : App, r : App) -> bool:
         f_fn, f_args = unfold_app(l.fn)
         g_fn, g_args = unfold_app(r.fn)
-        # if f_fn or g_fn has mvars, then def_eq will throw an error
         if not self.def_eq(f_fn, g_fn):
             return False
         
-        # if f_args or g_args don't have mvars then the length of the arguments should be the same regardles of the presence of mvars in the arguments
-        
         if len(f_args) != len(g_args): return False
         for f_arg, g_arg in zip(f_args, g_args):
-            # if f_arg or g_arg has mvars, then def_eq will throw an error
             if not self.def_eq(f_arg, g_arg):
                 return False
         return True
@@ -295,7 +290,6 @@ class TypeChecker:
 
     @typechecked
     def try_structural_eta_expansion(self, l : Expression, r : Expression) -> bool:
-        # try_structural_eta_expansion_core will throw an error if mvars are present in the expressions
         return self.try_structural_eta_expansion_core(l, r) or self.try_structural_eta_expansion_core(r, l)
     
     @typechecked
@@ -307,13 +301,10 @@ class TypeChecker:
         if not (isinstance(t, Lambda) and (not isinstance(s, Lambda))): 
             return False
         
-        # if s has mvars, then infer_core will throw an error
         s_type = self.whnf(self.infer_core(s, infer_only=(self.allow_loose_infer and False)))
-        # at this point s and s_type are definitely without mvars
         if isinstance(s_type, MVar): raise UnfinishedError()
         if not isinstance(s_type, Pi): 
             return False
-        # if t has mvars, then def_eq will throw an error
         new_s = Lambda(bname=s_type.bname, arg_type=s_type.arg_type, body=App(s, BVar(0)))
         return self.def_eq(t, new_s)
 
@@ -323,14 +314,11 @@ class TypeChecker:
         Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y.
         Always assumes that x and y were cloned beforehand.
         """
-        # try_eta_expansion_core will throw an error if mvars are present in the expressions
         return self.try_eta_expansion_core(t, s) or self.try_eta_expansion_core(s, t)
     
     @typechecked
     def def_eq_easy(self, l: Expression, r: Expression) -> Optional[bool]:
         if isinstance(l, MVar) or isinstance(r, MVar): raise UnfinishedError() # they should not be actual MVars, however, their subexpressions might contain MVars
-        # even if mvars are present in the subexpressions some more work can be done
-        # other def_eqs will throw an error if mvars are present in the expressions
         
         if self.equiv_manager.were_found_and_equiv(l, r): return True
 
@@ -352,14 +340,11 @@ class TypeChecker:
         if not self.is_prop(t_type):
             return None
         
-        # if s has mvars, then infer_core will throw an error
         s_type = self.infer_core(s, infer_only=(self.allow_loose_infer and True))
-        # at this point s_type is definitely without mvars so more work can be done
         return self.def_eq(t_type, s_type)
     
     @typechecked
     def def_eq_unit_like(self, t : Expression, s : Expression) -> bool:
-        # if t has mvars, then infer_core will throw an error
         t_type = self.whnf(self.infer_core(t, infer_only=(self.allow_loose_infer and True)))
         inductive_const = get_app_function(t_type)
 
@@ -371,8 +356,6 @@ class TypeChecker:
         constructor = self.get_first_constructor(inductive_const.name)
         if constructor is None: return False
         if constructor.num_fields != 0: return False
-        # if s has mvars, then infer_core will throw an error
-        # t_ype is definitely without mvars, so we can proceed
         return self.def_eq_reward_wrapper(t_type, self.infer_core(s, infer_only=(self.allow_loose_infer and True)))
     
     def bookkeep_correct_external_expected_type_equality(self, got_type : Expression, expected_type : Expression):
@@ -405,7 +388,7 @@ class TypeChecker:
     @typechecked
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
         if isinstance(l, MVar) or isinstance(r, MVar): raise UnfinishedError() # they should not be actual MVars, however, their subexpressions might contain MVars
-        # even if mvars are present in the subexpressions some more work can be done
+        
         if l is r: return True
         if l == r : return True
 
@@ -415,9 +398,7 @@ class TypeChecker:
             if isinstance(whnfd_l, MVar): raise UnfinishedError()
             if isinstance(whnfd_l, Const) and whnfd_l.name == self.environment.Bool_true_name:
                 return True
-        
-        # at this point we don't know if l or r have mvars in the subexpressions, but they are not MVars themselves
-        # other def_eqs will throw an error if mvars are present in the expressions
+
         is_easy = self.def_eq_easy(l, r)
         if is_easy is not None: return is_easy
 
@@ -514,7 +495,6 @@ class TypeChecker:
 
     @typechecked
     def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression:
-        # delta_reduction_core is called from delta_reduction, so we can assume that fn, decl and args are without mvars
         assert fn.name == decl.info.name
         decl_val = self.environment.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params)
         return fold_apps(decl_val, args)
@@ -964,7 +944,6 @@ class TypeChecker:
     # TYPE INFERENCE
     @typechecked
     def infer_fvar(self, fvar : FVar):
-        # contains no mvar; see create_fvar
         return self.get_type_of_fvar(fvar)
     
     @typechecked
@@ -1015,7 +994,6 @@ class TypeChecker:
 
     @typechecked
     def infer_pi(self, pi : Pi, infer_only : bool) -> Expression:
-        # if pi.arg_type contains mvars, then infer_core will throw an error
         arg_type_type = self.infer_core(pi.arg_type, infer_only=(self.allow_loose_infer and infer_only))
         possible_lhs = self.is_sort(arg_type_type)
         
@@ -1023,16 +1001,13 @@ class TypeChecker:
             self.bookkeep_wrong_external_inference(pi)
             raise ExpectedDifferentExpressionError(Sort, self.whnf(arg_type_type).__class__)
         else: lhs = possible_lhs
-        # at this point pi.arg_type is definitely without mvars
 
-        # if pi.body_type contains mvars, then infer_core will throw an error
         fvar, inst_body_type = self.instantiate_fvar(
             bname=pi.bname, 
-            arg_type=pi.arg_type, # no mvars
+            arg_type=pi.arg_type,
             arg_val=None,
             body=pi.body_type, 
         )
-        # at this point inst_body_type is definitely without mvars
         inst_body_type_type = self.infer_core(inst_body_type, infer_only=(self.allow_loose_infer and infer_only))
         possible_rhs = self.is_sort(inst_body_type_type)
 
@@ -1060,7 +1035,6 @@ class TypeChecker:
     @typechecked
     def infer_lambda(self, e : Lambda, infer_only : bool) -> Expression:
         if not infer_only:
-            # if e.arg_type contains mvars, then infer_core will throw an error
             arg_type_type = self.infer_core(e.arg_type, infer_only=(self.allow_loose_infer and infer_only))
             possible_sort = self.is_sort(arg_type_type) # have to clone the arg_type since we are using it
             
@@ -1255,7 +1229,6 @@ class TypeChecker:
         else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
         
         # cache the result
-        assert expr.num_mvars == 0 # TODO: remove for optimization
         self.infer_cache[infer_only].put(expr, inferred_type)
         self.bookkeep_correct_external_inference(expr, inferred_type)
 
@@ -1282,7 +1255,13 @@ class TypeChecker:
         return inferred_type
 
     # CHECKING DECLARATIONS
-    def infer_and_compare(self, expr : Expression, expected_type : Expression):
+    def infer_and_compare(self, expr : Expression, expected_type : Expression, check_expected_type : bool = True) -> bool:
+        if check_expected_type:
+            handle_external_save = self.handle_external
+            self.handle_external = False
+            self.infer(expected_type, clear_caches=True)
+            self.handle_external = handle_external_save
+
         def set_expected_true(e : Expression):
             e.is_expected_type = True
         # sets the is_expected_type flag to true in the expected_type
