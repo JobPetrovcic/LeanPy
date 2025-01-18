@@ -6,7 +6,6 @@ from typeguard import typechecked
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import Level, LevelParam
 from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
-from LeanPy.Kernel.KernelErrors import UnfinishedError
 
 # for fvars we are relying on total equality
 @typechecked
@@ -26,6 +25,7 @@ def replace_expression(expr : Expression, fn : Callable[[Expression], Optional[E
 
     if isinstance(expr, BVar): return expr
     elif isinstance(expr, FVar): return expr
+    elif isinstance(expr, MVar): return expr
     elif isinstance(expr, Sort): return expr
     elif isinstance(expr, Const): return expr
     elif isinstance(expr, App): return App(fn=replace_expression(expr.fn, fn), arg=replace_expression(expr.arg, fn))
@@ -54,6 +54,7 @@ def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int
 
     if isinstance(expr, BVar): return BVar(dbj_id=expr.dbj_id)
     elif isinstance(expr, FVar): return expr # fvars differentiate by reference
+    elif isinstance(expr, MVar): return expr
     elif isinstance(expr, Sort): return Sort(level=expr.level) # don't copy the level
     elif isinstance(expr, Const): return Const(name=expr.name, lvl_params=expr.lvl_params)  # don't copy the name
     elif isinstance(expr, App): 
@@ -93,7 +94,7 @@ def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int
 def do_fn(expr : Expression, fn : Callable[[Expression], None]):
     """ Applies the given function to all subexpressions in the given expression. """
     fn(expr)
-    if isinstance(expr, BVar) or isinstance(expr, FVar) or isinstance(expr, Sort) or isinstance(expr, Const): pass
+    if isinstance(expr, BVar) or isinstance(expr, FVar) or isinstance(expr, Sort) or isinstance(expr, Const) or isinstance(expr, MVar): pass
     elif isinstance(expr, App):
         do_fn(expr.fn, fn)
         do_fn(expr.arg, fn)
@@ -114,7 +115,7 @@ def do_fn(expr : Expression, fn : Callable[[Expression], None]):
 
 def do_fn_w_depth(expr : Expression, fn : Callable[[Expression, int], None], depth : int):
     fn(expr, depth)
-    if isinstance(expr, BVar) or isinstance(expr, FVar) or isinstance(expr, Sort) or isinstance(expr, Const): pass
+    if isinstance(expr, BVar) or isinstance(expr, FVar) or isinstance(expr, Sort) or isinstance(expr, Const) or isinstance(expr, MVar): pass
     elif isinstance(expr, App):
         do_fn_w_depth(expr.fn, fn, depth)
         do_fn_w_depth(expr.arg, fn, depth)
@@ -151,7 +152,6 @@ def instantiate_bvar(body : Expression, val : Expression) -> Expression:
     Replaces the outermost bound variable in the given expression with the given free variable. Throws an error if it finds an unbound bvar index.
     """
     def intantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
-        if isinstance(expr, MVar): raise UnfinishedError()
         if isinstance(expr, BVar): 
             if expr.dbj_id == depth: return val
         return None
@@ -162,7 +162,6 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
     Replaces the outermost bound variables in the given expression with the given free variables. Throws an error if it finds an unbound bvar index.
     """
     def instantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
-        if isinstance(expr, MVar): raise UnfinishedError()
         if isinstance(expr, BVar): 
             if expr.dbj_id >= depth: 
                 if expr.dbj_id - depth < len(vals): return vals[expr.dbj_id - depth]
@@ -174,7 +173,6 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
 def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     # turns fvar into a bound variable with de Bruijn index depth
     def abstraction_fn(expr : Expression, depth : int) -> Optional[Expression]:
-        if isinstance(expr, MVar): raise PanicError("MVars should never be present when abstracting.")
         if isinstance(expr, FVar):
             if expr is fvar:
                 return BVar(dbj_id=depth)

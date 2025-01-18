@@ -12,7 +12,10 @@ class Expression:
     def __init__(self):
         self.hash = self.get_hash()
         self.is_external = False
+        self.is_expected_type = False
         self.was_rewarded = False
+        self.infer_source_expr : Expression | None = None
+        self.version = 0
         self.update_bookkeeping()
 
     def update_bookkeeping(self):
@@ -23,6 +26,8 @@ class Expression:
         self.num_mvars = self.get_num_mvars()
 
         self.num_lvl_mvars = self.get_lvl_mvars()
+
+        self.version += 1
 
     def get_num_fvars(self) -> int: raise NotImplementedError(f"Method get_num_fvars not implemented for class {self.__class__.__name__}")
     def get_num_bvars(self) -> int: raise NotImplementedError(f"Method get_num_bvars not implemented for class {self.__class__.__name__}")

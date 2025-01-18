@@ -7,11 +7,14 @@ class Level:
     def __init__(self):
         self.is_external = False
         self.was_rewarded = False
+        self.version = 0
         self.update_bookkeeping()
     
     def update_bookkeeping(self):
         self.hash = self.get_hash()
         self.num_mvars = self.get_num_mvars()
+
+        self.version += 1
 
     def __str__(self) -> str:
         raise NotImplementedError("Method __str__ not implemented for abstract class Level")
