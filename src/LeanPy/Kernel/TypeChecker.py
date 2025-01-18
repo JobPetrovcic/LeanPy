@@ -580,7 +580,7 @@ class TypeChecker:
     @typechecked
     def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]:
         while True:
-            if t_n.num_fvars > 0 and not s_n.num_fvars > 0:
+            if t_n.num_fvars == 0 and s_n.num_fvars == 0:
                 nat_t = self.reduce_nat_lit(t_n) 
                 if nat_t is not None: 
                     return t_n, s_n, self.def_eq_reward_wrapper(nat_t, s_n)
