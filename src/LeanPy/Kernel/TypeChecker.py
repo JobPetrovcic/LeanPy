@@ -1,7 +1,7 @@
 from typing import Callable, List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
-from LeanPy.Kernel.Analysis import has_fvar_not_in_context
+from LeanPy.Kernel.Analysis import has_fvar_not_in_context, print_neg
 from LeanPy.Kernel.Cache.EquivManager import EquivManager
 from LeanPy.Kernel.Cache.Cache import InferCache, PairCache, WHNFCache
 from LeanPy.Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, InductiveType, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
@@ -324,7 +324,6 @@ class TypeChecker:
 
         if isinstance(l, Sort) and isinstance(r, Sort): return self.def_eq_sort(l, r)
         elif isinstance(l, BVar) or isinstance(r, BVar): raise PanicError("BVar should have been substituted by now, when comparing expressions for definitional equality.")
-        elif isinstance(l, FVar) and isinstance(r, FVar): return l is r
         
         elif isinstance(l, Pi) and isinstance(r, Pi):
             return self.def_eq_pi(l, r)
@@ -387,10 +386,10 @@ class TypeChecker:
         return ret
     
     @typechecked
+    @print_neg
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
         if isinstance(l, MVar) or isinstance(r, MVar): raise UnfinishedError() # they should not be actual MVars, however, their subexpressions might contain MVars
         
-        if l is r: return True
         if l == r : return True
 
         # r cannot have mvars if it is a Const and bool so equality checking work can be done
@@ -775,7 +774,7 @@ class TypeChecker:
         mk = self.whnf(args[mk_pos]) # whnf to expose the Quot_mk
 
         if isinstance(mk, MVar): raise UnfinishedError()
-        assert isinstance(mk, App) # TODO: is this ok
+        
         mk_fn, mk_args = unfold_app(mk)
 
         if isinstance(mk_fn, MVar): raise UnfinishedError() 
@@ -783,6 +782,7 @@ class TypeChecker:
         if mk_fn.name != self.environment.Quot_mk_name: return None
         if len(mk_args) != 3: return None # the Quot.mk takes 3 arguments
 
+        assert isinstance(mk, App)
         f = args[arg_pos] # get the function we are lifting/inducing
         r = App(f, mk.arg) # get the class representative and apply f on it
 
