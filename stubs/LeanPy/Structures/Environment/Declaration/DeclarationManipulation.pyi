@@ -1,0 +1,3 @@
+from Structures.Environment.Declaration.Declaration import *
+
+def is_structural_inductive(inductive: Inductive) -> bool: ...

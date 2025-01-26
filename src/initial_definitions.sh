@@ -1,1 +1,0 @@
-lake exe lean4export TestProject.Basic -- Nat Nat.zero Nat.succ List.cons List.nil Quot Quot.mk Quot.ind Quot.mk
