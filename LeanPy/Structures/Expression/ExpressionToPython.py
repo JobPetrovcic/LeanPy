@@ -1,9 +1,9 @@
 from typing import Dict, List, Tuple
-from Structures.Environment.Declaration.Declaration import *
-from Structures.Environment.ReducibilityHint import *
-from Structures.Expression.Expression import *
-from Structures.Expression.Level import *
-from Structures.Name import Anonymous, Name, SubName
+from LeanPy.Structures.Environment.Declaration.Declaration import *
+from LeanPy.Structures.Environment.ReducibilityHint import *
+from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.Level import *
+from LeanPy.Structures.Name import Anonymous, Name, SubName
 
 class ExpressionToPython:
     def __init__(self):

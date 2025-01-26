@@ -1,6 +1,6 @@
 from typing import Type
-from Structures.Environment.LocalContext import LocalContext
-from Structures.Expression.Expression import Expression
+from LeanPy.Structures.Environment.LocalContext import LocalContext
+from LeanPy.Structures.Expression.Expression import Expression
 
 
 class KernelError(Exception):

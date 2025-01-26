@@ -1,11 +1,11 @@
 from abc import abstractmethod
 from typeguard import typechecked
-from Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
-from Structures.Expression.ExpressionManipulation import get_app_function, get_binding_body, get_binding_type
-from Kernel.KernelErrors import PanicError
-from Structures.Name import Name
-from Structures.Expression.Expression import *
-from Structures.Expression.Level import LevelParam
+from LeanPy.Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
+from LeanPy.Structures.Expression.ExpressionManipulation import get_app_function, get_binding_body, get_binding_type
+from LeanPy.Kernel.KernelErrors import PanicError
+from LeanPy.Structures.Name import Name
+from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.Level import LevelParam
 from typing import List, Optional
 
 class RecursorRule:

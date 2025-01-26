@@ -1,6 +1,6 @@
-from Structures.Expression.Level import *
-from Structures.Expression.LevelManipulation import from_offset, is_equivalent, lt_compare, make_imax, normalize, key_lt
-from Structures.Name import *
+from LeanPy.Structures.Expression.Level import *
+from LeanPy.Structures.Expression.LevelManipulation import from_offset, is_equivalent, lt_compare, make_imax, normalize, key_lt
+from LeanPy.Structures.Name import *
 
 def test_normalize1():
     t = LevelIMax(LevelSucc(LevelZero()), LevelSucc(LevelZero()))

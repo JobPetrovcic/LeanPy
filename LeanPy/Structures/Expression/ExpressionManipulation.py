@@ -3,9 +3,9 @@ from typing import Callable, List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
 
-from Structures.Expression.Expression import *
-from Structures.Expression.Level import Level, LevelParam
-from Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
+from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.Level import Level, LevelParam
+from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
 
 # for fvars we are relying on total equality
 @typechecked

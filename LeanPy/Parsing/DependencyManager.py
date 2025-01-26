@@ -1,9 +1,9 @@
 from typing import Dict, List, Set
 
-from Kernel.TypeChecker import TypeChecker
-from Parsing import LeanJSONParser
-from Structures.Environment.Declaration.Declaration import Declaration
-from Structures.Environment.Environment import Environment
+from LeanPy.Kernel.TypeChecker import TypeChecker
+from LeanPy.Parsing import LeanJSONParser
+from LeanPy.Structures.Environment.Declaration.Declaration import Declaration
+from LeanPy.Structures.Environment.Environment import Environment
 
 class DependencyManager:
     def __init__(self, folder : str):

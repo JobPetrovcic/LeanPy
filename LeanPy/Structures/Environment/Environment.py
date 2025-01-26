@@ -2,11 +2,11 @@ from typing import Dict, List
 
 from typeguard import typechecked
 
-from Structures.Environment.Declaration.Declaration import Constructor, Declaration, Definition, Inductive, Opaque, Quot, Theorem
-from Structures.Expression.Expression import Const, Expression, Sort
-from Structures.Expression.ExpressionManipulation import substitute_level_params_in_expression
-from Structures.Expression.Level import Level, LevelSucc, LevelZero
-from Structures.Name import Anonymous, Name, SubName
+from LeanPy.Structures.Environment.Declaration.Declaration import Constructor, Declaration, Definition, Inductive, Opaque, Quot, Theorem
+from LeanPy.Structures.Expression.Expression import Const, Expression, Sort
+from LeanPy.Structures.Expression.ExpressionManipulation import substitute_level_params_in_expression
+from LeanPy.Structures.Expression.Level import Level, LevelSucc, LevelZero
+from LeanPy.Structures.Name import Anonymous, Name, SubName
 
 class Environment:
     def __init__(self):

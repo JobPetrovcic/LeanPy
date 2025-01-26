@@ -1,7 +1,7 @@
 from typeguard import typechecked
-from Structures.Expression.ExpressionManipulation import fold_apps, unfold_app
-from Structures.Expression.Expression import App, Const
-from Structures.Name import Anonymous, SubName
+from LeanPy.Structures.Expression.ExpressionManipulation import fold_apps, unfold_app
+from LeanPy.Structures.Expression.Expression import App, Const
+from LeanPy.Structures.Name import Anonymous, SubName
 
 @typechecked
 def create_name(name : str):

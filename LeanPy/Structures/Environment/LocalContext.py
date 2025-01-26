@@ -2,7 +2,7 @@ from typing import Set, Optional
 
 from typeguard import typechecked
 
-from Structures.Expression.Expression import Expression, FVar
+from LeanPy.Structures.Expression.Expression import Expression, FVar
 
 class LocalContext:
     def __init__(self):

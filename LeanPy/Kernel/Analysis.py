@@ -2,9 +2,9 @@ from typing import Any, Callable, Tuple
 
 from typeguard import typechecked
 
-from Structures.Environment.LocalContext import LocalContext
-from Structures.Expression.Expression import Expression, FVar
-from Structures.Expression.ExpressionManipulation import do_fn
+from LeanPy.Structures.Environment.LocalContext import LocalContext
+from LeanPy.Structures.Expression.Expression import Expression, FVar
+from LeanPy.Structures.Expression.ExpressionManipulation import do_fn
 
 @typechecked
 def has_fvar_not_in_context(body : Expression, context : LocalContext):

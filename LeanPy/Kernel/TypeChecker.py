@@ -1,23 +1,23 @@
 from typing import List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
-from Kernel.Analysis import has_fvar_not_in_context, print_neg
-from Kernel.Cache.EquivManager import EquivManager
-from Kernel.Cache.Cache import InferCache, WHNFCache
-from Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, Inductive, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
-from Structures.Environment.Declaration.DeclarationManipulation import is_structural_inductive
-from Structures.Environment.Environment import Environment
-from Structures.Environment.LocalContext import LocalContext
-from Structures.Environment.NatReduction import *
-from Structures.Environment.NatReduction import nat_lit_to_constructor
-from Structures.Environment.NatReduction import str_lit_to_constructor
-from Structures.Environment.NatReduction import reduce_bin_nat_pred
-from Structures.Expression.Expression import *
-from Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, fold_apps, has_fvar, has_loose_bvars, has_specific_fvar, instantiate_bvar, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
-from Structures.Expression.Level import *
-from Structures.Expression.LevelManipulation import is_equivalent, is_equivalent_list, are_unique_level_params
-from Kernel.KernelErrors import ExpectedDifferentExpressionError, ExpectedDifferentTypesError, PanicError, ProjectionError, EnvironmentError, DeclarationError, RecursorError
-from Structures.Name import Name
+from LeanPy.Kernel.Analysis import has_fvar_not_in_context, print_neg
+from LeanPy.Kernel.Cache.EquivManager import EquivManager
+from LeanPy.Kernel.Cache.Cache import InferCache, WHNFCache
+from LeanPy.Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, Inductive, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
+from LeanPy.Structures.Environment.Declaration.DeclarationManipulation import is_structural_inductive
+from LeanPy.Structures.Environment.Environment import Environment
+from LeanPy.Structures.Environment.LocalContext import LocalContext
+from LeanPy.Structures.Environment.NatReduction import *
+from LeanPy.Structures.Environment.NatReduction import nat_lit_to_constructor
+from LeanPy.Structures.Environment.NatReduction import str_lit_to_constructor
+from LeanPy.Structures.Environment.NatReduction import reduce_bin_nat_pred
+from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionManipulation import ReductionStatus, abstract_bvar, abstract_multiple_bvar, fold_apps, has_fvar, has_loose_bvars, has_specific_fvar, instantiate_bvar, instantiate_bvars, level_zip, substitute_level_params_in_expression, unfold_app, get_app_function
+from LeanPy.Structures.Expression.Level import *
+from LeanPy.Structures.Expression.LevelManipulation import is_equivalent, is_equivalent_list, are_unique_level_params
+from LeanPy.Kernel.KernelErrors import ExpectedDifferentExpressionError, ExpectedDifferentTypesError, PanicError, ProjectionError, EnvironmentError, DeclarationError, RecursorError
+from LeanPy.Structures.Name import Name
 import warnings
 
 import sys

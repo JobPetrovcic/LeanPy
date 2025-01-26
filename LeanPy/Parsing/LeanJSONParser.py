@@ -3,15 +3,15 @@ from typing import Any, List, Tuple
 
 
 
-from Structures.Name import *
-from Structures.Expression.Level import * 
+from LeanPy.Structures.Name import *
+from LeanPy.Structures.Expression.Level import * 
 tag_to_level_class = {c.__name__ : c for c in level_constructors}
 
-from Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.Expression import *
 tag_to_expr_class = {c.__name__ : c for c in expr_constructors}
 
-from Structures.Environment.Declaration.Declaration import *
-from Structures.Environment.ReducibilityHint import *
+from LeanPy.Structures.Environment.Declaration.Declaration import *
+from LeanPy.Structures.Environment.ReducibilityHint import *
 
 from typing import Union, Dict
 

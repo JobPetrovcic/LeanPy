@@ -1,11 +1,11 @@
 from typing import List, Tuple
-from Parsing.LeanTextParser import LeanFormatParser
-from Structures.Name import *
-from Structures.Expression.Level import *
-from Structures.Expression.Expression import *
-from Structures.Environment.Declaration.Declaration import *
-from Structures.Environment.ReducibilityHint import *
-from Structures.Expression.ExpressionToPython import ExpressionToPython
+from LeanPy.Parsing.LeanTextParser import LeanFormatParser
+from LeanPy.Structures.Name import *
+from LeanPy.Structures.Expression.Level import *
+from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Environment.Declaration.Declaration import *
+from LeanPy.Structures.Environment.ReducibilityHint import *
+from LeanPy.Structures.Expression.ExpressionToPython import ExpressionToPython
 
 
 #def test_lean_format_parser1():
@@ -28,11 +28,11 @@ from Structures.Expression.ExpressionToPython import ExpressionToPython
 #            tests.append((python_name, decl))
 #
 #    code = str(exporter)
-#    print("""from Structures.Name import *
-#from Structures.Expression.Level import *
-#from Structures.Expression.Expression import *
-#from Structures.Environment.Declaration.Declaration import *
-#from Structures.Environment.ReducibilityHint import *
+#    print("""from LeanPy.Structures.Name import *
+#from LeanPy.Structures.Expression.Level import *
+#from LeanPy.Structures.Expression.Expression import *
+#from LeanPy.Structures.Environment.Declaration.Declaration import *
+#from LeanPy.Structures.Environment.ReducibilityHint import *
 #""")
 #    print(code)
 #    exec(code, globals())

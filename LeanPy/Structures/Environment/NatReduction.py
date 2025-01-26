@@ -2,8 +2,8 @@ from typing import Callable
 
 from typeguard import typechecked
 
-from Structures.Environment.Environment import Environment
-from Structures.Expression.Expression import App, Const, Expression, NatLit, StrLit
+from LeanPy.Structures.Environment.Environment import Environment
+from LeanPy.Structures.Expression.Expression import App, Const, Expression, NatLit, StrLit
 def nat_add(a : int, b : int) -> int: return a + b
 def nat_sub(a : int, b : int) -> int: return max(0, a - b)
 def nat_mul(a : int, b : int) -> int: return a * b

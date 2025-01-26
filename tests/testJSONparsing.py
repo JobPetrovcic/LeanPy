@@ -1,5 +1,5 @@
 import os
-from Parsing.DependencyManager import DependencyManager
+from LeanPy.Parsing.DependencyManager import DependencyManager
 
 if __name__ == "__main__":
     dir ="../../lean2json/TestJSONProject/json_dump"

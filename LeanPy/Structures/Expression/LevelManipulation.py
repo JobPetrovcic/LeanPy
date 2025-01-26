@@ -1,12 +1,12 @@
 import functools
 from typing import Callable, Dict, Optional, List, Sequence, Tuple
 
-from Structures.Expression.Level import *
+from LeanPy.Structures.Expression.Level import *
 
 
 from typeguard import typechecked
-from Kernel.KernelErrors import PanicError
-from Structures.Expression.Level import *
+from LeanPy.Kernel.KernelErrors import PanicError
+from LeanPy.Structures.Expression.Level import *
     
 def to_offset(level : Level) -> Tuple[Level, int]:
     cur = level

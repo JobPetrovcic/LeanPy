@@ -9,7 +9,7 @@ setup(
         'typing_extensions'
     ],
     extras_require={
-        'dev': ['mypy', 'pytest'],
+        'dev': ['mypy', 'pytest', 'stubgen'],
     },
     package_data={
         'LeanPy': ['*.pyi', 'py.typed']

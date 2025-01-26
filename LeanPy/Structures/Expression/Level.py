@@ -1,6 +1,6 @@
 from typeguard import typechecked
 
-from Structures.Name import Name
+from LeanPy.Structures.Name import Name
 
 class Level:
     def __str__(self) -> str:

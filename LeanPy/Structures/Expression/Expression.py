@@ -4,8 +4,8 @@ from typing_extensions import override
 
 from typeguard import typechecked
 
-from Structures.Expression.Level import *
-from Structures.Name import *
+from LeanPy.Structures.Expression.Level import *
+from LeanPy.Structures.Name import *
 
 class Expression:
     @typechecked
