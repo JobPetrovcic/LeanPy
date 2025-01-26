@@ -1,9 +1,9 @@
 from typing import List, Optional, Sequence, Tuple
 
 from typeguard import typechecked
-from LeanPy.Kernel.Analysis import has_fvar_not_in_context, print_neg
+from LeanPy.Kernel.Analysis import has_fvar_not_in_context, err_print_neg
 from LeanPy.Kernel.Cache.EquivManager import EquivManager
-from LeanPy.Kernel.Cache.Cache import InferCache, WHNFCache
+from LeanPy.Kernel.Cache.Cache import InferCache, PairCache, WHNFCache
 from LeanPy.Structures.Environment.Declaration.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, Inductive, Opaque, Quot, Recursor, Theorem, compare_reducibility_hints
 from LeanPy.Structures.Environment.Declaration.DeclarationManipulation import is_structural_inductive
 from LeanPy.Structures.Environment.Environment import Environment
@@ -35,6 +35,7 @@ class TypeChecker:
         self.infer_cache = [InferCache(), InferCache()]
 
         self.equiv_manager = EquivManager()
+        self.instantiation_cache = PairCache[Expression]()
 
         if environment is None:
             self.environment = Environment()
@@ -60,7 +61,13 @@ class TypeChecker:
         """
         Replace the outermost bound variable in the body with the value. Clones the body(!).
         """
-        return instantiate_bvar(body, val)
+
+        cached_inst_body = self.instantiation_cache.get(body, val)
+        if cached_inst_body is not None: return cached_inst_body
+
+        inst_body = instantiate_bvar(body, val)
+        self.instantiation_cache.put(body, val, inst_body)
+        return inst_body
     
     @typechecked
     def instantiate_multiple(self, body : Expression, vals : Sequence[Expression]) -> Expression:
@@ -254,7 +261,6 @@ class TypeChecker:
 
         if isinstance(l, Sort) and isinstance(r, Sort): return self.def_eq_sort(l, r)
         elif isinstance(l, BVar) or isinstance(r, BVar): raise PanicError("BVar should have been substituted by now, when comparing expressions for definitional equality.")
-        elif isinstance(l, FVar) and isinstance(r, FVar): return l is r
         
         elif isinstance(l, Pi) and isinstance(r, Pi):
             return self.def_eq_pi(l, r)
@@ -285,10 +291,10 @@ class TypeChecker:
         if constructor.num_fields != 0: return False
         return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_loose_infer and True)))
     
-    @print_neg
+    @err_print_neg
     @typechecked
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
-        if l is r: return True
+        if l == r: return True
 
         # TODO might need to optimize has_fvar by caching
         if not has_fvar(l) and isinstance(r, Const) and r.cname == self.environment.Bool_true_name:
@@ -653,13 +659,13 @@ class TypeChecker:
         mk = self.whnf(args[mk_pos]) # whnf to expose the Quot_mk
         #print(self.local_context)
 
-        assert isinstance(mk, App)
         mk_fn, mk_args = unfold_app(mk)
 
         if not isinstance(mk_fn, Const): return None
         if mk_fn.cname != self.environment.Quot_mk_name: return None
         if len(mk_args) != 3: return None # the Quot.mk takes 3 arguments
 
+        assert isinstance(mk, App)
         f = args[arg_pos] # get the function we are lifting/inducing
         r = App(f, mk.arg) # get the class representative and apply f on it
 
@@ -1051,10 +1057,12 @@ class TypeChecker:
         return inferred_type
     
     def clear_caches(self):
-        self.whnf_core_cache.clear()
         self.whnf_cache.clear()
-        for cache in self.infer_cache:
-            cache.clear()
+        self.whnf_core_cache.clear()
+        self.infer_cache[False].clear()
+        self.infer_cache[True].clear()
+        self.equiv_manager.clear()
+        self.instantiation_cache.clear()
 
     @typechecked
     def infer(self, expr : Expression, clear_caches : bool = True) -> Expression:

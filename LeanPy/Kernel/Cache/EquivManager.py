@@ -40,3 +40,5 @@ class EquivManager:
             self.expr_to_dsu[expr2] = DSUObject()
         self.expr_to_dsu[expr1].join(self.expr_to_dsu[expr2])
         
+    def clear(self):
+        self.expr_to_dsu.clear()

@@ -28,7 +28,7 @@ class ExpressionToPython:
     # NAMES
     def get_name_value_str(self, name : Name) -> str:
         if isinstance(name, SubName):
-            return f"SubName(anc={self.get_name(name.anc)}, name='{name.name}')"
+            return f"SubName(anc={self.get_name(name.anc)}, name='{name.str}')"
         elif isinstance(name, Anonymous):
             return f"Anonymous()"
         else:
@@ -56,7 +56,7 @@ class ExpressionToPython:
         elif isinstance(lvl, LevelSucc):
             return f"LevelSucc(anc={self.get_level(lvl.anc, python_name + '_anc')})"
         elif isinstance(lvl, LevelParam):
-            return f"LevelParam(name={self.get_name(lvl.name)})"
+            return f"LevelParam(name={self.get_name(lvl.pname)})"
         elif isinstance(lvl, LevelMax):
             return f"LevelMax(lhs={self.get_level(lvl.lhs, python_name + '_lhs')}, rhs={self.get_level(lvl.rhs, python_name + '_rhs')})"
         elif isinstance(lvl, LevelIMax):
@@ -90,7 +90,7 @@ class ExpressionToPython:
             return f"Sort(level={self.get_level(expr.level, python_name + '_lvl' + str(self.level_cnt))})"
         elif isinstance(expr, Const):
             lvl_params_str = self.get_levels_str(expr.lvl_params, python_name)
-            return f"Const(cname={self.get_name(expr.name)}, lvl_params={lvl_params_str})"
+            return f"Const(cname={self.get_name(expr.cname)}, lvl_params={lvl_params_str})"
         elif isinstance(expr, App):
             return f"App(fn={self.get_expression_value_str(expr.fn, python_name)}, arg={self.get_expression_value_str(expr.arg, python_name)})"
         elif isinstance(expr, Lambda):
@@ -121,7 +121,7 @@ class ExpressionToPython:
     
     # DECLARATION INFOS
     def get_declaration_info_value_str(self, info : DeclarationInfo) -> str:
-        got_name = self.get_name(info.name)
+        got_name = self.get_name(info.ciname)
         lvl_params_str = self.get_level_params_str(info.lvl_params, got_name)
         return f"DeclarationInfo(name={got_name}, lvl_params={lvl_params_str}, type={self.get_expression(info.type, got_name + '_info_type')})"
 
@@ -174,7 +174,7 @@ class ExpressionToPython:
 
     def export_declaration(self, decl : Declaration) -> Tuple[str, str]:
         if decl not in self.declarations:
-            python_name = f"decl_{str(decl.info.name).replace('.', '_').replace('@', 'at')}"
+            python_name = f"decl_{str(decl.info.ciname).replace('.', '_').replace('@', 'at')}"
             self.add_declaration_line(decl, python_name)
         else: raise ValueError(f"Declaration {decl} already exists in the exporter.")
         return python_name, self.declarations[decl]

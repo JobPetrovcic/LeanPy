@@ -235,12 +235,7 @@ def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:
 
 def has_fvar(expr : Expression) -> bool:
     """ Returns True if the given expression contains a free variable. """
-    has_fvar = False
-    def fn(expr : Expression):
-        nonlocal has_fvar
-        if isinstance(expr, FVar): has_fvar = True
-    do_fn(expr, fn)
-    return has_fvar
+    return expr.num_fvars > 0
 
 def level_zip(lvl_params : List[LevelParam], lvl_values : List[Level]) -> LevelSubList:
     """ Checks if the two lists of levels have the same length and zips them together. """
