@@ -15,6 +15,9 @@ class MapCache:
             else: return # value is the same
         
         self.cache[key] = value
+    
+    def clear(self):
+        self.cache.clear()
 
 class InferCache(MapCache):
     def __init__(self):
@@ -43,3 +46,6 @@ class PairCache(Generic[T]):
                 raise Exception(f"PairCache already contains key {key} with different value {self.cache[key]}")
             return
         self.cache[key] = value
+    
+    def clear(self):
+        self.cache.clear()

@@ -147,6 +147,8 @@ class Environment:
     def add_declaration(self, name : Name, decl : Declaration):
         if name in self.name_dict:
             raise ValueError(f"Name {name} already exists in environment.")
+        if (len(self.name_dict) + 1) % 100 == 0:
+            print(f"Added {len(self.name_dict) + 1} declarations.")
         self.name_dict[name] = decl
     
     @typechecked

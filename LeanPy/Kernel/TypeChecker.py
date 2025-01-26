@@ -396,12 +396,9 @@ class TypeChecker:
     @typechecked
     def delta_reduction(self, expr : Expression) -> Optional[Expression]:
         """ Unfolds the applications of the expression. If the function is a declaration, then it unfolds it. """
-        #print(f"delta reducing {expr}")
         is_d = self.is_delta(expr)
-        #print(f"expr {expr} is a delta")
         if is_d is None: return None
         ret = self.delta_reduction_core(*is_d)
-        #print(f"delta reduced {expr} to {ret}")
         return ret
     
     @typechecked
@@ -437,7 +434,6 @@ class TypeChecker:
         if e_new is e: return None
         return e_new
 
-    ##@profile
     @typechecked
     def lazy_delta_reduction_step(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, ReductionStatus]:
         id_t = self.is_delta(t_n)
@@ -452,21 +448,16 @@ class TypeChecker:
         elif (id_t is None) and (id_s is not None):
             t_new = self.try_unfold_proj_app(t_n)
             if t_new is not None: 
-                #print(f"unfolding proj {t_n}")
                 t_n = t_new
             else: 
-                #print(f"delta reducing {s_n}")
                 s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
         elif (id_t is not None) and (id_s is not None):
             hint_compare = compare_reducibility_hints(id_t[1], id_s[1])
             if hint_compare < 0: # reduce t
-                #print(f"delta reducing hint {t_n}")
                 t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_rec=False, cheap_proj=True)
             elif hint_compare > 0: # reduce s
-                #print(f"delta reducing hint {s_n}")
                 s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
             else: # reduce both
-                #print(f"delta reducing both {t_n} and {s_n}")
                 t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_rec=False, cheap_proj=True)
                 s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
         else:
@@ -477,7 +468,6 @@ class TypeChecker:
             return t_n, s_n, (ReductionStatus.EQUAL if is_easy else ReductionStatus.NOT_EQUAL)
         else: return t_n, s_n, ReductionStatus.CONTINUE
     
-    ##@profile
     @typechecked
     def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]:
         while True:
@@ -1060,11 +1050,19 @@ class TypeChecker:
 
         return inferred_type
     
+    def clear_caches(self):
+        self.whnf_core_cache.clear()
+        self.whnf_cache.clear()
+        for cache in self.infer_cache:
+            cache.clear()
+
     @typechecked
-    def infer(self, expr : Expression) -> Expression:
+    def infer(self, expr : Expression, clear_caches : bool = True) -> Expression:
         if not self.local_context.is_empty():
             raise PanicError(f"Local context is not empty when inferring: {self.local_context}")
-        #rprint(f"CHECKING NEW EXPRESSION {expr}")
+        if clear_caches:
+            self.clear_caches()
+
         inferred_type = self.infer_core(expr, infer_only=(self.allow_loose_infer and False))
 
         has_fvar_not_in_context(inferred_type, self.local_context) # TODO : remove this after testing
@@ -1073,8 +1071,6 @@ class TypeChecker:
     # CHECKING DECLARATIONS
     @typechecked
     def check_declaration_info(self, info : DeclarationInfo):
-        #print(f"CHECKING DECLARATION {info.name}")
-        #print(f"INFO TYPE : {info.type}")
         if not are_unique_level_params(info.lvl_params):
             raise EnvironmentError(f"Level parameters in declaration info {info} are not unique.")
         if has_fvar(info.type):
@@ -1087,16 +1083,12 @@ class TypeChecker:
 
     @typechecked
     def add_definition(self, name : Name, d : Definition):
-        #rprint(f"ADDING DEFINITION : {name}")
         self.check_declaration_info(d.info)
-        #rprint(f"VALUE : {d.value}")
 
         infered_type = self.infer(d.value)
         if not self.def_eq(infered_type, d.info.type):
             raise DeclarationError(f"Definition {name} has type {d.info.type} but inferred type {infered_type}")
         self.environment.add_declaration(name, d)
-
-        #rprint(f"ADDED DEFINITION : {name}")
     
     @typechecked
     def add_theorem(self, name : Name, t : Theorem):
@@ -1109,11 +1101,8 @@ class TypeChecker:
             raise DeclarationError(f"Theorem {name} has type {t.info.type} but inferred type {infered_type}")
         self.environment.add_declaration(name, t)
 
-        #rprint(f"ADDED THEOREM : {name}")
-
     @typechecked
     def add_opaque(self, name : Name, o : Opaque):
-        #rprint(f"ADDING OPAQUE : {name}")
         self.check_declaration_info(o.info)
 
         inferred_type = self.infer(o.value)
@@ -1122,33 +1111,23 @@ class TypeChecker:
         
         self.environment.add_declaration(name, o)
 
-        #rprint(f"ADDED OPAQUE : {name}")
-
     @typechecked
     def add_axiom(self, name : Name, a : Axiom):
-        #rprint(f"ADDING AXIOM : {name}")
         self.check_declaration_info(a.info)
         self.environment.add_declaration(name, a)
-
-        #rprint(f"ADDED AXIOM : {name}")
     
     @typechecked
     def add_inductive(self, name : Name, ind : Inductive):
-        #rprint(f"ADDING INDUCTIVE : {name}")
         assert name == ind.info.ciname, "Sanity check failed: name does not match info name."
         
         self.environment.add_declaration(name, ind)
 
         self.check_inductive_declaration_infos(name)
-        #rprint(f"ADDED INDUCTIVE : {name}")
 
     @typechecked
     def add_constructor(self, name : Name, constructor : Constructor):
-        #rprint(f"ADDING CONSTRUCTOR: {name}")
         self.environment.add_declaration(name, constructor)
         self.check_inductive_declaration_infos(constructor.inductive_name)
-
-        #rprint(f"ADDED CONSTRUCTOR : {name}")
 
     @typechecked
     def number_of_added_constructors(self, inductive_decl : Inductive) -> int:
@@ -1199,7 +1178,6 @@ class TypeChecker:
 
     @typechecked
     def add_recursor(self, name : Name, recursor : Recursor):
-        #rprint(f"ADDING RECURSOR : {name}")
         self.check_declaration_info(recursor.info)
         self.environment.add_declaration(name, recursor) # add the recursor to the environment before checking the recursion rules, since they refer to the recursor
 
@@ -1208,23 +1186,15 @@ class TypeChecker:
             if not isinstance(constructor_decl, Constructor):
                 raise DeclarationError(f"Recursor rule {rec_rule} is not associated with a constructor; found {constructor_decl.__class__.__name__} with name {constructor_decl.info.ciname} instead.")
             
-            # TODO: why is there a problem here with Lean.IR....?
-            #if constructor_decl.num_params != recursor.num_params:
-            #    raise DeclarationError(f"Recursor rule {rec_rule} is associated with constructor {constructor_decl.info.ciname} which has {constructor_decl.num_params} parameters, but the recursor {recursor.info.ciname} has {recursor.num_params} parameters.")
-
-        #rprint(f"ADDED RECURSOR : {name}")
 
     @typechecked
     def add_quotient(self, name : Name, q : Quot):
-        #rprint(f"ADDING QUOTIENT : {name}")
         self.check_declaration_info(q.info)
         self.environment.add_declaration(name, q)
 
-        #rprint(f"ADDED QUOTIENT : {name}")
 
     @typechecked
     def add_declaration(self, name : Name, decl : Declaration):
-        print(f"ADDING DECLARATION : {name}")
         if isinstance(decl, Definition): self.add_definition(name, decl)
         elif isinstance(decl, Theorem): self.add_theorem(name, decl)
         elif isinstance(decl, Opaque): self.add_opaque(name, decl)
