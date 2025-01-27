@@ -2,15 +2,15 @@ from typing import Type
 from LeanPy.Structures.Environment.LocalContext import LocalContext
 from LeanPy.Structures.Expression.Expression import Expression
 
+class PanicError(Exception):
+    def __init__(self, message : str):
+        super().__init__(message)
+
 
 class KernelError(Exception):
     def __init__(self, message : str):
         self.message = message
         super().__init__(self.message)
-
-class PanicError(KernelError):
-    def __init__(self, message : str):
-        super().__init__(message)
 
 class ExpectedDifferentExpressionError(KernelError):
     def __init__(self, expected : Type[Expression], got : Type[Expression]):
@@ -33,5 +33,9 @@ class DeclarationError(KernelError):
         super().__init__(message)
 
 class RecursorError(KernelError):
+    def __init__(self, message : str):
+        super().__init__(message)
+
+class StructureError(KernelError):
     def __init__(self, message : str):
         super().__init__(message)

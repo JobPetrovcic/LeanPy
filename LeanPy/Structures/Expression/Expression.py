@@ -17,12 +17,14 @@ class Expression:
 
         self.num_fvars = self.get_num_fvars()
         self.num_bvars = self.get_num_bvars()
+        self.bvar_range = self.get_bvar_range() # the maximum bvar index in the expression, adjusted for the number of binders
         self.num_mvars = self.get_num_mvars()
 
         self.num_lvl_mvars = self.get_lvl_mvars()
 
     def get_num_fvars(self) -> int: raise NotImplementedError(f"Method get_num_fvars not implemented for class {self.__class__.__name__}")
     def get_num_bvars(self) -> int: raise NotImplementedError(f"Method get_num_bvars not implemented for class {self.__class__.__name__}")
+    def get_bvar_range(self) -> int: return self.get_num_bvars()
     def get_num_mvars(self) -> int: raise NotImplementedError(f"Method get_num_mvars not implemented for class {self.__class__.__name__}")
     def get_lvl_mvars(self) -> int: raise NotImplementedError(f"Method get_lvl_mvars not implemented for class {self.__class__.__name__}")
 
@@ -57,6 +59,7 @@ class BVar(Expression):
     def get_hash(self) -> int: return hash(("BVar", self.db_index))
     def get_num_fvars(self): return 0
     def get_num_bvars(self): return 1
+    def get_bvar_range(self): return self.db_index
     def get_num_mvars(self): return 0
     def get_lvl_mvars(self): return 0
     
@@ -87,6 +90,7 @@ class FVar(Expression):
     def get_hash(self) -> int: return hash(("FVar", id(self)))
     def get_num_fvars(self): return 1
     def get_num_bvars(self): return 0
+    def get_bvar_range(self): return -1
     def get_num_mvars(self): return 0
     def get_lvl_mvars(self): return 0
     
@@ -107,6 +111,7 @@ class Sort(Expression):
     def get_hash(self) -> int: return hash(("Sort", self.level))
     def get_num_fvars(self): return 0
     def get_num_bvars(self): return 0
+    def get_bvar_range(self): return -1
     def get_num_mvars(self): return 0
     def get_lvl_mvars(self): return self.level.num_mvars
 
@@ -128,6 +133,7 @@ class Const(Expression):
     def get_hash(self) -> int: return hash(("Const", hash(self.cname)))
     def get_num_fvars(self): return 0
     def get_num_bvars(self): return 0
+    def get_bvar_range(self): return -1
     def get_num_mvars(self): return 0
     def get_lvl_mvars(self): return sum([lvl.num_mvars for lvl in self.lvl_params])
     
@@ -152,6 +158,7 @@ class App(Expression):
     def get_hash(self) -> int: return hash(("App", hash(self.fn), hash(self.arg)))
     def get_num_fvars(self): return self.fn.num_fvars + self.arg.num_fvars
     def get_num_bvars(self): return self.fn.num_bvars + self.arg.num_bvars
+    def get_bvar_range(self): return max(self.fn.num_bvars, self.arg.num_bvars)
     def get_num_mvars(self): return self.fn.num_mvars + self.arg.num_mvars
     def get_lvl_mvars(self): return self.fn.num_lvl_mvars + self.arg.num_lvl_mvars
     
@@ -180,6 +187,7 @@ class Pi(Expression):
     def get_hash(self) -> int: return hash(("Pi", hash(self.arg_type), hash(self.body_type)))
     def get_num_fvars(self): return self.arg_type.num_fvars + self.body_type.num_fvars
     def get_num_bvars(self): return self.arg_type.num_bvars + self.body_type.num_bvars
+    def get_bvar_range(self): return max(self.arg_type.num_bvars, self.body_type.num_bvars-1) # the -1 is because the argument is a binder
     def get_num_mvars(self): return self.arg_type.num_mvars + self.body_type.num_mvars
     def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.body_type.num_lvl_mvars
     
@@ -202,6 +210,7 @@ class Lambda(Expression):
     def get_hash(self) -> int: return hash(("Lambda", hash(self.arg_type), hash(self.body)))
     def get_num_fvars(self): return self.arg_type.num_fvars + self.body.num_fvars
     def get_num_bvars(self): return self.arg_type.num_bvars + self.body.num_bvars
+    def get_bvar_range(self): return max(self.arg_type.num_bvars, self.body.num_bvars-1) # the -1 is because the argument is a binder
     def get_num_mvars(self): return self.arg_type.num_mvars + self.body.num_mvars
     def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.body.num_lvl_mvars
     
@@ -225,6 +234,7 @@ class Let(Expression):
     def get_hash(self) -> int: return hash(("Let", hash(self.bname), hash(self.arg_type), hash(self.val), hash(self.body)))
     def get_num_fvars(self): return self.arg_type.num_fvars + self.val.num_fvars + self.body.num_fvars
     def get_num_bvars(self): return self.arg_type.num_bvars + self.val.num_bvars + self.body.num_bvars
+    def get_bvar_range(self): return max(self.arg_type.num_bvars, self.val.num_bvars, self.body.num_bvars-1) # the -1 is because the argument is a binder
     def get_num_mvars(self): return self.arg_type.num_mvars + self.val.num_mvars + self.body.num_mvars
     def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.val.num_lvl_mvars + self.body.num_lvl_mvars
     
@@ -246,6 +256,7 @@ class Proj(Expression):
     def get_hash(self) -> int: return hash(("Proj", hash(self.sname), self.index, hash(self.expr)))
     def get_num_fvars(self): return self.expr.num_fvars
     def get_num_bvars(self): return self.expr.num_bvars
+    def get_bvar_range(self): return self.expr.bvar_range
     def get_num_mvars(self): return self.expr.num_mvars
     def get_lvl_mvars(self): return self.expr.num_lvl_mvars
     
@@ -267,6 +278,7 @@ class NatLit(Expression):
     def get_hash(self) -> int: return hash(("NatLit", self.val))
     def get_num_fvars(self): return 0
     def get_num_bvars(self): return 0
+    def get_bvar_range(self): return -1
     def get_num_mvars(self): return 0
     def get_lvl_mvars(self): return 0
     
@@ -287,6 +299,7 @@ class StrLit(Expression):
     def get_hash(self) -> int: return hash(("StringLit", self.val))
     def get_num_fvars(self): return 0
     def get_num_bvars(self): return 0
+    def get_bvar_range(self): return -1
     def get_num_mvars(self): return 0
     def get_lvl_mvars(self): return 0
 
@@ -305,6 +318,7 @@ class MVar(Expression):
     def get_hash(self) -> int:return hash("MVar")
     def get_num_fvars(self): return 0
     def get_num_bvars(self): return 0
+    def get_bvar_range(self): return -1
     def get_num_mvars(self): return 1
     def get_lvl_mvars(self): return 0
     

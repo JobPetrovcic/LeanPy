@@ -7,12 +7,12 @@ from LeanPy.Structures.Environment.LocalContext import LocalContext
 from LeanPy.Structures.Expression.Expression import Expression, FVar
 from LeanPy.Structures.Expression.ExpressionManipulation import do_fn
 
-@typechecked
-def has_fvar_not_in_context(body : Expression, context : LocalContext):
-    """ Raises an error if the given expression contains a free variable not in the given context. """
-    def fn(expr : Expression):
-        if isinstance(expr, FVar) and expr not in context.fvars: raise ValueError(f"In body\n\t{body}\n\n found free variable\n\t{expr}\n\n not in context {context}")
-    do_fn(body, fn)
+#@typechecked
+#def has_fvar_not_in_context(body : Expression, context : LocalContext):
+#    """ Raises an error if the given expression contains a free variable not in the given context. """
+#    def fn(expr : Expression):
+#        if isinstance(expr, FVar) and expr not in context.fvars: raise ValueError(f"In body\n\t{body}\n\n found free variable\n\t{expr}\n\n not in context {context}")
+#    do_fn(body, fn)
 
 def print_function_name(func : Callable[[Any], Any]) -> Callable[[Any], Any]:
     def wrapper(*args : Any, **kwargs : Any) -> Any:
