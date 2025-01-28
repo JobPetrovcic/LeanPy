@@ -1,11 +1,7 @@
 import sys
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, ParamSpec, Tuple, TypeVar
 
-from typeguard import typechecked
-
-from LeanPy.Structures.Environment.LocalContext import LocalContext
-from LeanPy.Structures.Expression.Expression import Expression, FVar
-from LeanPy.Structures.Expression.ExpressionManipulation import do_fn
+from LeanPy.Structures.Expression.Expression import Expression
 
 #@typechecked
 #def has_fvar_not_in_context(body : Expression, context : LocalContext):
@@ -14,8 +10,10 @@ from LeanPy.Structures.Expression.ExpressionManipulation import do_fn
 #        if isinstance(expr, FVar) and expr not in context.fvars: raise ValueError(f"In body\n\t{body}\n\n found free variable\n\t{expr}\n\n not in context {context}")
 #    do_fn(body, fn)
 
-def print_function_name(func : Callable[[Any], Any]) -> Callable[[Any], Any]:
-    def wrapper(*args : Any, **kwargs : Any) -> Any:
+T = TypeVar("T")
+P = ParamSpec("P")
+def print_function_name(func: Callable[P, T]) -> Callable[P, T]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         print(f"{func.__name__}")
         return func(*args, **kwargs)
     return wrapper

@@ -3,7 +3,7 @@ from LeanPy.Structures.Expression.Expression import Expression
 
 class MapCache:
     def __init__(self):
-        # based on hashes and total equality (see Expression.__eq__ and Expression.totally_equal)
+        # based on hashes and total equality (see Expression.__eq__)
         self.cache : Dict[Expression, Expression] = {} 
     
     def get(self, key : Expression) -> Optional[Expression]:

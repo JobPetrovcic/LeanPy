@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Set, Tuple
 from typing_extensions import override
 
 #from typeguard import typechecked
@@ -42,16 +42,29 @@ class Expression:
         raise NotImplementedError(f"Method __str__ not implemented for clas {self.__class__.__name__}")
     
     @abstractmethod
-    #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         raise NotImplementedError(f"Method __eq__ not implemented for class {self.__class__.__name__}")
     
+    @profile
     def __eq__(self, other : object) -> bool:
+        assert isinstance(other, Expression), f"Cannot compare an Expression with a non-Expression object {other}"
+
+        # create a cache for pairs of expressions that have already been compared
+        # NOTE: note that this cache uses MEMORY ADDRESSES of the expressions to since we are implementing __eq__ that would be called by the == operator
+        compare_cache : Set[Tuple[int, int]] = set() 
+        return self.check_cache_and_compare(other, compare_cache)
+
+    def check_cache_and_compare(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         if self is other: return True
-        if not isinstance(other, Expression): return False
         # compare the hashes first
         if hash(self) != hash(other): return False
-        return self.totally_equal(other)
+        if self.__class__ != other.__class__: return False
+
+        key = (id(self), id(other))
+
+        if key in compare_cache: return True
+        compare_cache.add(key)
+        return self.totally_equal(other, compare_cache)
 
 class BVar(Expression):
     #@typechecked
@@ -73,7 +86,7 @@ class BVar(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         return isinstance(other, BVar) and self.db_index == other.db_index
 
 class FVar(Expression):
@@ -106,7 +119,7 @@ class FVar(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         return self is other
 
 class Sort(Expression):
@@ -129,7 +142,7 @@ class Sort(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         return isinstance(other, Sort) and self.level.totally_equal(other.level)
     
 class Const(Expression):
@@ -156,7 +169,7 @@ class Const(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         return isinstance(other, Const) and self.cname == other.cname and len(self.lvl_params) == len(other.lvl_params) and all([l1.totally_equal(l2) for l1, l2 in zip(self.lvl_params, other.lvl_params)])
     
 class App(Expression):
@@ -186,8 +199,8 @@ class App(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
-        return isinstance(other, App) and self.fn.totally_equal(other.fn) and self.arg.totally_equal(other.arg)
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+        return isinstance(other, App) and self.fn.check_cache_and_compare(other.fn, compare_cache) and self.arg.check_cache_and_compare(other.arg, compare_cache)
 
 class Pi(Expression):
     #@typechecked
@@ -211,8 +224,8 @@ class Pi(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
-        return isinstance(other, Pi) and self.arg_type.totally_equal(other.arg_type) and self.body_type.totally_equal(other.body_type) # don't need to check bname
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+        return isinstance(other, Pi) and self.arg_type.check_cache_and_compare(other.arg_type, compare_cache) and self.body_type.check_cache_and_compare(other.body_type, compare_cache) # don't need to check bname
     
 class Lambda(Expression):
     #@typechecked
@@ -236,8 +249,8 @@ class Lambda(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
-        return isinstance(other, Lambda) and self.arg_type.totally_equal(other.arg_type) and self.body.totally_equal(other.body) # don't need to check bname
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+        return isinstance(other, Lambda) and self.arg_type.check_cache_and_compare(other.arg_type, compare_cache) and self.body.check_cache_and_compare(other.body, compare_cache) # don't need to check bname
 
 class Let(Expression):
     #@typechecked
@@ -262,8 +275,8 @@ class Let(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
-        return isinstance(other, Let) and self.arg_type.totally_equal(other.arg_type) and self.val.totally_equal(other.val) and self.body.totally_equal(other.body) # don't need to check bname
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+        return isinstance(other, Let) and self.arg_type.check_cache_and_compare(other.arg_type, compare_cache) and self.val.check_cache_and_compare(other.val, compare_cache) and self.body.check_cache_and_compare(other.body, compare_cache) # don't need to check bname
 
 class Proj(Expression):
     #@typechecked
@@ -286,8 +299,8 @@ class Proj(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
-        return isinstance(other, Proj) and self.sname == other.sname and self.index == other.index and self.expr.totally_equal(other.expr) # check the name since it refers to the structure we are projecting
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+        return isinstance(other, Proj) and self.sname == other.sname and self.index == other.index and self.expr.check_cache_and_compare(other.expr, compare_cache) # check the name since it refers to the structure we are projecting
 
 class NatLit(Expression):
     #@typechecked
@@ -310,7 +323,7 @@ class NatLit(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         return isinstance(other, NatLit) and self.val == other.val
 
 class StrLit(Expression):
@@ -333,7 +346,7 @@ class StrLit(Expression):
     
     #@typechecked
     #@profile
-    def totally_equal(self, other : 'Expression') -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
         return isinstance(other, StrLit) and self.val == other.val
     
 class MVar(Expression):
