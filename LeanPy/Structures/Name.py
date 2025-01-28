@@ -27,10 +27,10 @@ class SubName(Name):
     def __init__(self, anc : Name, str : str):
         self.str = str
         self.anc = anc
+        self.full_str = f"{self.anc}.{self.str}"
     
     def __str__(self) -> str:
-        if isinstance(self.anc, Anonymous): return self.str
-        else: return f"{self.anc}.{self.str}"
+        return self.full_str
 
 def string_to_name(s : str) -> Name:
     parts = s.split(".")

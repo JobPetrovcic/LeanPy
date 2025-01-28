@@ -85,6 +85,9 @@ class Environment:
         self.Bool_true_name = SubName(self.Bool_name, "true")
         self.Bool_false_name = SubName(self.Bool_name, "false")
         self.Bool_reduce_name = SubName(self.Lean_name, "reduceBool")
+
+        self.filler_name = self.create_name_from_str("filler")
+        self.filler_const = Const(self.filler_name, [])
                                         
     @typechecked
     def get_declaration_under_name(self, name : Name) -> Declaration:
@@ -112,7 +115,7 @@ class Environment:
             print(f"subs parameters : {[str(l) for l in subs]}")
             raise ValueError(f"Declaration {decl.info.ciname} has {len(decl.info.lvl_params)} level parameters, but {len(subs)} substitutions were provided.")
         substitutions = list(zip(decl.info.lvl_params, subs))
-        return substitute_level_params_in_expression(decl.get_type(), substitutions) # this clones the expression
+        return substitute_level_params_in_expression(decl.get_type(), substitutions)
     
     @typechecked
     def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level]) -> Expression:

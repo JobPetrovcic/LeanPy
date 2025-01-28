@@ -8,7 +8,7 @@ from LeanPy.Structures.Expression.Level import Level, LevelParam
 from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
 
 # for fvars we are relying on total equality
-@profile
+##@profile
 #@typechecked
 def replace_expression(expr : Expression, fn : Callable[[Expression], Optional[Expression]]) -> Expression:
     """ 
@@ -57,7 +57,7 @@ def replace_expression(expr : Expression, fn : Callable[[Expression], Optional[E
     elif isinstance(expr, StrLit): return expr
     else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
 
-@profile
+##@profile
 #@typechecked
 def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int], Optional[Expression]], depth :int) -> Expression:
     """ 
@@ -129,7 +129,7 @@ def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int
         return expr
     else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
 
-@profile
+##@profile
 #@typechecked
 def do_fn(expr : Expression, fn : Callable[[Expression], None]):
     """ Applies the given function to all subexpressions in the given expression. """
@@ -174,11 +174,11 @@ def do_fn_w_depth(expr : Expression, fn : Callable[[Expression, int], None], dep
     elif isinstance(expr, NatLit) or isinstance(expr, StrLit): pass
     else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
 
-#@profile
+##@profile
 #@typechecked
 def substitute_level_params_in_expression(body : Expression, params : LevelSubList) -> Expression:
     """ Replaces all level parameters in the given"""
-    #@profile
+    ##@profile
     def replace_level_params(expr : Expression) -> Optional[Expression]:
         if isinstance(expr, Sort):
             return Sort(level=substitute_level_params_level(expr.level, params)) # copy the levels since we are changing them
@@ -188,15 +188,15 @@ def substitute_level_params_in_expression(body : Expression, params : LevelSubLi
 
     return replace_expression(body, replace_level_params)
 
-#@profile
+##@profile
 #@typechecked
 def instantiate_bvar(body : Expression, val : Expression) -> Expression:
     """
     Replaces the outermost bound variable in the given expression with the given free variable. Throws an error if it finds an unbound bvar index.
     """
-    #@profile
+    ##@profile
     def instantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
-        if expr.bvar_range < 0: return expr # if bvar_range is negative, then all de Bruijn indices are bounded in the expression
+        if not has_loose_bvars(expr): return expr
         if isinstance(expr, BVar): 
             if expr.db_index == depth: return val
         return None
@@ -206,9 +206,9 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
     """
     Replaces the outermost bound variables in the given expression with the given free variables. Throws an error if it finds an unbound bvar index.
     """
-    #@profile
+    ##@profile
     def instantiation_fn(expr : Expression, depth : int) -> Optional[Expression]:
-        if expr.bvar_range < 0: return expr # if bvar_range is negative, then all de Bruijn indices are bounded in the expression
+        if not has_loose_bvars(expr): return expr
         if isinstance(expr, BVar): 
             if expr.db_index >= depth: 
                 if expr.db_index - depth < len(vals): return vals[expr.db_index - depth]
@@ -216,11 +216,14 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
         return None
     return replace_expression_w_depth(body, instantiation_fn, 0)
 
-#@profile
+##@profile
 #@typechecked
 def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     # turns fvar into a bound variable with de Bruijn index depth
-    #@profile
+    ##@profile
+    assert not has_loose_bvars(fvar.type), f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}"
+    if fvar.val is not None:
+        assert not has_loose_bvars(fvar.val), f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}"
     def abstraction_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if not has_fvar(expr): return expr
         if isinstance(expr, FVar):
@@ -231,8 +234,12 @@ def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     return replace_expression_w_depth(body, abstraction_fn, 0)
 
 def abstract_multiple_bvar(fvars : List[FVar], body : Expression) -> Expression:
+    for fvar in fvars:
+        assert not has_loose_bvars(fvar.type), f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}"
+        if fvar.val is not None:
+            assert not has_loose_bvars(fvar.val), f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}"
     """ Abstracts multiple free variables in the given expression. """
-    #@profile
+    ##@profile
     def replace_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if not has_fvar(expr): return expr
         if isinstance(expr, FVar):
@@ -246,7 +253,7 @@ def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression]]:
     fn, args = unfold_app_rev(expr)
     return fn, list(reversed(args))
 
-#@profile
+##@profile
 #@typechecked
 def unfold_app_rev(expr : Expression) -> Tuple[Expression, List[Expression]]:
     """ If expr is of form (...((f a1) a2) ... an), returns f, [an, ..., a2, a1]. """
@@ -263,7 +270,7 @@ def get_app_function(expr : Expression) -> Expression:
         expr = expr.fn
     return expr
 
-#@profile
+##@profile
 #@typechecked
 def fold_apps(fn : Expression, args : List[Expression]) -> Expression:
     """ Folds a function and a list of arguments into a single application expression. """
@@ -272,12 +279,12 @@ def fold_apps(fn : Expression, args : List[Expression]) -> Expression:
         result = App(fn=result, arg=arg)
     return result
 
-#@profile
+##@profile
 #@typechecked
 def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:
     """ Returns True if the given expression contains the given free variable. """
     has_fvar = False
-    #@profile
+    ##@profile
     def fn(expr : Expression):
         nonlocal has_fvar
         if isinstance(expr, FVar) and (expr is fvar): has_fvar = True
@@ -293,7 +300,7 @@ def level_zip(lvl_params : List[LevelParam], lvl_values : List[Level]) -> LevelS
     if len(lvl_params) != len(lvl_values): raise ValueError("Found different number of level parameters.")
     return list(zip(lvl_params, lvl_values))
 
-#@profile
+##@profile
 #@typechecked
 def get_binding_type(expr : Expression) -> Expression:
     """ Returns the type of the given binding expression. """
@@ -302,7 +309,7 @@ def get_binding_type(expr : Expression) -> Expression:
 
     raise ValueError(f"Can get binding type of Lambda or Pi, not {expr.__class__.__name__}")
 
-#@profile
+##@profile
 #@typechecked
 def get_binding_body(expr : Expression) -> Expression:
     """ Returns the body of the given binding expression. """
@@ -311,17 +318,9 @@ def get_binding_body(expr : Expression) -> Expression:
     
     raise ValueError(f"Can get binding body of Lambda or Pi, not {expr.__class__.__name__}")
 
-#def has_loose_bvars(expr : Expression) -> bool:
-#    """ Returns True if the given expression has any loose bound variables. """
-#    has_loose = False
-#    #@profile
-#    def is_loose_bvarfn(expr : Expression, depth : int):
-#        nonlocal has_loose
-#        if isinstance(expr, BVar) and expr.db_index == depth: has_loose = True
-#        
-#    do_fn_w_depth(expr, is_loose_bvarfn, 0)
-#
-#    return has_loose
+def has_loose_bvars(expr : Expression) -> bool:
+    """ Returns True if the given expression has any loose bound variables. """
+    return expr.bvar_range >= 0
 
 class ReductionStatus(Enum):
     NOT_EQUAL = 0
