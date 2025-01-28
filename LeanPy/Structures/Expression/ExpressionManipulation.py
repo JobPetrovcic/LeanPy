@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
 
 #from typeguard import typechecked
 
@@ -10,52 +10,145 @@ from LeanPy.Structures.Expression.LevelManipulation import substitute_level_para
 # for fvars we are relying on total equality
 ##@profile
 #@typechecked
+
+T = TypeVar('T')
+def save_result(expr : T, new_expr : Expression, replace_cache : Dict[T, Expression]):
+    replace_cache[expr] = new_expr
+
+def replace_expression_aux(
+        expr : Expression, 
+        fn : Callable[[Expression], Optional[Expression]],
+        replace_cache : Dict[Expression, Expression],
+    ) -> Expression:
+    
+    # first check if we have already replaced this expression
+    if expr in replace_cache: return replace_cache[expr]
+
+    new_expr = fn(expr)
+    if new_expr is None:
+        if isinstance(expr, BVar): new_expr = expr
+        elif isinstance(expr, FVar): new_expr = expr
+        elif isinstance(expr, Sort): new_expr = expr
+        elif isinstance(expr, Const): new_expr = expr
+        elif isinstance(expr, App):
+            r_fn = replace_expression_aux(expr.fn, fn, replace_cache)
+            r_arg = replace_expression_aux(expr.arg, fn, replace_cache) 
+            if expr.fn is r_fn and expr.arg is r_arg: new_expr = expr
+            new_expr = App(fn=r_fn, arg=r_arg)
+        elif isinstance(expr, Lambda): 
+            r_arg_type = replace_expression_aux(expr.arg_type, fn, replace_cache)
+            r_body = replace_expression_aux(expr.body, fn, replace_cache)
+            if expr.arg_type is r_arg_type and expr.body is r_body: new_expr = expr
+            new_expr = Lambda(bname=expr.bname, arg_type=r_arg_type, body=r_body)
+        elif isinstance(expr, Pi): 
+            r_arg_type = replace_expression_aux(expr.arg_type, fn, replace_cache)
+            r_body_type = replace_expression_aux(expr.body_type, fn, replace_cache)
+            if expr.arg_type is r_arg_type and expr.body_type is r_body_type: new_expr = expr
+            new_expr = Pi(bname=expr.bname, arg_type=r_arg_type, body_type=r_body_type)
+        elif isinstance(expr, Let): 
+            r_arg_type = replace_expression_aux(expr.arg_type, fn, replace_cache)
+            r_val = replace_expression_aux(expr.val, fn, replace_cache)
+            r_body = replace_expression_aux(expr.body, fn, replace_cache)
+            if expr.arg_type is r_arg_type and expr.val is r_val and expr.body is r_body: new_expr = expr
+            new_expr = Let(bname=expr.bname, arg_type=r_arg_type, val=r_val, body=r_body)
+        elif isinstance(expr, Proj): 
+            r_expr = replace_expression_aux(expr.expr, fn, replace_cache)
+            if expr.expr is r_expr: new_expr = expr
+            new_expr = Proj(sname=expr.sname, index=expr.index, expr=r_expr)
+        elif isinstance(expr, NatLit): new_expr = expr
+        elif isinstance(expr, StrLit): new_expr = expr
+        else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
+    
+    save_result(expr, new_expr, replace_cache)
+
+    return new_expr
+    
 def replace_expression(expr : Expression, fn : Callable[[Expression], Optional[Expression]]) -> Expression:
     """ 
-    Recursively replaces subexpressions in the given expression using the given function. It does by creating a new expression tree. 
+    Recursively replaces subexpressions in the given expression using the given function. It does create a new expression tree. 
 
     Args:
         expr: The expression to replace subexpressions in.
         fn: The function to use to replace subexpressions. It should return None if the expression should not be replaced.
     
+    NOTE: uses a cache to avoid recomputing the same expression multiple times. Thus the function fn should be pure.
+
     Returns:
         The new expression with subexpressions replaced.
     """
-    new_expr = fn(expr)
-    if new_expr is not None: return new_expr
+    return replace_expression_aux(expr, fn, {})
 
-    if isinstance(expr, BVar): return expr
-    elif isinstance(expr, FVar): return expr
-    elif isinstance(expr, Sort): return expr
-    elif isinstance(expr, Const): return expr
-    elif isinstance(expr, App):
-        r_fn = replace_expression(expr.fn, fn)
-        r_arg = replace_expression(expr.arg, fn) 
-        if expr.fn is r_fn and expr.arg is r_arg: return expr
-        return App(fn=r_fn, arg=r_arg)
-    elif isinstance(expr, Lambda): 
-        r_arg_type = replace_expression(expr.arg_type, fn)
-        r_body = replace_expression(expr.body, fn)
-        if expr.arg_type is r_arg_type and expr.body is r_body: return expr
-        return Lambda(bname=expr.bname, arg_type=r_arg_type, body=r_body)
-    elif isinstance(expr, Pi): 
-        r_arg_type = replace_expression(expr.arg_type, fn)
-        r_body_type = replace_expression(expr.body_type, fn)
-        if expr.arg_type is r_arg_type and expr.body_type is r_body_type: return expr
-        return Pi(bname=expr.bname, arg_type=r_arg_type, body_type=r_body_type)
-    elif isinstance(expr, Let): 
-        r_arg_type = replace_expression(expr.arg_type, fn)
-        r_val = replace_expression(expr.val, fn)
-        r_body = replace_expression(expr.body, fn)
-        if expr.arg_type is r_arg_type and expr.val is r_val and expr.body is r_body: return expr
-        return Let(bname=expr.bname, arg_type=r_arg_type, val=r_val, body=r_body)
-    elif isinstance(expr, Proj): 
-        r_expr = replace_expression(expr.expr, fn)
-        if expr.expr is r_expr: return expr
-        return Proj(sname=expr.sname, index=expr.index, expr=r_expr)
-    elif isinstance(expr, NatLit): return expr
-    elif isinstance(expr, StrLit): return expr
-    else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
+def replace_expression_w_depth_aux(
+        expr : Expression, 
+        fn : Callable[[Expression, int], Optional[Expression]],
+        depth : int,
+        replace_cache : Dict[Tuple[Expression, int], Expression]
+    ) -> Expression:
+
+    # first check if we have already replaced this expression
+    key = (expr, depth)
+    if key in replace_cache: return replace_cache[key]
+
+    new_expr = fn(expr, depth)
+    if new_expr is None:
+        if isinstance(expr, BVar): new_expr = BVar(db_index=expr.db_index)
+        elif isinstance(expr, FVar): new_expr = expr # fvars differentiate by reference
+        elif isinstance(expr, Sort): new_expr = Sort(level=expr.level) # don't copy the level
+        elif isinstance(expr, Const): new_expr = Const(cname=expr.cname, lvl_params=expr.lvl_params)  # don't copy the name
+        elif isinstance(expr, App): 
+            r_fn = replace_expression_w_depth_aux(expr.fn, fn, depth, replace_cache)
+            r_arg = replace_expression_w_depth_aux(expr.arg, fn, depth, replace_cache)
+
+            # if the function and argument are the same, new_expr = the original expression
+            if expr.fn is r_fn and expr.arg is r_arg: new_expr = expr
+            new_expr = App(
+                fn=r_fn,
+                arg=r_arg
+            )
+        elif isinstance(expr, Lambda):
+            r_arg_type = replace_expression_w_depth_aux(expr.arg_type, fn, depth, replace_cache)
+            r_body = replace_expression_w_depth_aux(expr.body, fn, depth + 1, replace_cache)
+            if expr.arg_type is r_arg_type and expr.body is r_body: new_expr = expr
+            new_expr = Lambda(
+                bname=expr.bname, 
+                arg_type=r_arg_type,
+                body=r_body
+            )
+        elif isinstance(expr, Pi):
+            r_arg_type = replace_expression_w_depth_aux(expr.arg_type, fn, depth, replace_cache)
+            r_body_type = replace_expression_w_depth_aux(expr.body_type, fn, depth + 1, replace_cache)
+            if expr.arg_type is r_arg_type and expr.body_type is r_body_type: new_expr = expr 
+            new_expr = Pi(
+                bname=expr.bname, 
+                arg_type=r_arg_type,
+                body_type=r_body_type
+            )
+        elif isinstance(expr, Let): 
+            r_arg_type = replace_expression_w_depth_aux(expr.arg_type, fn, depth, replace_cache)
+            r_val = replace_expression_w_depth_aux(expr.val, fn, depth, replace_cache)
+            r_body = replace_expression_w_depth_aux(expr.body, fn, depth + 1, replace_cache)
+            if expr.arg_type is r_arg_type and expr.val is r_val and expr.body is r_body: new_expr = expr
+            new_expr = Let(
+                bname=expr.bname, 
+                arg_type=r_arg_type,
+                val=r_val,
+                body=r_body
+            )
+        elif isinstance(expr, Proj): 
+            r_expr = replace_expression_w_depth_aux(expr.expr, fn, depth, replace_cache)
+            if expr.expr is r_expr: new_expr = expr
+            new_expr = Proj(
+                sname=expr.sname, 
+                index=expr.index, 
+                expr=r_expr)
+        elif isinstance(expr, NatLit): 
+            new_expr = expr
+        elif isinstance(expr, StrLit): 
+            new_expr = expr
+        else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
+
+    save_result((expr, depth), new_expr, replace_cache)
+    return new_expr
 
 ##@profile
 #@typechecked
@@ -67,112 +160,12 @@ def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int
         expr: The expression to replace subexpressions in.
         fn: The function to use to replace subexpressions. It should return None if the expression should not be replaced.
     
+    NOTE: uses a cache to avoid recomputing the same expression multiple times. Thus the function fn should be pure.
+        
     Returns:
         The new expression with subexpressions replaced.
     """
-    new_expr = fn(expr, depth)
-    if new_expr is not None: return new_expr
-
-    if isinstance(expr, BVar): return BVar(db_index=expr.db_index)
-    elif isinstance(expr, FVar): return expr # fvars differentiate by reference
-    elif isinstance(expr, Sort): return Sort(level=expr.level) # don't copy the level
-    elif isinstance(expr, Const): return Const(cname=expr.cname, lvl_params=expr.lvl_params)  # don't copy the name
-    elif isinstance(expr, App): 
-        r_fn = replace_expression_w_depth(expr.fn, fn, depth)
-        r_arg = replace_expression_w_depth(expr.arg, fn, depth)
-
-        # if the function and argument are the same, return the original expression
-        if expr.fn is r_fn and expr.arg is r_arg: return expr
-        return App(
-            fn=r_fn,
-            arg=r_arg
-        )
-    elif isinstance(expr, Lambda):
-        r_arg_type = replace_expression_w_depth(expr.arg_type, fn, depth)
-        r_body = replace_expression_w_depth(expr.body, fn, depth + 1)
-        if expr.arg_type is r_arg_type and expr.body is r_body: return expr
-        return Lambda(
-            bname=expr.bname, 
-            arg_type=r_arg_type,
-            body=r_body
-        )
-    elif isinstance(expr, Pi):
-        r_arg_type = replace_expression_w_depth(expr.arg_type, fn, depth)
-        r_body_type = replace_expression_w_depth(expr.body_type, fn, depth + 1)
-        if expr.arg_type is r_arg_type and expr.body_type is r_body_type: return expr 
-        return Pi(
-            bname=expr.bname, 
-            arg_type=r_arg_type,
-            body_type=r_body_type
-        )
-    elif isinstance(expr, Let): 
-        r_arg_type = replace_expression_w_depth(expr.arg_type, fn, depth)
-        r_val = replace_expression_w_depth(expr.val, fn, depth)
-        r_body = replace_expression_w_depth(expr.body, fn, depth + 1)
-        if expr.arg_type is r_arg_type and expr.val is r_val and expr.body is r_body: return expr
-        return Let(
-            bname=expr.bname, 
-            arg_type=r_arg_type,
-            val=r_val,
-            body=r_body
-        )
-    elif isinstance(expr, Proj): 
-        r_expr = replace_expression_w_depth(expr.expr, fn, depth)
-        if expr.expr is r_expr: return expr
-        return Proj(
-            sname=expr.sname, 
-            index=expr.index, 
-            expr=r_expr)
-    elif isinstance(expr, NatLit): 
-        return expr
-    elif isinstance(expr, StrLit): 
-        return expr
-    else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
-
-##@profile
-#@typechecked
-def do_fn(expr : Expression, fn : Callable[[Expression], None]):
-    """ Applies the given function to all subexpressions in the given expression. """
-    fn(expr)
-    if isinstance(expr, BVar) or isinstance(expr, FVar) or isinstance(expr, Sort) or isinstance(expr, Const): pass
-    elif isinstance(expr, App):
-        do_fn(expr.fn, fn)
-        do_fn(expr.arg, fn)
-    elif isinstance(expr, Lambda):
-        do_fn(expr.arg_type, fn)
-        do_fn(expr.body, fn)
-    elif isinstance(expr, Pi):
-        do_fn(expr.arg_type, fn)
-        do_fn(expr.body_type, fn)
-    elif isinstance(expr, Let):
-        do_fn(expr.arg_type, fn)
-        do_fn(expr.val, fn)
-        do_fn(expr.body, fn)
-    elif isinstance(expr, Proj):
-        do_fn(expr.expr, fn)
-    elif isinstance(expr, NatLit) or isinstance(expr, StrLit): pass
-    else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
-
-def do_fn_w_depth(expr : Expression, fn : Callable[[Expression, int], None], depth : int):
-    fn(expr, depth)
-    if isinstance(expr, BVar) or isinstance(expr, FVar) or isinstance(expr, Sort) or isinstance(expr, Const): pass
-    elif isinstance(expr, App):
-        do_fn_w_depth(expr.fn, fn, depth)
-        do_fn_w_depth(expr.arg, fn, depth)
-    elif isinstance(expr, Lambda):
-        do_fn_w_depth(expr.arg_type, fn, depth)
-        do_fn_w_depth(expr.body, fn, depth + 1)
-    elif isinstance(expr, Pi):
-        do_fn_w_depth(expr.arg_type, fn, depth)
-        do_fn_w_depth(expr.body_type, fn, depth + 1)
-    elif isinstance(expr, Let):
-        do_fn_w_depth(expr.arg_type, fn, depth)
-        do_fn_w_depth(expr.val, fn, depth)
-        do_fn_w_depth(expr.body, fn, depth + 1)
-    elif isinstance(expr, Proj):
-        do_fn_w_depth(expr.expr, fn, depth)
-    elif isinstance(expr, NatLit) or isinstance(expr, StrLit): pass
-    else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
+    return replace_expression_w_depth_aux(expr, fn, depth, {})
 
 ##@profile
 #@typechecked
@@ -278,18 +271,6 @@ def fold_apps(fn : Expression, args : List[Expression]) -> Expression:
     for arg in args:
         result = App(fn=result, arg=arg)
     return result
-
-##@profile
-#@typechecked
-def has_specific_fvar(expr : Expression, fvar : FVar) -> bool:
-    """ Returns True if the given expression contains the given free variable. """
-    has_fvar = False
-    ##@profile
-    def fn(expr : Expression):
-        nonlocal has_fvar
-        if isinstance(expr, FVar) and (expr is fvar): has_fvar = True
-    do_fn(expr, fn)
-    return has_fvar
 
 def has_fvar(expr : Expression) -> bool:
     """ Returns True if the given expression contains a free variable. """

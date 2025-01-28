@@ -182,7 +182,6 @@ def is_equivalent_list(l : List[Level], r : List[Level]) -> bool:
     if len(l) != len(r): return False
     for i in range(len(l)):
         if not is_equivalent(l[i], r[i]): 
-            raise PanicError(f"Levels {l[i]} and {r[i]} are not equivalent") # TODO
             return False
     return True
 
