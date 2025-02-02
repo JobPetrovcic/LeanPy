@@ -21,7 +21,7 @@ class EquivManager:
         self.expr_to_dsu : Dict[Expression, DSUObject] = {}
 
     def create_fresh_dsu_object(self, expr : Expression):
-        assert expr not in self.expr_to_dsu, f"Expression {expr} already in DSU" # TODO: remove this after testing
+        #assert expr not in self.expr_to_dsu, f"Expression {expr} already in DSU"
         self.expr_to_dsu[expr] = DSUObject()
         return self.expr_to_dsu[expr]
 
@@ -30,8 +30,6 @@ class EquivManager:
         return self.expr_to_dsu[expr].get_root() # get the root of the DSU object
     
     def add_equiv(self, expr1_dsu_root : DSUObject, expr2_dsu_root : DSUObject):
-        assert expr1_dsu_root.is_root() and expr2_dsu_root.is_root() # TODO: remove this after testing
-
         if expr1_dsu_root == expr2_dsu_root: return
         if expr1_dsu_root.rank < expr2_dsu_root.rank:
             expr1_dsu_root, expr2_dsu_root = expr2_dsu_root, expr1_dsu_root
@@ -55,4 +53,7 @@ class FailureCache:
     
     def did_fail_before(self, expr1 : Expression, expr2 : Expression) -> bool:
         return (expr1, expr2) in self.did_fail
+    
+    def clear(self):
+        self.did_fail.clear()
     

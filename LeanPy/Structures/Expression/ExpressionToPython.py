@@ -1,5 +1,5 @@
 from typing import Dict, List, Tuple
-from LeanPy.Structures.Environment.Declaration.Declaration import *
+from LeanPy.Structures.Environment.Declarations.Declaration import *
 from LeanPy.Structures.Environment.ReducibilityHint import *
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import *
@@ -94,11 +94,11 @@ class ExpressionToPython:
         elif isinstance(expr, App):
             return f"App(fn={self.get_expression_value_str(expr.fn, python_name)}, arg={self.get_expression_value_str(expr.arg, python_name)})"
         elif isinstance(expr, Lambda):
-            return f"Lambda(bname={self.get_name(expr.bname)}, arg_type={self.get_expression_value_str(expr.arg_type, python_name)}, body={self.get_expression_value_str(expr.body, python_name)})"
+            return f"Lambda(bname={self.get_name(expr.bname)}, domain={self.get_expression_value_str(expr.domain, python_name)}, body={self.get_expression_value_str(expr.body, python_name)})"
         elif isinstance(expr, Pi):
-            return f"Pi(bname={self.get_name(expr.bname)}, arg_type={self.get_expression_value_str(expr.arg_type, python_name)}, body_type={self.get_expression_value_str(expr.body_type, python_name)})"
+            return f"Pi(bname={self.get_name(expr.bname)}, domain={self.get_expression_value_str(expr.domain, python_name)}, codomain={self.get_expression_value_str(expr.codomain, python_name)})"
         elif isinstance(expr, Let):
-            return f"Let(bname={self.get_name(expr.bname)}), arg_type={self.get_expression_value_str(expr.arg_type, python_name)}, val={self.get_expression_value_str(expr.val, python_name)}, body={self.get_expression_value_str(expr.body, python_name)}"
+            return f"Let(bname={self.get_name(expr.bname)}), domain={self.get_expression_value_str(expr.domain, python_name)}, val={self.get_expression_value_str(expr.val, python_name)}, body={self.get_expression_value_str(expr.body, python_name)}"
         elif isinstance(expr, BVar):
             return f"BVar(db_index={expr.db_index})"
         elif isinstance(expr, Proj):

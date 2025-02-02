@@ -29,17 +29,19 @@ class WHNFCache(MapCache):
 
 
 T = TypeVar("T")
-class PairCache(Generic[T]):
+N = TypeVar("N")
+M = TypeVar("M")
+class PairCache(Generic[N, M, T]):
     """
     Cache objects for pairs of expressions, formally Expression x Expression -> T
     """
     def __init__(self):
-        self.cache: Dict[Tuple[Expression, Expression], T] = {}
+        self.cache: Dict[Tuple[N, M], T] = {}
     
-    def get(self, expr1: Expression, expr2: Expression) -> Optional[T]:
+    def get(self, expr1: N, expr2: M) -> Optional[T]:
         return self.cache.get((expr1, expr2), None)
     
-    def put(self, expr1: Expression, expr2: Expression, value: T):
+    def put(self, expr1: N, expr2: M, value: T):
         key = (expr1, expr2)
         if key in self.cache:
             if self.cache[key] != value:

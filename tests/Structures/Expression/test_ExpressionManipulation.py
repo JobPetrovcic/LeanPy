@@ -1,6 +1,7 @@
 from typeguard import typechecked
 from LeanPy.Structures.Expression.ExpressionManipulation import fold_apps, unfold_app
-from LeanPy.Structures.Expression.Expression import App, Const
+from LeanPy.Structures.Expression.Expression import App, Const, Pi, Sort
+from LeanPy.Structures.Expression.Level import LevelZero
 from LeanPy.Structures.Name import Anonymous, SubName
 
 @typechecked
@@ -23,3 +24,12 @@ def test_fold_unfold_apps():
         assert isinstance(x, Const)
         assert isinstance(y, Const)
         assert x.cname == y.cname
+
+def test_bvar_range():
+    f = Sort(LevelZero())
+    assert f.bvar_range == -1
+    y = Sort(LevelZero())
+    assert f.bvar_range == -1
+
+    pi = Pi(create_name("x"), f, y)
+    assert pi.bvar_range == -1

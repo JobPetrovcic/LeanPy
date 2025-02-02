@@ -1,8 +1,6 @@
 import json
 from typing import Any, List, Tuple
 
-
-
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import * 
 tag_to_level_class = {c.__name__ : c for c in level_constructors}
@@ -10,18 +8,16 @@ tag_to_level_class = {c.__name__ : c for c in level_constructors}
 from LeanPy.Structures.Expression.Expression import *
 tag_to_expr_class = {c.__name__ : c for c in expr_constructors}
 
-from LeanPy.Structures.Environment.Declaration.Declaration import *
+from LeanPy.Structures.Environment.Declarations.Declaration import *
 from LeanPy.Structures.Environment.ReducibilityHint import *
 
 from typing import Union, Dict
 
 json_type = Union[str, int, list['json_type'], dict[str, 'json_type']]
 
-#@typechecked
 def getObj(tag : str, args : Dict[str, Any]) -> Any:
     return globals()[tag](**args)
 
-#@typechecked
 def deserialize_expr(json_obj : dict[str, 'json_type'], subexprs : List[Expression | None]) -> Union[Expression, Level]:
     tag = json_obj['tag']
     assert isinstance(tag, str), f"Expected string, got {tag}"
@@ -55,10 +51,8 @@ def deserialize_expr(json_obj : dict[str, 'json_type'], subexprs : List[Expressi
     subexprs[ind] = obj
     return obj
 
-#@typechecked
 def deserialize_list(json_list : List[json_type], subexprs : List[Expression | None] | None): return [deserialize_json(x, subexprs) for x in json_list]
 
-#@typechecked
 def deserialize_json(json_obj : json_type, subexprs_or_none : List[Expression | None] | None ) -> Any:
     if isinstance(json_obj, list): return deserialize_list(json_obj, subexprs_or_none)
     elif isinstance(json_obj, dict): 

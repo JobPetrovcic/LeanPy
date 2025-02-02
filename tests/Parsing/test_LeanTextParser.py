@@ -1,23 +1,23 @@
 from typing import List, Tuple
-from LeanPy.Parsing.LeanTextParser import LeanFormatParser
+from LeanPy.Parsing.LeanTextParser import LeanTextParser
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.Expression import *
-from LeanPy.Structures.Environment.Declaration.Declaration import *
+from LeanPy.Structures.Environment.Declarations.Declaration import *
 from LeanPy.Structures.Environment.ReducibilityHint import *
 from LeanPy.Structures.Expression.ExpressionToPython import ExpressionToPython
 
 
 #def test_lean_format_parser1():
-#    LeanFormatParser.from_file("Exports/MyNat.export")
+#    LeanTextParser.from_file("Exports/MyNat.export")
 #
 #def test_lean_format_parser2():
-#    LeanFormatParser.from_file("Exports/db_application.export")
+#    LeanTextParser.from_file("Exports/db_application.export")
 #
 #def test_lean_format_parser3():
-#    LeanFormatParser.from_file("Exports/double.export")
+#    LeanTextParser.from_file("Exports/double.export")
 #
-#    parsed = LeanFormatParser.from_file("Exports/double.export")
+#    parsed = LeanTextParser.from_file("Exports/double.export")
 #    environment = parsed.type_checker.environment
 #
 #    exporter = ExpressionToPython()
@@ -31,7 +31,7 @@ from LeanPy.Structures.Expression.ExpressionToPython import ExpressionToPython
 #    print("""from LeanPy.Structures.Name import *
 #from LeanPy.Structures.Expression.Level import *
 #from LeanPy.Structures.Expression.Expression import *
-#from LeanPy.Structures.Environment.Declaration.Declaration import *
+#from LeanPy.Structures.Environment.Declarations.Declaration import *
 #from LeanPy.Structures.Environment.ReducibilityHint import *
 #""")
 #    print(code)

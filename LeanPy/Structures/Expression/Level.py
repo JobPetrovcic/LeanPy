@@ -36,7 +36,6 @@ class LevelZero(Level):
     def get_num_mvars(self) -> int: return 0
 
 class LevelSucc(Level):
-    @typechecked
     def __init__(self, anc: Level):
         self.anc = anc
         Level.__init__(self)
@@ -59,7 +58,6 @@ class LevelSucc(Level):
     def get_num_mvars(self) -> int: return self.anc.num_mvars
     
 class LevelMax(Level):
-    @typechecked
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
@@ -75,7 +73,6 @@ class LevelMax(Level):
     def get_num_mvars(self) -> int: return self.lhs.num_mvars + self.rhs.num_mvars
 
 class LevelIMax(Level):
-    @typechecked
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
@@ -91,7 +88,6 @@ class LevelIMax(Level):
     def get_num_mvars(self) -> int: return self.lhs.num_mvars + self.rhs.num_mvars
 
 class LevelParam(Level):
-    @typechecked
     def __init__(self, pname: Name):
         self.pname = pname
         Level.__init__(self)
@@ -99,7 +95,6 @@ class LevelParam(Level):
     def __str__(self) -> str:
         return f"{self.pname}"
     
-    @typechecked
     def totally_equal(self, other: 'Level') -> bool:
         return isinstance(other, LevelParam) and self.pname==other.pname
     
@@ -107,7 +102,6 @@ class LevelParam(Level):
     def get_num_mvars(self) -> int: return 0
 
 class LevelMVar(Level):
-    @typechecked
     def __init__(self):
         Level.__init__(self)
     

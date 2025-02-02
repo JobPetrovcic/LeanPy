@@ -176,7 +176,7 @@ def is_any_max(level : Level) -> bool:
     return isinstance(level, LevelMax) or isinstance(level, LevelIMax)
 
 def is_equivalent(l : Level, r : Level) -> bool:
-    return (l is r) or l.totally_equal(r) or normalize(l).totally_equal(normalize(r))
+    return (l is r) or l.totally_equal(r) or normalize(l).totally_equal(normalize(r)) # TODO: should we cache
 
 def is_equivalent_list(l : List[Level], r : List[Level]) -> bool:
     if len(l) != len(r): return False
@@ -209,3 +209,5 @@ def substitute_level_params_level(level : Level, params : LevelSubList) -> Level
                 return value
         return None
     return replace_level(level, replace_fn)
+
+__all__ = ["are_unique_level_params", "is_equivalent", "is_equivalent_list", "make_imax"]

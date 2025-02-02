@@ -1,7 +1,6 @@
 from abc import abstractmethod
-from typeguard import typechecked
 from LeanPy.Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
-from LeanPy.Structures.Expression.ExpressionManipulation import get_app_function, get_binding_body, get_binding_type
+from LeanPy.Structures.Expression.ExpressionManipulation import get_app_function
 from LeanPy.Kernel.KernelErrors import PanicError
 from LeanPy.Structures.Name import Name
 from LeanPy.Structures.Expression.Expression import *
@@ -9,7 +8,6 @@ from LeanPy.Structures.Expression.Level import LevelParam
 from typing import List, Optional
 
 class RecursorRule:
-    @typechecked
     def __init__(self, constructor: Name, num_fields: int, value: Expression):
         self.constructor = constructor
         assert num_fields >= 0
@@ -20,7 +18,6 @@ class RecursorRule:
         return f"\tRecursorRule for {self.constructor} with {self.num_fields} args:\n\t\t{self.value}"
 
 class DeclarationInfo:
-    @typechecked
     def __init__(self, ciname: Name, lvl_params : List[LevelParam], type : Expression):
         self.ciname = ciname
         self.lvl_params = lvl_params
@@ -33,7 +30,8 @@ class Declaration:
     def __init__(self, info : DeclarationInfo):
         self.info = info
     
-    def get_type(self) -> Expression:
+    @property
+    def type(self) -> Expression:
         return self.info.type
 
     def get_height(self) -> int:
@@ -48,9 +46,16 @@ class Declaration:
             return self.hint
         else:
             return OpaqueHint()
+    
+    @property
+    def lvl_params(self) -> List[LevelParam]:
+        return self.info.lvl_params
+    
+    @property
+    def name(self) -> Name:
+        return self.info.ciname
 
 class Axiom(Declaration):
-    @typechecked
     def __init__(self, info : DeclarationInfo):
         super().__init__(info)
     
@@ -58,7 +63,6 @@ class Axiom(Declaration):
         return False
 
 class Definition(Declaration):
-    @typechecked
     def __init__(self, info: DeclarationInfo, value: Expression, hint: ReducibilityHint):
         super().__init__(info)
         self.value = value
@@ -66,9 +70,11 @@ class Definition(Declaration):
     
     def has_value(self, allow_opaque : bool = False) -> bool:
         return True
+    
+    def __str__(self):
+        return f"Definition:\n\t{self.info}\nValue: \n\t{self.value}\nHint: \n\t{self.hint}"
 
 class Theorem(Declaration):
-    @typechecked
     def __init__(self, info: DeclarationInfo, value: Expression):
         super().__init__(info)
         self.value = value
@@ -77,7 +83,6 @@ class Theorem(Declaration):
         return True
 
 class Opaque(Declaration):
-    @typechecked
     def __init__(self, info: DeclarationInfo, value: Expression):
         super().__init__(info)
         self.value = value
@@ -86,7 +91,6 @@ class Opaque(Declaration):
         return allow_opaque
 
 class Quot(Declaration):
-    @typechecked
     def __init__(self, info: DeclarationInfo):
         super().__init__(info)
     
@@ -94,7 +98,6 @@ class Quot(Declaration):
         return False
 
 class Inductive(Declaration):
-    @typechecked
     def __init__(
         self, 
         info: DeclarationInfo, 
@@ -113,12 +116,13 @@ class Inductive(Declaration):
 
         self.is_checked : bool = False
     
+    @property
     def number_of_constructors(self) -> int:
         return len(self.constructor_names)
     
     def get_ith_constructor_name(self, i: int) -> Name:
         assert i>=0, "Constructor index must be non-negative."
-        if i < self.number_of_constructors(): 
+        if i < self.number_of_constructors: 
             raise ValueError(f"Constructor index {i} is out of bounds.")
         return self.constructor_names[i]
 
@@ -129,7 +133,6 @@ class Inductive(Declaration):
         return f"Inductive:\n{self.info}\n\tParams: {self.num_params}\n\tIndices: {self.num_indices}\n\tConstructors: {[str(n) for n in self.constructor_names]}\n\tRecursive: {self.is_recursive}"      
 
 class Constructor(Declaration):
-    @typechecked
     def __init__(self, info: DeclarationInfo, c_index : int, inductive_name: Name, num_params: int, num_fields: int):
         super().__init__(info)
         self.inductive_name = inductive_name
@@ -143,7 +146,6 @@ class Constructor(Declaration):
         return False
 
 class Recursor(Declaration):
-    @typechecked
     def __init__(self, info: DeclarationInfo, num_params: int, num_indices: int, num_motives: int,
                     num_minors: int, recursor_rules: List["RecursorRule"], isK: bool):
         super().__init__(info)
@@ -158,7 +160,6 @@ class Recursor(Declaration):
         rrs = ''.join(["\t\t"+str(rr)+"\n" for rr in self.recursor_rules])
         return f"Recursor:\n{self.info}\n\tParams: {self.num_params}\n\tIndices: {self.num_indices}\n\tMotives: {self.num_motives}\n\tMinors: {self.num_minors}\n\tRules: {rrs}\n\tisK: {self.isK}"
     
-    @typechecked
     def has_value(self, allow_opaque : bool = False) -> bool:
         return False
     
@@ -175,19 +176,26 @@ class Recursor(Declaration):
     
     def get_major_induct(self) -> Name: # DOES NOT CHANGE ANYTHING
         n = self.get_major_index()
-        t = self.info.type
+        t = self.type
 
         for _ in range(n):
-            t = get_binding_body(t)
- 
-        t = get_binding_type(t)
+            if isinstance(t, Pi):
+                t = t.codomain
+            elif isinstance(t, Lambda):
+                t = t.body
+            else: 
+                raise ValueError(f"Expected Pi or Lambda, got {t} when decomposing major premise of recursor.")
+
+        if not (isinstance(t, Pi) or isinstance(t, Lambda)):
+            raise ValueError(f"Expected Pi or Lambda, got {t} when decomposing major premise of recursor.")
+        t = t.domain
+        
         fn = get_app_function(t)
         if not isinstance(fn, Const):
             raise ValueError(f"Expected Const, got {fn} when decomposing major premise of recursor.")
         
         return fn.cname
     
-    @typechecked
     def get_recursion_rule(self, major : Expression) -> Optional[RecursorRule]:
         fn = get_app_function(major)
         if not isinstance(fn, Const): return None

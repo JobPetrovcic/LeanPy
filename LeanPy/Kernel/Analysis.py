@@ -3,13 +3,6 @@ from typing import Any, Callable, ParamSpec, Tuple, TypeVar
 
 from LeanPy.Structures.Expression.Expression import Expression
 
-#@typechecked
-#def has_fvar_not_in_context(body : Expression, context : LocalContext):
-#    """ Raises an error if the given expression contains a free variable not in the given context. """
-#    def fn(expr : Expression):
-#        if isinstance(expr, FVar) and expr not in context.fvars: raise ValueError(f"In body\n\t{body}\n\n found free variable\n\t{expr}\n\n not in context {context}")
-#    do_fn(body, fn)
-
 T = TypeVar("T")
 P = ParamSpec("P")
 def print_function_name(func: Callable[P, T]) -> Callable[P, T]:
@@ -18,7 +11,7 @@ def print_function_name(func: Callable[P, T]) -> Callable[P, T]:
         return func(*args, **kwargs)
     return wrapper
 
-def err_print_neg_verbose(fn :Callable[[Any, Expression, Expression], Tuple[Expression, Expression, bool]]):
+def err_print_neg_reduction(fn :Callable[[Any, Expression, Expression], Tuple[Expression, Expression, bool]]):
     def wrapper(self_arg : Any, l : Expression, r : Expression):
         l_n, r_n, result = fn(self_arg, l, r)
         if not result:
@@ -28,11 +21,14 @@ def err_print_neg_verbose(fn :Callable[[Any, Expression, Expression], Tuple[Expr
         return result
     return wrapper
 
+verbose = True
 def err_print_neg(fn :Callable[[Any, Expression, Expression], bool]):
     def wrapper(self_arg : Any, l : Expression, r : Expression):
         result = fn(self_arg, l, r)
         if not result:
             print(f"Negative test failed for {fn.__name__} with\n\t{l}\nand\n\t{r}", file=sys.stderr)
+            if verbose:
+                print(f"The types of the expressions are \n\t{self_arg.infer_core(l, infer_only=False)}\nand\n\t{self_arg.infer_core(r, infer_only=False)}", file=sys.stderr)
         return result
     return wrapper
 

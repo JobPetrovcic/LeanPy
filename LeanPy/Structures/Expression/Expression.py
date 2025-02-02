@@ -7,6 +7,8 @@ from typing_extensions import override
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Name import *
 
+EXPR_COMPARE_RAW_THRESHOLD = 100 # the threshold for when to compare expressions without using the cache
+
 class Expression:
     #@typechecked
     def __init__(self):
@@ -42,29 +44,45 @@ class Expression:
         raise NotImplementedError(f"Method __str__ not implemented for clas {self.__class__.__name__}")
     
     @abstractmethod
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         raise NotImplementedError(f"Method __eq__ not implemented for class {self.__class__.__name__}")
     
-    @profile
+    ##@profile
     def __eq__(self, other : object) -> bool:
         assert isinstance(other, Expression), f"Cannot compare an Expression with a non-Expression object {other}"
 
+        if self.expr_size != other.expr_size: return False
         # create a cache for pairs of expressions that have already been compared
         # NOTE: note that this cache uses MEMORY ADDRESSES of the expressions to since we are implementing __eq__ that would be called by the == operator
         compare_cache : Set[Tuple[int, int]] = set() 
-        return self.check_cache_and_compare(other, compare_cache)
+        return self.check_cache_and_compare(other, compare_cache, self.expr_size >= EXPR_COMPARE_RAW_THRESHOLD)
 
-    def check_cache_and_compare(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    def check_cache_and_compare(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         if self is other: return True
         # compare the hashes first
         if hash(self) != hash(other): return False
         if self.__class__ != other.__class__: return False
 
-        key = (id(self), id(other))
-
-        if key in compare_cache: return True
-        compare_cache.add(key)
-        return self.totally_equal(other, compare_cache)
+        if use_cache:
+            key = (id(self), id(other))
+            if key in compare_cache: return True
+            compare_cache.add(key)
+        return self.totally_equal(other, compare_cache, use_cache)
+    
+    @property
+    def has_loose_bvars(self) -> bool:
+        """ Returns True if the given expression has any loose bound variables. """
+        return self.bvar_range >= 0
+    
+    @property
+    def has_expr_mvars(self) -> bool:
+        """ Returns True if the given expression has any metavariables. """
+        return self.num_mvars > 0
+    
+    @property
+    def has_fvars(self) -> bool:
+        """ Returns True if the given expression has any free variables. """
+        return self.num_fvars > 0
 
 class BVar(Expression):
     #@typechecked
@@ -85,8 +103,8 @@ class BVar(Expression):
         return f"db{self.db_index}"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         return isinstance(other, BVar) and self.db_index == other.db_index
 
 class FVar(Expression):
@@ -103,7 +121,7 @@ class FVar(Expression):
         return f"{self.name}-{hex(id(self))}"# : ({self.type}) := ({self.val})"
     
     def full_print(self) -> str:
-        return f"{'let ' if self.is_let else ''}{self.full_identifier()} : ({self.type}) := ({self.val})"
+        return f"{'Flet ' if self.is_let else ''}{self.full_identifier()} : ({self.type})" + (f" := ({self.val})" if self.val is not None else "")
 
     @override
     def get_hash(self) -> int: return hash(("FVar", id(self)))
@@ -115,11 +133,15 @@ class FVar(Expression):
     def get_expr_size(self) -> int: return 1
     
     def __str__(self) -> str:
-        return f"F{self.name}" + (f":= {self.val}" if self.val is not None else "")
+        name_str = f"{self.name}"
+        # replace . with _ in the name
+        name_str = name_str.replace(".", "_").replace("@", "")
+
+        return f"{name_str}" + (f":= {self.val}" if self.val is not None else "")
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         return self is other
 
 class Sort(Expression):
@@ -141,8 +163,8 @@ class Sort(Expression):
         return f"Sort {self.level}"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         return isinstance(other, Sort) and self.level.totally_equal(other.level)
     
 class Const(Expression):
@@ -168,8 +190,8 @@ class Const(Expression):
         return f"{const_str}.{params_str}"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         return isinstance(other, Const) and self.cname == other.cname and len(self.lvl_params) == len(other.lvl_params) and all([l1.totally_equal(l2) for l1, l2 in zip(self.lvl_params, other.lvl_params)])
     
 class App(Expression):
@@ -198,85 +220,91 @@ class App(Expression):
         return f"({fn} {' '.join(map(str, args))})"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
-        return isinstance(other, App) and self.fn.check_cache_and_compare(other.fn, compare_cache) and self.arg.check_cache_and_compare(other.arg, compare_cache)
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
+        return isinstance(other, App) and self.fn.check_cache_and_compare(other.fn, compare_cache, use_cache) and self.arg.check_cache_and_compare(other.arg, compare_cache, use_cache)
 
 class Pi(Expression):
     #@typechecked
-    def __init__(self, bname : Name, arg_type : Expression, body_type : Expression):
+    def __init__(self, bname : Name, domain : Expression, codomain : Expression):
         self.bname = bname
-        self.arg_type = arg_type
-        self.body_type = body_type
+        self.domain = domain
+        self.codomain = codomain
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int: return hash(("Pi", hash(self.arg_type), hash(self.body_type)))
-    def get_num_fvars(self): return self.arg_type.num_fvars + self.body_type.num_fvars
-    def get_num_bvars(self): return self.arg_type.num_bvars + self.body_type.num_bvars
-    def get_bvar_range(self): return max(self.arg_type.bvar_range, self.body_type.bvar_range-1) # the -1 is because the argument is a binder
-    def get_num_mvars(self): return self.arg_type.num_mvars + self.body_type.num_mvars
-    def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.body_type.num_lvl_mvars
-    def get_expr_size(self) -> int: return self.arg_type.expr_size + self.body_type.expr_size + 1
+    def get_hash(self) -> int: return hash(("Pi", hash(self.domain), hash(self.codomain)))
+    def get_num_fvars(self): return self.domain.num_fvars + self.codomain.num_fvars
+    def get_num_bvars(self): return self.domain.num_bvars + self.codomain.num_bvars
+    def get_bvar_range(self): return max(self.domain.bvar_range, self.codomain.bvar_range-1) # the -1 is because the argument is a binder
+    def get_num_mvars(self): return self.domain.num_mvars + self.codomain.num_mvars
+    def get_lvl_mvars(self): return self.domain.num_lvl_mvars + self.codomain.num_lvl_mvars
+    def get_expr_size(self) -> int: return self.domain.expr_size + self.codomain.expr_size + 1
     
     def __str__(self) -> str:
-        return f"({self.bname} : {self.arg_type}) -> ({self.body_type})"
+        bname_str = f"{self.bname}"
+        # replace . with _ in the name
+        bname_str = bname_str.replace(".", "_").replace("@", "")
+        return f"({bname_str} : {self.domain}) -> ({self.codomain})"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
-        return isinstance(other, Pi) and self.arg_type.check_cache_and_compare(other.arg_type, compare_cache) and self.body_type.check_cache_and_compare(other.body_type, compare_cache) # don't need to check bname
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
+        return isinstance(other, Pi) and self.domain.check_cache_and_compare(other.domain, compare_cache, use_cache) and self.codomain.check_cache_and_compare(other.codomain, compare_cache, use_cache) # don't need to check bname
     
 class Lambda(Expression):
     #@typechecked
-    def __init__(self, bname : Name, arg_type : Expression, body : Expression):
+    def __init__(self, bname : Name, domain : Expression, body : Expression):
         self.bname = bname
-        self.arg_type = arg_type
+        self.domain = domain
         self.body = body
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int: return hash(("Lambda", hash(self.arg_type), hash(self.body)))
-    def get_num_fvars(self): return self.arg_type.num_fvars + self.body.num_fvars
-    def get_num_bvars(self): return self.arg_type.num_bvars + self.body.num_bvars
-    def get_bvar_range(self): return max(self.arg_type.bvar_range, self.body.bvar_range-1) # the -1 is because the argument is a binder
-    def get_num_mvars(self): return self.arg_type.num_mvars + self.body.num_mvars
-    def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.body.num_lvl_mvars
-    def get_expr_size(self) -> int: return self.arg_type.expr_size + self.body.expr_size + 1
+    def get_hash(self) -> int: return hash(("Lambda", hash(self.domain), hash(self.body)))
+    def get_num_fvars(self): return self.domain.num_fvars + self.body.num_fvars
+    def get_num_bvars(self): return self.domain.num_bvars + self.body.num_bvars
+    def get_bvar_range(self): return max(self.domain.bvar_range, self.body.bvar_range-1) # the -1 is because the argument is a binder
+    def get_num_mvars(self): return self.domain.num_mvars + self.body.num_mvars
+    def get_lvl_mvars(self): return self.domain.num_lvl_mvars + self.body.num_lvl_mvars
+    def get_expr_size(self) -> int: return self.domain.expr_size + self.body.expr_size + 1
     
     def __str__(self) -> str:
-        return f"fun ({self.bname} : {self.arg_type}) => ({self.body})"
+        bname_str = f"{self.bname}"
+        # replace . with _ in the name
+        bname_str = bname_str.replace(".", "_").replace("@", "")
+        return f"(fun ({bname_str} : {self.domain}) => ({self.body}))"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
-        return isinstance(other, Lambda) and self.arg_type.check_cache_and_compare(other.arg_type, compare_cache) and self.body.check_cache_and_compare(other.body, compare_cache) # don't need to check bname
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
+        return isinstance(other, Lambda) and self.domain.check_cache_and_compare(other.domain, compare_cache, use_cache) and self.body.check_cache_and_compare(other.body, compare_cache, use_cache) # don't need to check bname
 
 class Let(Expression):
     #@typechecked
-    def __init__(self, bname : Name, arg_type : Expression, val : Expression, body : Expression):
+    def __init__(self, bname : Name, domain : Expression, val : Expression, body : Expression):
         self.bname = bname
-        self.arg_type = arg_type
+        self.domain = domain
         self.val = val
         self.body = body
         Expression.__init__(self)
     
     @override
-    def get_hash(self) -> int: return hash(("Let", hash(self.bname), hash(self.arg_type), hash(self.val), hash(self.body)))
-    def get_num_fvars(self): return self.arg_type.num_fvars + self.val.num_fvars + self.body.num_fvars
-    def get_num_bvars(self): return self.arg_type.num_bvars + self.val.num_bvars + self.body.num_bvars
-    def get_bvar_range(self): return max(self.arg_type.bvar_range, self.val.bvar_range, self.body.bvar_range-1) # the -1 is because the argument is a binder
-    def get_num_mvars(self): return self.arg_type.num_mvars + self.val.num_mvars + self.body.num_mvars
-    def get_lvl_mvars(self): return self.arg_type.num_lvl_mvars + self.val.num_lvl_mvars + self.body.num_lvl_mvars
-    def get_expr_size(self) -> int: return self.arg_type.expr_size + self.val.expr_size + self.body.expr_size + 1
+    def get_hash(self) -> int: return hash(("Let", hash(self.bname), hash(self.domain), hash(self.val), hash(self.body)))
+    def get_num_fvars(self): return self.domain.num_fvars + self.val.num_fvars + self.body.num_fvars
+    def get_num_bvars(self): return self.domain.num_bvars + self.val.num_bvars + self.body.num_bvars
+    def get_bvar_range(self): return max(self.domain.bvar_range, self.val.bvar_range, self.body.bvar_range-1) # the -1 is because the argument is a binder
+    def get_num_mvars(self): return self.domain.num_mvars + self.val.num_mvars + self.body.num_mvars
+    def get_lvl_mvars(self): return self.domain.num_lvl_mvars + self.val.num_lvl_mvars + self.body.num_lvl_mvars
+    def get_expr_size(self) -> int: return self.domain.expr_size + self.val.expr_size + self.body.expr_size + 1
     
     def __str__(self) -> str:
-        return f"(let {self.bname} : {self.arg_type} := {self.val}) in ({self.body})"
+        return f"(let {self.bname} : {self.domain} := {self.val}) in ({self.body})"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
-        return isinstance(other, Let) and self.arg_type.check_cache_and_compare(other.arg_type, compare_cache) and self.val.check_cache_and_compare(other.val, compare_cache) and self.body.check_cache_and_compare(other.body, compare_cache) # don't need to check bname
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
+        return isinstance(other, Let) and self.domain.check_cache_and_compare(other.domain, compare_cache, use_cache) and self.val.check_cache_and_compare(other.val, compare_cache, use_cache) and self.body.check_cache_and_compare(other.body, compare_cache, use_cache) # don't need to check bname
 
 class Proj(Expression):
     #@typechecked
@@ -298,9 +326,9 @@ class Proj(Expression):
         return f"({self.expr}).{self.index}"
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
-        return isinstance(other, Proj) and self.sname == other.sname and self.index == other.index and self.expr.check_cache_and_compare(other.expr, compare_cache) # check the name since it refers to the structure we are projecting
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
+        return isinstance(other, Proj) and self.sname == other.sname and self.index == other.index and self.expr.check_cache_and_compare(other.expr, compare_cache, use_cache) # check the name since it refers to the structure we are projecting
 
 class NatLit(Expression):
     #@typechecked
@@ -322,8 +350,8 @@ class NatLit(Expression):
         return str(self.val)
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         return isinstance(other, NatLit) and self.val == other.val
 
 class StrLit(Expression):
@@ -345,8 +373,8 @@ class StrLit(Expression):
         return f'"{self.val}"'
     
     #@typechecked
-    #@profile
-    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]]) -> bool:
+    ##@profile
+    def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
         return isinstance(other, StrLit) and self.val == other.val
     
 class MVar(Expression):
@@ -366,4 +394,4 @@ class MVar(Expression):
 
 expr_constructors = [BVar, FVar, Sort, Const, App, Pi, Lambda, Let, Proj, NatLit, StrLit]
 
-__all__ = ['Expression', 'BVar', 'FVar', 'Sort', 'Const', 'App', 'Pi', 'Lambda', 'Let', 'Proj', 'NatLit', 'StrLit', 'expr_constructors']
+__all__ = ['Expression', 'BVar', 'FVar', 'Sort', 'Const', 'App', 'Pi', 'Lambda', 'Let', 'Proj', 'NatLit', 'StrLit', 'MVar', 'expr_constructors']

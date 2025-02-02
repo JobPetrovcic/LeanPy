@@ -6,14 +6,10 @@ class Name:
     def __str__(self) -> str:
         raise NotImplementedError("Method __str__ not implemented for abstract class Name")
     
-    @typechecked
-    def defEq(self, other: 'Name') -> bool:
-        return self.__str__() == other.__str__()
-    
     def __eq__(self, other: object) -> bool:
         if self is other: return True
         if not isinstance(other, Name): return False
-        return self.defEq(other)
+        return self.__str__() == other.__str__()
     
     def __hash__(self) -> int:
         return hash(self.__str__())
@@ -23,11 +19,13 @@ class Anonymous(Name):
         return ""
 
 class SubName(Name):
-    @typechecked
     def __init__(self, anc : Name, str : str):
         self.str = str
         self.anc = anc
-        self.full_str = f"{self.anc}.{self.str}"
+        if isinstance(anc, Anonymous):
+            self.full_str = str
+        else:
+            self.full_str = f"{self.anc}.{self.str}"
     
     def __str__(self) -> str:
         return self.full_str

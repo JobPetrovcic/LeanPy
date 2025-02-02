@@ -1,8 +1,8 @@
-from LeanPy.Parsing.LeanTextParser import LeanFormatParser
+from LeanPy.Parsing.LeanTextParser import LeanTextParser
 from LeanPy.Structures.Expression.Expression import Const
 
 def test_decidable():
-    parsed = LeanFormatParser.from_file("Exports/bool_reduction.export")
+    parsed = LeanTextParser.from_file("Exports/bool_reduction.export")
     type_checker = parsed.type_checker
     decl = type_checker.environment.get_declaration_under_name(type_checker.environment.create_name_from_str("A"))
     

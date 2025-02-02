@@ -1,12 +1,9 @@
-from typing import Dict, List
-
-from typeguard import typechecked
-
-from LeanPy.Structures.Environment.Declaration.Declaration import Constructor, Declaration, Definition, Inductive, Opaque, Quot, Theorem
-from LeanPy.Structures.Expression.Expression import Const, Expression, Sort
-from LeanPy.Structures.Expression.ExpressionManipulation import substitute_level_params_in_expression
-from LeanPy.Structures.Expression.Level import Level, LevelSucc, LevelZero
-from LeanPy.Structures.Name import Anonymous, Name, SubName
+from typing import Dict
+from LeanPy.Structures.Environment.Declarations.Declaration import Constructor, Declaration, Inductive
+from LeanPy.Structures.Name import *
+from LeanPy.Structures.Expression.Level import *
+from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Name import string_to_name
 
 class Environment:
     def __init__(self):
@@ -18,17 +15,9 @@ class Environment:
 
     def init_name_dict(self):
         self.init_bases()
-        self.name_dict : Dict[Name, Declaration ] = {}
+        self.name_dict : Dict[Name, Declaration] = {}
     
     # SPECIAL STRUCTURES : Nat, String, Quot, List
-
-    def create_name_from_str(self, name_str : str) -> Name:
-        """ Creates a name from a string. """
-        parts = name_str.split(".")
-        cur = self.anonymous
-        for part in parts:
-            cur = SubName(cur, part)
-        return cur
 
     def init_bases(self):
         self.anonymous = Anonymous()
@@ -38,10 +27,10 @@ class Environment:
         self.Type = Sort(self.level_one)
 
         # Lean constants
-        self.Lean_name = self.create_name_from_str("Lean")
+        self.Lean_name = string_to_name("Lean")
 
         # Nat constants
-        self.Nat_name = self.create_name_from_str("Nat")
+        self.Nat_name = string_to_name("Nat")
         self.Nat_zero_name = SubName(self.Nat_name, "zero")
         self.Nat_succ_name = SubName(self.Nat_name, "succ")
 
@@ -65,37 +54,37 @@ class Environment:
         self.Nat_reduce_name = SubName(self.Lean_name, "reduceNat")
 
         # String constants
-        self.String_name = self.create_name_from_str("String")
+        self.String_name = string_to_name("String")
         self.String_mk_name = SubName(self.String_name, "mk")
         
         # List constants
-        self.List_name = self.create_name_from_str("List")
+        self.List_name = string_to_name("List")
         self.List_nil_name = SubName(self.List_name, "nil")
         self.List_cons_name = SubName(self.List_name, "cons")
-        self.Char_name = self.create_name_from_str("Char")
+        self.Char_name = string_to_name("Char")
 
         # Quot constants
-        self.Quot_name = self.create_name_from_str("Quot")
+        self.Quot_name = string_to_name("Quot")
         self.Quot_mk_name = SubName(self.Quot_name, "mk")
         self.Quot_lift_name = SubName(self.Quot_name, "lift")
         self.Quot_ind_name = SubName(self.Quot_name, "ind")
 
         # Bool constants
-        self.Bool_name = self.create_name_from_str("Bool")
+        self.Bool_name = string_to_name("Bool")
         self.Bool_true_name = SubName(self.Bool_name, "true")
         self.Bool_false_name = SubName(self.Bool_name, "false")
+        
         self.Bool_reduce_name = SubName(self.Lean_name, "reduceBool")
 
-        self.filler_name = self.create_name_from_str("filler")
+        self.filler_name = string_to_name("filler")
         self.filler_const = Const(self.filler_name, [])
-                                        
-    @typechecked
+
     def get_declaration_under_name(self, name : Name) -> Declaration:
         if name not in self.name_dict:
             print([str(k) for k in self.name_dict.keys()])
             raise ValueError(f"Name {name} does not exist in environment.")
         found = self.name_dict[name]
-        if not self.checking_inductive:
+        if self.checking_inductive:
             if isinstance(found, Inductive):
                 if not found.is_checked:
                     raise ValueError(f"Inductive type {name} has not been checked.")
@@ -105,57 +94,13 @@ class Environment:
         
         return found
     
+    def add_declaration(self, decl : Declaration):
+        if decl.info.ciname in self.name_dict:
+            raise ValueError(f"Name {decl.info.ciname} already exists in environment.")
+        if (len(self.name_dict) + 1) % 100 == 0:
+            print(f"Added {len(self.name_dict) + 1} declarations.")
+        self.name_dict[decl.info.ciname] = decl
+    
     def exists_declaration_under_name(self, name : Name) -> bool:
         return name in self.name_dict
     
-    @typechecked
-    def get_declaration_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level]) -> Expression:
-        if len(decl.info.lvl_params) != len(subs):
-            print(f"decl parameters : {[str(l) for l in decl.info.lvl_params]}")
-            print(f"subs parameters : {[str(l) for l in subs]}")
-            raise ValueError(f"Declaration {decl.info.ciname} has {len(decl.info.lvl_params)} level parameters, but {len(subs)} substitutions were provided.")
-        substitutions = list(zip(decl.info.lvl_params, subs))
-        return substitute_level_params_in_expression(decl.get_type(), substitutions)
-    
-    @typechecked
-    def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level]) -> Expression:
-        if len(decl.info.lvl_params) != len(subs):
-            raise ValueError(f"Declaration {decl} has a different number of level parameters than the substitutions provided.")
-        substitutions = list(zip(decl.info.lvl_params, subs))
-        return substitute_level_params_in_expression(decl.value, substitutions) # this clones the expression
-    
-    @typechecked
-    def get_constant_type(self, c : Const) -> Expression:
-        decl = self.get_declaration_under_name(c.cname)
-        
-        sub_constant_type = self.get_declaration_type_with_substituted_level_params(decl, c.lvl_params)
-
-        return sub_constant_type
-
-    @typechecked
-    def get_inductive(self, name : Name) -> Inductive:
-        decl = self.get_declaration_under_name(name)
-        if not isinstance(decl, Inductive):
-            raise ValueError(f"Name {name} is not an inductive type.")
-        return decl
-
-    @typechecked
-    def get_constructor(self, name : Name) -> Constructor:
-        decl = self.get_declaration_under_name(name)
-        if not isinstance(decl, Constructor):
-            raise ValueError(f"Name {name} is not a constructor.")
-        return decl
-    
-    @typechecked
-    def add_declaration(self, name : Name, decl : Declaration):
-        if name in self.name_dict:
-            raise ValueError(f"Name {name} already exists in environment.")
-        if (len(self.name_dict) + 1) % 100 == 0:
-            print(f"Added {len(self.name_dict) + 1} declarations.")
-        self.name_dict[name] = decl
-    
-    @typechecked
-    def add_quot_declaration(self, name : Name, decl : Quot):
-        if name in self.name_dict:
-            raise ValueError(f"Name {name} already exists in environment.")
-        self.name_dict[name] = decl

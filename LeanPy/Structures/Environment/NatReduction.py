@@ -73,5 +73,7 @@ def str_lit_to_constructor(environment : Environment, s : StrLit) -> Expression:
 __all__ = [
     'nat_add', 'nat_sub', 'nat_mul', 'nat_pow', 'nat_gcd', 'nat_mod', 'nat_div', 'nat_beq', 'nat_ble', 'nat_land', 'nat_lor', 'nat_xor', 'nat_shiftl', 'nat_shiftr',
 
-    'reduce_bin_nat_op'
+    'reduce_bin_nat_op', 'reduce_bin_nat_pred',
+
+    'nat_lit_to_constructor', 'str_lit_to_constructor'
     ]
