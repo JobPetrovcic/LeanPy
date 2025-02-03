@@ -249,10 +249,10 @@ class TypeChecker:
             self.remove_fvar(sub)
         return ret
 
-    def are_struct_eq_exprs(self, a : Expression, b : Expression) -> bool:
+    def are_struct_eq_exprs(self, a : Expression, b : Expression, use_hash : bool) -> bool:
         if a is b: 
             return True
-        if a.hash != b.hash: 
+        if use_hash and a.hash != b.hash: 
             return False
         if isinstance(a, BVar) and isinstance(b, BVar): 
             return a.db_index == b.db_index
@@ -272,15 +272,15 @@ class TypeChecker:
         elif isinstance(a, Const) and isinstance(b, Const): result = self.def_eq_const(a, b)
         #elif isinstance(a, MVar) and isinstance(b, MVar): result = (a is b)
         elif isinstance(a, FVar) and isinstance(b, FVar): result = (a is b)
-        elif isinstance(a, App) and isinstance(b, App): result = self.are_struct_eq_exprs(a.fn, b.fn) and self.are_struct_eq_exprs(a.arg, b.arg)
-        elif isinstance(a, Lambda) and isinstance(b, Lambda): result = self.are_struct_eq_exprs(a.domain, b.domain) and self.are_struct_eq_exprs(a.body, b.body)
-        elif isinstance(a, Pi) and isinstance(b, Pi): result = self.are_struct_eq_exprs(a.domain, b.domain) and self.are_struct_eq_exprs(a.codomain, b.codomain)
+        elif isinstance(a, App) and isinstance(b, App): result = self.are_struct_eq_exprs(a.fn, b.fn, use_hash) and self.are_struct_eq_exprs(a.arg, b.arg, use_hash)
+        elif isinstance(a, Lambda) and isinstance(b, Lambda): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.body, b.body, use_hash)
+        elif isinstance(a, Pi) and isinstance(b, Pi): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.codomain, b.codomain, use_hash)
         elif isinstance(a, Sort) and isinstance(b, Sort): result = self.def_eq_sort(a, b)
         elif isinstance(a, NatLit) and isinstance(b, NatLit): result = (a.val == b.val)
         elif isinstance(a, StrLit) and isinstance(b, StrLit): result = (a.val == b.val)
         # what about MData?
-        elif isinstance(a, Proj) and isinstance(b, Proj): result = a.index == b.index and self.are_struct_eq_exprs(a.expr, b.expr)
-        elif isinstance(a, Let) and isinstance(b, Let): result = self.are_struct_eq_exprs(a.domain, b.domain) and self.are_struct_eq_exprs(a.val, b.val) and self.are_struct_eq_exprs(a.body, b.body)
+        elif isinstance(a, Proj) and isinstance(b, Proj): result = a.index == b.index and self.are_struct_eq_exprs(a.expr, b.expr, use_hash)
+        elif isinstance(a, Let) and isinstance(b, Let): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.val, b.val, use_hash) and self.are_struct_eq_exprs(a.body, b.body, use_hash)
         else: raise PanicError(f"Unreachable code reached: Cannot compare expressions {a} and {b} of class {a.__class__} and {b.__class__}.")
         
         if result:
@@ -288,8 +288,8 @@ class TypeChecker:
 
         return result
 
-    def def_eq_easy(self, l: Expression, r: Expression) -> Optional[bool]:
-        if self.are_struct_eq_exprs(l, r): 
+    def def_eq_easy(self, l: Expression, r: Expression, use_hash : bool = False) -> Optional[bool]:
+        if self.are_struct_eq_exprs(l, r, use_hash): 
             return True
 
         if not (l.__class__ == r.__class__): 
@@ -333,7 +333,7 @@ class TypeChecker:
         return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)))
     
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
-        is_easy = self.def_eq_easy(l, r)
+        is_easy = self.def_eq_easy(l, r, use_hash=True)
         if is_easy is not None: 
             return is_easy
 
