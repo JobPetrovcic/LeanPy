@@ -644,7 +644,7 @@ class TypeChecker:
         if not isinstance(f, Proj): 
             return None
         e_new = self.whnf_core(e, cheap_rec=False, cheap_proj=False)
-        if not (e_new == e): 
+        if e_new == e: 
             return None
         return e_new
     

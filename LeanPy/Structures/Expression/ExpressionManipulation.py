@@ -187,7 +187,7 @@ def mark_used(fvars : List[FVar], expr : Expression, used : List[bool]):
     """
     Marks the fvars that are used in the given expression. Used should be the same length as fvars and will be modified in place.
     """
-    assert len(fvars) == len(used)
+    assert len(fvars) <= len(used)
     def mark_fn(e : Expression):
         if isinstance(e, FVar):
             for i, fvar in enumerate(fvars):
