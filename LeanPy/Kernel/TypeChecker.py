@@ -195,6 +195,7 @@ class TypeChecker:
                 var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
                 var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
                 if not self.def_eq(var_t_type, var_s_type):
+                    self.cleanup_fvars(subs)
                     return False
             if t.codomain.has_loose_bvars or s.codomain.has_loose_bvars:
                 if var_s_type is None:
