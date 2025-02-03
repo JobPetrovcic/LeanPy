@@ -48,6 +48,10 @@ class TypeChecker:
         self.local_context.add_fvar(fvar)
         return fvar
     
+    def cleanup_fvars(self, fvars : List[FVar]):
+        for fvar in fvars[::-1]:
+            self.remove_fvar(fvar)
+    
     def get_type_of_fvar(self, fvar : FVar) -> Expression:
         return self.local_context.get_fvar_type(fvar)
     
@@ -115,24 +119,6 @@ class TypeChecker:
             Subs parameters : {[str(l) for l in subs]}
             """)
         return self.subst_level_params(decl.value, decl.lvl_params, subs)
-        
-    def instantiate_fvar(
-            self, 
-            bname : Name, 
-            domain : Expression, # the type of the fvar
-            arg_val : Optional[Expression],  # the value of the fvar
-            body : Expression, # the body in which the fvar is instantiated
-            is_let : bool = False
-        ) -> Tuple[FVar, Expression]: # CHECKED
-        fvar = self.create_fvar(bname, domain, arg_val, is_let=is_let)
-        return fvar, self.instantiate(body, fvar)
-    
-    def abstract(self, fvar : FVar, expr : Expression) -> Expression: # CHECKED
-        """Abstracts the outermost bound variable in the given expression."""
-        # TODO: caching?
-        self.remove_fvar(fvar)
-        abstract_expression = abstract_bvar(expr, fvar)
-        return abstract_expression
     
     def ensure_pi(self, expr : Expression) -> Pi: # CHECKED
         if isinstance(expr, Pi): 
@@ -220,8 +206,8 @@ class TypeChecker:
             s = s.codomain
         ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]))
 
-        for sub in subs[::-1]:
-            self.remove_fvar(sub)
+        self.cleanup_fvars(subs)
+
         return ret
     
     def def_eq_lambda(self, init_it : Lambda , init_s : Lambda) -> bool:
@@ -232,21 +218,22 @@ class TypeChecker:
         while isinstance(t, Lambda) and isinstance(s, Lambda):
             var_s_type = None
             if not (t.domain == s.domain):
-                var_s_type = self.instantiate_multiple(s.domain, tuple(subs[::-1]))
-                var_t_type = self.instantiate_multiple(t.domain, tuple(subs[::-1]))
+                var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
+                var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
                 if not self.def_eq(var_t_type, var_s_type):
+                    self.cleanup_fvars(subs)
                     return False
             if t.body.has_loose_bvars or s.body.has_loose_bvars:
                 if var_s_type is None:
-                    var_s_type = self.instantiate_multiple(s.domain, tuple(subs[::-1]))
+                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
                 subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False))
             else:
                 subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False))
             t = t.body
             s = s.body
-        ret = self.def_eq(self.instantiate_multiple(t, tuple(subs[::-1])), self.instantiate_multiple(s, tuple(subs[::-1])))
-        for sub in subs[::-1]:
-            self.remove_fvar(sub)
+            
+        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]))
+        self.cleanup_fvars(subs)
         return ret
 
     def are_struct_eq_exprs(self, a : Expression, b : Expression, use_hash : bool) -> bool:
@@ -713,8 +700,6 @@ class TypeChecker:
 
             t_n, s_n, status = self.lazy_delta_reduction_step(t_n, s_n)
 
-            #print(f"reduced to {t_n} and {s_n}")
-
             if status == ReductionStatus.CONTINUE: continue
             elif status == ReductionStatus.EQUAL: 
                 return t_n, s_n, True
@@ -1061,20 +1046,19 @@ class TypeChecker:
         us : List[Level] = []
         e = pi
         while isinstance(e, Pi):
-            inst_domain = self.instantiate_multiple(e.domain, tuple(fvars[::-1]))
+            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
             t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only))
             us.append(t1.level)
             fvars.append(self.create_fvar(e.bname, inst_domain, None, False))
             e = e.codomain
 
-        e = self.instantiate_multiple(e, tuple(fvars[::-1]))
+        e = self.instantiate_multiple(e, fvars[::-1])
         t1 = self.ensure_sort(self.infer_core(e, infer_only))
         lvl = t1.level
         for u in us[::-1]:
             lvl = make_imax(u, lvl)
 
-        for fvar in fvars[::-1]:
-            self.remove_fvar(fvar)
+        self.cleanup_fvars(fvars)
 
         return Sort(level=lvl)
     
@@ -1111,8 +1095,7 @@ class TypeChecker:
 
         r = self.make_pi_binding(fvars, r)
 
-        for fvar in fvars[::-1]:
-            self.remove_fvar(fvar)
+        self.cleanup_fvars(fvars)
         return r
     
     def infer_nat_lit(self, n : NatLit) -> Expression:
@@ -1174,8 +1157,7 @@ class TypeChecker:
         
         r = self.make_let_binding(used_fvars, r)
 
-        for fvar in fvars[::-1]:
-            self.remove_fvar(fvar)
+        self.cleanup_fvars(fvars)
         return r
 
 

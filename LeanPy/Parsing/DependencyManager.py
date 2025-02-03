@@ -33,8 +33,6 @@ class DependencyManager:
         self.type_checker.local_context.clear()
 
         self.type_checker.add_declaration(decl=declaration, type_check=type_check)
-        #except Exception as e:
-        #    print(f"In {decl_file_name} got exception\n{e}")
 
     def load(self, decl_file_name : str, is_main : bool = True, type_check_dependencies : bool = True):
         """
