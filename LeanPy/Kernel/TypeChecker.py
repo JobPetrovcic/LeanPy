@@ -205,7 +205,7 @@ class TypeChecker:
         s : Expression = init_s
         while isinstance(t, Pi) and isinstance(s, Pi):
             var_s_type = None
-            if t.domain != s.domain:
+            if not (t.domain == s.domain):
                 var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
                 var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
                 if not self.def_eq(var_t_type, var_s_type):
@@ -677,7 +677,7 @@ class TypeChecker:
             elif hint_compare > 0: # reduce s
                 s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
             else: # reduce both
-                if isinstance(t_n, App) and isinstance(s_n, App) and (id_t[1] is id_s[1]) and isinstance(id_t, Definition) and isinstance(id_t.hint, Regular):
+                if isinstance(t_n, App) and isinstance(s_n, App) and (id_t[1] is id_s[1]) and isinstance(id_t[1], Definition) and isinstance(id_t[1].hint, Regular):
                     if not self.failure_cache.did_fail_before(t_n, s_n):
                         if self.def_eq_const(id_t[0], id_s[0]) and self.def_eq_args(t_n, s_n):
                             return t_n, s_n, ReductionStatus.EQUAL
@@ -1049,6 +1049,7 @@ class TypeChecker:
                     fn_type = self.instantiate_multiple(fn_type, args[j:i:-1]) # TODO: check if -1 is correct
                     fn_type = self.ensure_pi(fn_type)
                     fn_type = fn_type.codomain
+                    j = i
             
             return self.instantiate_multiple(fn_type, args[j::-1]) # TODO: check if -1 is correct
             
