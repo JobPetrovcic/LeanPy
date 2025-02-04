@@ -1032,12 +1032,12 @@ class TypeChecker:
                 if isinstance(fn_type, Pi):
                     fn_type = fn_type.codomain
                 else:
-                    fn_type = self.instantiate_multiple(fn_type, args[j:i:-1]) # TODO: check if -1 is correct
+                    fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1]) # TODO: check if -1 is correct
                     fn_type = self.ensure_pi(fn_type)
                     fn_type = fn_type.codomain
                     j = i
             
-            return self.instantiate_multiple(fn_type, args[j::-1]) # TODO: check if -1 is correct
+            return self.instantiate_multiple(fn_type, args[j:][::-1]) # TODO: check if -1 is correct
             
     def infer_sort(self, sort : Sort) -> Expression:
         return Sort(LevelSucc(sort.level))
