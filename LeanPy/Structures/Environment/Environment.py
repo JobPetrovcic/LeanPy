@@ -81,7 +81,6 @@ class Environment:
 
     def get_declaration_under_name(self, name : Name) -> Declaration:
         if name not in self.name_dict:
-            print([str(k) for k in self.name_dict.keys()])
             raise ValueError(f"Name {name} does not exist in environment.")
         found = self.name_dict[name]
         if self.checking_inductive:
