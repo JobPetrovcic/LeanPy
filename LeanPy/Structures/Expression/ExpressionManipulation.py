@@ -28,27 +28,27 @@ def replace_expression_aux(
             r_fn = replace_expression_aux(expr.fn, fn, replace_cache)
             r_arg = replace_expression_aux(expr.arg, fn, replace_cache) 
             if expr.fn is r_fn and expr.arg is r_arg: new_expr = expr
-            new_expr = App(fn=r_fn, arg=r_arg)
+            else: new_expr = App(fn=r_fn, arg=r_arg)
         elif isinstance(expr, Lambda): 
             r_domain = replace_expression_aux(expr.domain, fn, replace_cache)
             r_body = replace_expression_aux(expr.body, fn, replace_cache)
             if expr.domain is r_domain and expr.body is r_body: new_expr = expr
-            new_expr = Lambda(bname=expr.bname, domain=r_domain, body=r_body)
+            else: new_expr = Lambda(bname=expr.bname, domain=r_domain, body=r_body)
         elif isinstance(expr, Pi): 
             r_domain = replace_expression_aux(expr.domain, fn, replace_cache)
             r_codomain = replace_expression_aux(expr.codomain, fn, replace_cache)
             if expr.domain is r_domain and expr.codomain is r_codomain: new_expr = expr
-            new_expr = Pi(bname=expr.bname, domain=r_domain, codomain=r_codomain)
+            else: new_expr = Pi(bname=expr.bname, domain=r_domain, codomain=r_codomain)
         elif isinstance(expr, Let): 
             r_domain = replace_expression_aux(expr.domain, fn, replace_cache)
             r_val = replace_expression_aux(expr.val, fn, replace_cache)
             r_body = replace_expression_aux(expr.body, fn, replace_cache)
             if expr.domain is r_domain and expr.val is r_val and expr.body is r_body: new_expr = expr
-            new_expr = Let(bname=expr.bname, domain=r_domain, val=r_val, body=r_body)
+            else: new_expr = Let(bname=expr.bname, domain=r_domain, val=r_val, body=r_body)
         elif isinstance(expr, Proj): 
             r_expr = replace_expression_aux(expr.expr, fn, replace_cache)
             if expr.expr is r_expr: new_expr = expr
-            new_expr = Proj(sname=expr.sname, index=expr.index, expr=r_expr)
+            else: new_expr = Proj(sname=expr.sname, index=expr.index, expr=r_expr)
         elif isinstance(expr, NatLit): new_expr = expr
         elif isinstance(expr, StrLit): new_expr = expr
         else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
@@ -95,7 +95,7 @@ def replace_expression_w_depth_aux(
 
             # if the function and argument are the same, new_expr = the original expression
             if expr.fn is r_fn and expr.arg is r_arg: new_expr = expr
-            new_expr = App(
+            else: new_expr = App(
                 fn=r_fn,
                 arg=r_arg
             )
@@ -103,7 +103,7 @@ def replace_expression_w_depth_aux(
             r_domain = replace_expression_w_depth_aux(expr.domain, fn, depth, replace_cache)
             r_body = replace_expression_w_depth_aux(expr.body, fn, depth + 1, replace_cache)
             if expr.domain is r_domain and expr.body is r_body: new_expr = expr
-            new_expr = Lambda(
+            else: new_expr = Lambda(
                 bname=expr.bname, 
                 domain=r_domain,
                 body=r_body
@@ -112,7 +112,7 @@ def replace_expression_w_depth_aux(
             r_domain = replace_expression_w_depth_aux(expr.domain, fn, depth, replace_cache)
             r_codomain = replace_expression_w_depth_aux(expr.codomain, fn, depth + 1, replace_cache)
             if expr.domain is r_domain and expr.codomain is r_codomain: new_expr = expr 
-            new_expr = Pi(
+            else: new_expr = Pi(
                 bname=expr.bname, 
                 domain=r_domain,
                 codomain=r_codomain
@@ -122,7 +122,7 @@ def replace_expression_w_depth_aux(
             r_val = replace_expression_w_depth_aux(expr.val, fn, depth, replace_cache)
             r_body = replace_expression_w_depth_aux(expr.body, fn, depth + 1, replace_cache)
             if expr.domain is r_domain and expr.val is r_val and expr.body is r_body: new_expr = expr
-            new_expr = Let(
+            else: new_expr = Let(
                 bname=expr.bname, 
                 domain=r_domain,
                 val=r_val,
@@ -131,7 +131,7 @@ def replace_expression_w_depth_aux(
         elif isinstance(expr, Proj): 
             r_expr = replace_expression_w_depth_aux(expr.expr, fn, depth, replace_cache)
             if expr.expr is r_expr: new_expr = expr
-            new_expr = Proj(
+            else: new_expr = Proj(
                 sname=expr.sname, 
                 index=expr.index, 
                 expr=r_expr)
