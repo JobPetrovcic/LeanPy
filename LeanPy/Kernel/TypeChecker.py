@@ -267,7 +267,7 @@ class TypeChecker:
         elif isinstance(a, NatLit) and isinstance(b, NatLit): result = (a.val == b.val)
         elif isinstance(a, StrLit) and isinstance(b, StrLit): result = (a.val == b.val)
         # what about MData?
-        elif isinstance(a, Proj) and isinstance(b, Proj): result = a.index == b.index and self.are_struct_eq_exprs(a.expr, b.expr, use_hash)
+        elif isinstance(a, Proj) and isinstance(b, Proj): result = (a.index == b.index) and self.are_struct_eq_exprs(a.expr, b.expr, use_hash)
         elif isinstance(a, Let) and isinstance(b, Let): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.val, b.val, use_hash) and self.are_struct_eq_exprs(a.body, b.body, use_hash)
         else: raise PanicError(f"Unreachable code reached: Cannot compare expressions {a} and {b} of class {a.__class__} and {b.__class__}.")
         
