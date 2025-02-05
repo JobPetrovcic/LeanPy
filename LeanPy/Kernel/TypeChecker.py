@@ -140,7 +140,6 @@ class TypeChecker:
         
         raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__)
     
-    
     def is_structure_like(self, decl_name : Name) -> bool:
         decl = self.environment.get_declaration_under_name(decl_name)
         if not isinstance(decl, Inductive): 
@@ -335,9 +334,9 @@ class TypeChecker:
         if is_easy is not None: 
             return is_easy
 
-        if not l.has_fvars and isinstance(r, Const) and r.cname == self.environment.Bool_true_name:
+        if not l.has_fvars and isinstance(r, Const) and r == Const(cname=self.environment.Bool_true_name, lvl_params=[]):
             whnfd_l = self.whnf(l)
-            if isinstance(whnfd_l, Const) and whnfd_l.cname == self.environment.Bool_true_name:
+            if isinstance(whnfd_l, Const) and whnfd_l == Const(cname=self.environment.Bool_true_name, lvl_params=[]):
                 return True
 
         l_n = self.whnf_core(l, cheap_rec=False, cheap_proj=True)
@@ -916,7 +915,7 @@ class TypeChecker:
             #    throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceBool'");
             #}
             #return lean_unbox(r) == 0 ? some_expr(mk_bool_false()) : some_expr(mk_bool_true());
-        if isinstance(e.fn, Const) and e.fn.cname == self.environment.Nat_reduce_name:
+        if e.fn == Const(cname=self.environment.Nat_reduce_name, lvl_params=[]):
             raise NotImplementedError("TODO")
             #object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
             #if (lean_is_scalar(r) || lean_is_mpz(r)) {
