@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from typeguard import typechecked
 
 class Name:
     @abstractmethod
@@ -16,7 +15,7 @@ class Name:
 
 class Anonymous(Name):
     def __str__(self) -> str:
-        return ""
+        return "anon"
 
 class SubName(Name):
     def __init__(self, anc : Name, str : str):

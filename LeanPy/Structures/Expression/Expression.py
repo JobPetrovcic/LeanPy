@@ -160,7 +160,7 @@ class Sort(Expression):
     def get_expr_size(self) -> int: return 1
 
     def __str__(self) -> str:
-        return f"Sort {self.level}"
+        return f"(Sort ({self.level}))"
     
     #@typechecked
     ##@profile
@@ -323,7 +323,7 @@ class Proj(Expression):
     def get_expr_size(self) -> int: return self.expr.expr_size + 1
     
     def __str__(self) -> str:
-        return f"({self.expr}).{self.index}"
+        return f"({self.expr}).{self.index + 1}"
     
     #@typechecked
     ##@profile
@@ -347,7 +347,7 @@ class NatLit(Expression):
     def get_expr_size(self) -> int: return 1
 
     def __str__(self) -> str:
-        return str(self.val)
+        return "N"+str(self.val)
     
     #@typechecked
     ##@profile

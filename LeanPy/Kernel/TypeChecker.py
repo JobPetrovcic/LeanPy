@@ -7,6 +7,7 @@ from LeanPy.Structures.Environment.Declarations.Declaration import Declaration, 
 from LeanPy.Structures.Environment.Environment import Environment
 from LeanPy.Structures.Environment.LocalContext import LocalContext
 from LeanPy.Structures.Environment.NatReduction import *
+from LeanPy.Structures.Environment.NatReduction import is_nat_zero, is_nat_succ, is_nat_zero_const
 from LeanPy.Structures.Environment.ReducibilityHint import Regular
 from LeanPy.Structures.Expression.ExpressionManipulation import *
 from LeanPy.Structures.Expression.LevelManipulation import *
@@ -154,6 +155,15 @@ class TypeChecker:
         return isinstance(inferred_type, Sort) and is_equivalent(inferred_type.level, self.environment.level_zero)
     
     # DEFINITIONAL EQUALITY
+    def def_eq_offset(self, t : Expression, s : Expression) -> Optional[bool]:
+        if is_nat_zero(self.environment, t) and is_nat_zero(self.environment, s):
+            return True
+        pred_t = is_nat_succ(self.environment, t)
+        pred_s = is_nat_succ(self.environment, s)
+        if (pred_t is not None) and (pred_s is not None):
+            return self.def_eq_core(pred_t, pred_s)
+        return None
+
     def def_eq_sort(self, l : Sort, r : Sort) -> bool:
         """Sorts are equal if their levels satisfy antisymmetry.
         The comparsion function does not change anything, so def_eq_sort is safe to use when passing by reference.
@@ -684,6 +694,10 @@ class TypeChecker:
 
     def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]:
         while True:
+            try_offset = self.def_eq_offset(t_n, s_n)
+            if try_offset is not None:
+                return t_n, s_n, try_offset
+
             if not t_n.has_fvars and not s_n.has_fvars: 
                 nat_t = self.reduce_nat_lit(t_n) 
                 if nat_t is not None: 
@@ -731,17 +745,15 @@ class TypeChecker:
         fn, args = unfold_app(e)
         if not isinstance(fn, Const): 
             return None
-        if len(args) == 0: # TODO: why does not lean kernel do this?
-            if fn.cname == self.environment.Nat_zero_name: 
-                return NatLit(0)
         if len(args) == 1:
             if fn.cname == self.environment.Nat_succ_name:
                 arg = self.whnf(args[0])
                 if isinstance(arg, NatLit): 
                     return NatLit(arg.val + 1)
-                if isinstance(arg, Const) and arg.cname == self.environment.Nat_zero_name: 
+                if is_nat_zero_const(self.environment, arg): 
                     return NatLit(1)
                 return None
+            
         if len(args) == 2:
             arg1 = self.whnf(args[0])
             if not isinstance(arg1, NatLit): 
@@ -751,6 +763,7 @@ class TypeChecker:
                 return None
             
             name = fn.cname
+            assert len(fn.lvl_params) == 0
             if name == self.environment.Nat_add_name: 
                 return reduce_bin_nat_op(nat_add, arg1.val, arg2.val)
             elif name == self.environment.Nat_sub_name: 

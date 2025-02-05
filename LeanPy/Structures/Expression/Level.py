@@ -1,6 +1,4 @@
 from abc import abstractmethod
-from typeguard import typechecked
-
 from LeanPy.Structures.Name import Name
 
 class Level:
@@ -49,7 +47,7 @@ class LevelSucc(Level):
         if isinstance(r, LevelZero):
             return f"{o}"
         else:
-            return f"{o} + {r}"
+            return f"{r} + {o}"
 
     def totally_equal(self, other: 'Level') -> bool:
         return isinstance(other, LevelSucc) and self.anc.totally_equal(other.anc)
@@ -64,7 +62,7 @@ class LevelMax(Level):
         Level.__init__(self)
     
     def __str__(self) -> str:
-        return f"Max({self.lhs}, {self.rhs})"
+        return f"max ({self.lhs}) ({self.rhs})"
 
     def totally_equal(self, other: 'Level') -> bool:
         return isinstance(other, LevelMax) and self.lhs.totally_equal(other.lhs) and self.rhs.totally_equal(other.rhs)
@@ -79,7 +77,7 @@ class LevelIMax(Level):
         Level.__init__(self)
     
     def __str__(self) -> str:
-        return f"IMax({self.lhs}, {self.rhs})"
+        return f"imax ({self.lhs}) ({self.rhs})"
 
     def totally_equal(self, other: 'Level') -> bool:
         return isinstance(other, LevelIMax) and self.lhs.totally_equal(other.lhs) and self.rhs.totally_equal(other.rhs)
