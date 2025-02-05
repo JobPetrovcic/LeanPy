@@ -181,8 +181,8 @@ class TypeChecker:
         return False
     
     def def_eq_app(self, l : App, r : App) -> bool:
-        f_fn, f_args = unfold_app(l.fn)
-        g_fn, g_args = unfold_app(r.fn)
+        f_fn, f_args = unfold_app(l)
+        g_fn, g_args = unfold_app(r)
         if not self.def_eq(f_fn, g_fn):
             return False
         
