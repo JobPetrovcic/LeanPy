@@ -907,7 +907,7 @@ class TypeChecker:
             return None
         if not isinstance(e.arg, Const): 
             return None
-        if isinstance(e.fn, Const) and e.fn.cname == self.environment.Bool_reduce_name:
+        if e.fn == Const(cname=self.environment.Bool_reduce_name, lvl_params=[]):
             raise NotImplementedError("TODO")
             #object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
             #if (!lean_is_scalar(r)) {
@@ -1029,8 +1029,8 @@ class TypeChecker:
             inferred_domain = self.infer_core(app.arg, infer_only=(self.allow_unstrict_infer and infer_only))
 
             # the domain of the function should be equal to the type of the argument
-            if not self.def_eq(fn_type.domain, inferred_domain):
-                raise ExpectedEqualExpressionsError(fn_type.domain, inferred_domain)
+            if not self.def_eq(inferred_domain, fn_type.domain):
+                raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain)
             
             infered_type = self.instantiate(body=fn_type.codomain, val=app.arg)
             return infered_type
