@@ -1,9 +1,9 @@
 from abc import abstractmethod
 from LeanPy.Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
-from LeanPy.Structures.Expression.ExpressionManipulation import get_app_function
+from LeanPy.Structures.Expression.ExpressionManipulationDebug import get_app_function
 from LeanPy.Kernel.KernelErrors import PanicError
 from LeanPy.Structures.Name import Name
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 from LeanPy.Structures.Expression.Level import LevelParam
 from typing import List, Optional
 

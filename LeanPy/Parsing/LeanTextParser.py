@@ -4,7 +4,7 @@ from typing import Any, Iterator, List, Sequence, Tuple
 
 from LeanPy.Structures.Environment.Declarations.Declaration import Axiom, Constructor, Declaration, DeclarationInfo, Definition, Inductive, Opaque, Quot, RecursorRule, Recursor, Theorem
 from LeanPy.Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Name import *
 from LeanPy.Kernel.TypeChecker import TypeChecker

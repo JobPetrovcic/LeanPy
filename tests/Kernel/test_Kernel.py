@@ -1,5 +1,5 @@
 from LeanPy.Parsing.LeanTextParser import LeanTextParser
-from LeanPy.Structures.Expression.Expression import Const
+from LeanPy.Structures.Expression.ExpressionDebug import Const
 
 def test_decidable():
     parsed = LeanTextParser.from_file("Exports/bool_reduction.export")

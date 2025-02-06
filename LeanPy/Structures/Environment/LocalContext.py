@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from LeanPy.Structures.Expression.Expression import Expression, FVar
+from LeanPy.Structures.Expression.ExpressionDebug import Expression, FVar
 
 class LocalContext:
     def __init__(self):

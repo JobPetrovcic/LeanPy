@@ -2,7 +2,7 @@ import os
 import pickle
 from typing import Dict, List, Set
 
-from LeanPy.Kernel.TypeChecker import TypeChecker
+from LeanPy.Kernel.TypeCheckerDebug import TypeChecker
 from LeanPy.Parsing import LeanJSONParser
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 from LeanPy.Structures.Environment.Environment import Environment
@@ -11,7 +11,7 @@ n_to_save_already_checked = 100
 already_checked_file_path = "already_checked.pickle"
 
 class DependencyManager:
-    def __init__(self, folder : str, save_already_checked : bool = False):
+    def __init__(self, folder : str, save_already_checked : bool = True):
         # we keep track of which files have been loaded
         # NOTE: name of the declaration don't match the file name
         # currently, the only differnce is that "/" -> " "

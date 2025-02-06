@@ -2,7 +2,7 @@ from typing import Dict
 from LeanPy.Structures.Environment.Declarations.Declaration import Constructor, Declaration, Inductive
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 from LeanPy.Structures.Name import string_to_name
 
 class Environment:

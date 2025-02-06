@@ -9,11 +9,11 @@ from LeanPy.Structures.Environment.LocalContext import LocalContext
 from LeanPy.Structures.Environment.NatReduction import *
 from LeanPy.Structures.Environment.NatReduction import is_nat_zero, is_nat_succ, is_nat_zero_const
 from LeanPy.Structures.Environment.ReducibilityHint import Regular
-from LeanPy.Structures.Expression.ExpressionManipulation import *
+from LeanPy.Structures.Expression.ExpressionManipulationDebug import *
 from LeanPy.Structures.Expression.LevelManipulation import *
 from LeanPy.Structures.Name import Name
 from LeanPy.Structures.Expression.Level import *
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 from LeanPy.Structures.Environment.Declarations.Declaration import *
 
 
@@ -59,7 +59,7 @@ class TypeChecker:
     def get_value_of_fvar(self, fvar : FVar) -> Optional[Expression]:
         return self.local_context.get_fvar_value(fvar)
     
-    def instantiate(self, body : Expression, val : Expression) -> Expression:
+    def instantiate(self, body : Expression, val : Expression, func_name : str) -> Expression:
         """
         Replace the outermost bound variable in the body with the value. Clones the body(!).
         """
@@ -67,11 +67,11 @@ class TypeChecker:
         if cached_inst_body is not None: 
             return cached_inst_body
 
-        inst_body = instantiate_bvar(body, val)
+        inst_body = instantiate_bvar(body, val, func_name)
         self.instantiation_cache.put(body, val, inst_body)
         return inst_body
     
-    def instantiate_multiple(self, body : Expression, vals : Sequence[Expression]) -> Expression:
+    def instantiate_multiple(self, body : Expression, vals : Sequence[Expression], func_name : str) -> Expression:
         """
         Replace the outermost bound variables in the body with the values. Clones the body(!).
         IMPORTANT: vals should be in order of the innermost bound variable to the outermost bound variable.
@@ -81,11 +81,11 @@ class TypeChecker:
         if cached_inst_body is not None: 
             return cached_inst_body
 
-        inst_body = instantiate_bvars(body, vals_tuple)
+        inst_body = instantiate_bvars(body, vals_tuple, func_name)
         self.instantiation_multiple_cache.put(body, vals_tuple, inst_body)
         return inst_body
     
-    def subst_level_params(self, expr : Expression, lvl_params : List[LevelParam], levels : List[Level]) -> Expression:
+    def subst_level_params(self, expr : Expression, lvl_params : List[LevelParam], levels : List[Level], func_name : str) -> Expression:
         """
         Substitute the level parameters in the expression with the levels. Allows for caching.
         """
@@ -96,12 +96,12 @@ class TypeChecker:
         if cached_subst_expr is not None: 
             return cached_subst_expr
 
-        subst_expr = substitute_level_params_in_expression(expr, lvl_subst)
+        subst_expr = substitute_level_params_in_expression(expr, lvl_subst, func_name)
         self.lvl_param_subst_cache.put(expr, lvl_subst_tuple, subst_expr)
 
         return subst_expr
     
-    def get_declaration_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level]) -> Expression:
+    def get_declaration_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level], func_name : str) -> Expression:
         if len(decl.lvl_params) != len(subs):
             raise DeclarationError(f"""
             Declaration {decl.name} has {len(decl.lvl_params)} level parameters, but {len(subs)} substitutions were provided.
@@ -109,9 +109,9 @@ class TypeChecker:
             Decl parameters : {[str(l) for l in decl.lvl_params]}
             Subs parameters : {[str(l) for l in subs]}
             """)
-        return self.subst_level_params(decl.type, decl.lvl_params, subs)
+        return self.subst_level_params(decl.type, decl.lvl_params, subs, func_name)
     
-    def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level]) -> Expression:
+    def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level], func_name : str) -> Expression:
         if len(decl.lvl_params) != len(subs):
             raise DeclarationError(f"""
             Declaration {decl.name} has {len(decl.lvl_params)} level parameters, but {len(subs)} substitutions were provided.
@@ -119,7 +119,7 @@ class TypeChecker:
             Decl parameters : {[str(l) for l in decl.lvl_params]}
             Subs parameters : {[str(l) for l in subs]}
             """)
-        return self.subst_level_params(decl.value, decl.lvl_params, subs)
+        return self.subst_level_params(decl.value, decl.lvl_params, subs, func_name)
     
     def ensure_pi(self, expr : Expression) -> Pi: # CHECKED
         if isinstance(expr, Pi): 
@@ -201,20 +201,20 @@ class TypeChecker:
         while isinstance(t, Pi) and isinstance(s, Pi):
             var_s_type = None
             if not (t.domain == s.domain):
-                var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
+                var_s_type = self.instantiate_multiple(s.domain, subs[::-1], func_name="def_eq_pi")
+                var_t_type = self.instantiate_multiple(t.domain, subs[::-1], func_name="def_eq_pi")
                 if not self.def_eq(var_t_type, var_s_type):
                     self.cleanup_fvars(subs)
                     return False
             if t.codomain.has_loose_bvars or s.codomain.has_loose_bvars:
                 if var_s_type is None:
-                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
+                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1], func_name="def_eq_pi")
                 subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False))
             else:
                 subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False))
             t = t.codomain
             s = s.codomain
-        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]))
+        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1], func_name="def_eq_pi"), self.instantiate_multiple(s, subs[::-1], func_name="def_eq_pi"))
 
         self.cleanup_fvars(subs)
 
@@ -228,21 +228,21 @@ class TypeChecker:
         while isinstance(t, Lambda) and isinstance(s, Lambda):
             var_s_type = None
             if not (t.domain == s.domain):
-                var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
+                var_s_type = self.instantiate_multiple(s.domain, subs[::-1], func_name="def_eq_lambda")
+                var_t_type = self.instantiate_multiple(t.domain, subs[::-1], func_name="def_eq_lambda")
                 if not self.def_eq(var_t_type, var_s_type):
                     self.cleanup_fvars(subs)
                     return False
             if t.body.has_loose_bvars or s.body.has_loose_bvars:
                 if var_s_type is None:
-                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
+                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1], func_name="def_eq_lambda")
                 subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False))
             else:
                 subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False))
             t = t.body
             s = s.body
             
-        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]))
+        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1], func_name="def_eq_lambda"), self.instantiate_multiple(s, subs[::-1], func_name="def_eq_lambda"))
         self.cleanup_fvars(subs)
         return ret
 
@@ -583,7 +583,7 @@ class TypeChecker:
         rest_args = args[n_successful_subs:]
         successful_args = args[:n_successful_subs][::-1]
         
-        inst_f = self.instantiate_multiple(f, successful_args)
+        inst_f = self.instantiate_multiple(f, successful_args, func_name="beta_reduction")
 
         return fold_apps(inst_f, rest_args)
     
@@ -599,7 +599,7 @@ class TypeChecker:
         return fn, decl, args
     
     def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression:
-        decl_val = self.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params)
+        decl_val = self.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params, func_name="delta_reduction_core")
         return fold_apps(decl_val, args)
     
     def delta_reduction(self, expr : Expression) -> Optional[Expression]:
@@ -865,7 +865,7 @@ class TypeChecker:
             return None 
         if len(rec_fn.lvl_params) != len(rec_decl.lvl_params): 
             return None
-        rhs = self.subst_level_params(rule.value, rec_decl.lvl_params, rec_fn.lvl_params) # clones the rule.value
+        rhs = self.subst_level_params(rule.value, rec_decl.lvl_params, rec_fn.lvl_params, func_name="inductive_reduce_rec") # clones the rule.value
 
         # apply parameters, motives and minor premises from recursor application.
         assert rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors < len(rec_args), "Recursor application does not have enough arguments."
@@ -968,7 +968,7 @@ class TypeChecker:
             else:
                 r = self.whnf_core(fold_apps(fn, raw_args), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         elif isinstance(expr, Let):
-            r = self.whnf_core(self.instantiate(body=expr.body, val=expr.val), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
+            r = self.whnf_core(self.instantiate(body=expr.body, val=expr.val, func_name="whnf_core"), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         
         if r is None:
             raise PanicError(f"Expr of type {expr.__class__.__name__} could not be matched, this should not happen.")
@@ -1032,7 +1032,7 @@ class TypeChecker:
             if not self.def_eq(inferred_domain, fn_type.domain):
                 raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain)
             
-            infered_type = self.instantiate(body=fn_type.codomain, val=app.arg)
+            infered_type = self.instantiate(body=fn_type.codomain, val=app.arg, func_name="infer_app")
             return infered_type
         else:
             # If infer_only is true we only check that the type of fn is a pi type and keep substituting the arguments into the function type's codomain. We don't check that arguments match the function type's domain.
@@ -1044,12 +1044,12 @@ class TypeChecker:
                 if isinstance(fn_type, Pi):
                     fn_type = fn_type.codomain
                 else:
-                    fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1]) # TODO: check if -1 is correct
+                    fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1], func_name="infer_app") # TODO: check if -1 is correct
                     fn_type = self.ensure_pi(fn_type)
                     fn_type = fn_type.codomain
                     j = i
             
-            return self.instantiate_multiple(fn_type, args[j:][::-1]) # TODO: check if -1 is correct
+            return self.instantiate_multiple(fn_type, args[j:][::-1], func_name="infer_app") # TODO: check if -1 is correct
             
     def infer_sort(self, sort : Sort) -> Expression:
         return Sort(LevelSucc(sort.level))
@@ -1059,13 +1059,13 @@ class TypeChecker:
         us : List[Level] = []
         e = pi
         while isinstance(e, Pi):
-            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
+            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1], func_name="infer_pi")
             t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only))
             us.append(t1.level)
             fvars.append(self.create_fvar(e.bname, inst_domain, None, False))
             e = e.codomain
 
-        e = self.instantiate_multiple(e, fvars[::-1])
+        e = self.instantiate_multiple(e, fvars[::-1], func_name="infer_pi")
         t1 = self.ensure_sort(self.infer_core(e, infer_only))
         lvl = t1.level
         for u in us[::-1]:
@@ -1078,14 +1078,14 @@ class TypeChecker:
     def infer_const(self, c : Const) -> Expression:
         if len(c.lvl_params) != len(self.environment.get_declaration_under_name(c.cname).lvl_params):
             raise PanicError("The number of level parameters of the constant does not match the number of level parameters in the environment.")
-        return self.get_declaration_type_with_substituted_level_params(self.environment.get_declaration_under_name(c.cname), c.lvl_params)
+        return self.get_declaration_type_with_substituted_level_params(self.environment.get_declaration_under_name(c.cname), c.lvl_params, func_name="infer_const")
 
     def make_pi_binding(self, fvars : List[FVar], b : Expression) -> Expression:
-        r = abstract_multiple_bvars(fvars[::-1], b)
+        r = abstract_multiple_bvars(fvars[::-1], b, func_name="make_pi_binding")
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
             assert c_fvar.is_let == False, "Cannot have a let binding in a pi binding."
-            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
+            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type, func_name="make_pi_binding")
             r = Pi(c_fvar.name, abs_type, r)
         
         return r
@@ -1095,13 +1095,13 @@ class TypeChecker:
         e = lam
 
         while isinstance(e, Lambda):
-            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
+            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1], func_name="infer_lambda")
             fvars.append(self.create_fvar(e.bname, inst_domain, None, False))
             if not infer_only:
                 self.ensure_sort(self.infer_core(inst_domain, infer_only))
             e = e.body
         
-        r = self.instantiate_multiple(e, fvars[::-1])
+        r = self.instantiate_multiple(e, fvars[::-1], func_name="infer_lambda")
         assert not r.has_loose_bvars
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
@@ -1118,14 +1118,14 @@ class TypeChecker:
         return Const(self.environment.String_name, [])
 
     def make_let_binding(self, fvars : List[FVar], b : Expression) -> Expression:
-        r = abstract_multiple_bvars(fvars[::-1], b)
+        r = abstract_multiple_bvars(fvars[::-1], b, func_name="make_let_binding")
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
             assert c_fvar.is_let == True, "Cannot have a non-let binding in a let binding."
             assert c_fvar.val is not None, "Cannot have a let binding without a value."
 
-            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
-            abs_val = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.val)
+            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type, func_name="make_let_binding")
+            abs_val = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.val, func_name="make_let_binding")
 
             r = Let(bname=c_fvar.name, domain=abs_type, val=abs_val, body=r)
         
@@ -1137,8 +1137,8 @@ class TypeChecker:
 
         e = let
         while isinstance(e, Let):
-            val_type = self.instantiate_multiple(e.domain, fvars[::-1])
-            val = self.instantiate_multiple(e.val, fvars[::-1])
+            val_type = self.instantiate_multiple(e.domain, fvars[::-1], func_name="infer_let")
+            val = self.instantiate_multiple(e.val, fvars[::-1], func_name="infer_let")
             fvars.append(self.create_fvar(e.bname, val_type, val=val, is_let=True))
             vals.append(val)
 
@@ -1151,7 +1151,7 @@ class TypeChecker:
             
             e = e.body
         
-        r = self.instantiate_multiple(e, fvars[::-1])
+        r = self.instantiate_multiple(e, fvars[::-1], func_name="infer_let")
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
         used = [False] * len(fvars)
@@ -1202,7 +1202,7 @@ class TypeChecker:
 
         assert constructor_decl.num_params == I_decl.num_params, "Sanity check failed: number of parameters in inductive type and constructor do not match."
 
-        r = self.subst_level_params(constructor_decl.type, I_decl.lvl_params, inductive_fn.lvl_params)
+        r = self.subst_level_params(constructor_decl.type, I_decl.lvl_params, inductive_fn.lvl_params, func_name="infer_proj")
         
         for i in range(I_decl.num_params):
             if i >= len(args):
@@ -1210,7 +1210,7 @@ class TypeChecker:
             r = self.whnf(r)
             if not isinstance(r, Pi):
                 raise ProjectionError(f"Expected a Pi type when instantiating projection args but got {r.__class__}")
-            r = self.instantiate(body=r.codomain, val=args[i])
+            r = self.instantiate(body=r.codomain, val=args[i], func_name="infer_proj")
         
         is_prop_type = self.is_prop(r)
 
@@ -1222,7 +1222,8 @@ class TypeChecker:
             if r.codomain.has_loose_bvars: # TODO is this ok?
                 r = self.instantiate(
                     body=r.codomain, 
-                    val=Proj(I_name, i, proj.expr)
+                    val=Proj(I_name, i, proj.expr),
+                    func_name="infer_proj"
                 )
                 if is_prop_type and not self.is_prop(r):
                     raise ProjectionError(f"When substituting proj indices, the body should remain a prop type.")

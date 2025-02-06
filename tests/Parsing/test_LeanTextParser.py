@@ -2,10 +2,10 @@ from typing import List, Tuple
 from LeanPy.Parsing.LeanTextParser import LeanTextParser
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 from LeanPy.Structures.Environment.Declarations.Declaration import *
 from LeanPy.Structures.Environment.ReducibilityHint import *
-from LeanPy.Structures.Expression.ExpressionToPython import ExpressionToPython
+from LeanPy.Structures.Expression.ExpressionDebugToPython import ExpressionToPython
 
 
 #def test_lean_format_parser1():
@@ -30,7 +30,7 @@ from LeanPy.Structures.Expression.ExpressionToPython import ExpressionToPython
 #    code = str(exporter)
 #    print("""from LeanPy.Structures.Name import *
 #from LeanPy.Structures.Expression.Level import *
-#from LeanPy.Structures.Expression.Expression import *
+#from LeanPy.Structures.Expression.ExpressionDebug import *
 #from LeanPy.Structures.Environment.Declarations.Declaration import *
 #from LeanPy.Structures.Environment.ReducibilityHint import *
 #""")

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar
 
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 from LeanPy.Structures.Expression.Level import Level, LevelParam
 from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
 

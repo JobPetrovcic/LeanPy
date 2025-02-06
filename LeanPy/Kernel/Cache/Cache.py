@@ -1,5 +1,5 @@
 from typing import Dict, Generic, Optional, Tuple, TypeVar
-from LeanPy.Structures.Expression.Expression import Expression
+from LeanPy.Structures.Expression.ExpressionDebug import Expression
 
 class MapCache:
     def __init__(self):

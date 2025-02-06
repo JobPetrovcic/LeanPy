@@ -1,6 +1,6 @@
 from typing import Dict, Optional, Set, Tuple
 
-from LeanPy.Structures.Expression.Expression import Expression
+from LeanPy.Structures.Expression.ExpressionDebug import Expression
 
 class DSUObject:
     def __init__(self, parent : Optional['DSUObject'] = None):

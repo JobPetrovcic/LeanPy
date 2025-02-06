@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple
 from LeanPy.Structures.Environment.Declarations.Declaration import *
 from LeanPy.Structures.Environment.ReducibilityHint import *
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Name import Anonymous, Name, SubName
 

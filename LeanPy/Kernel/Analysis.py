@@ -1,7 +1,7 @@
 import sys
 from typing import Any, Callable, Concatenate, ParamSpec, Tuple, TypeVar
 
-from LeanPy.Structures.Expression.Expression import Expression
+from LeanPy.Structures.Expression.ExpressionDebug import Expression
 from line_profiler import LineProfiler
 
 lp = LineProfiler()

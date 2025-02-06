@@ -3,8 +3,8 @@ from typing import Callable, Optional
 from typeguard import typechecked
 
 from LeanPy.Structures.Environment.Environment import Environment
-from LeanPy.Structures.Expression.Expression import App, Const, Expression, NatLit, StrLit
-from LeanPy.Structures.Expression.ExpressionManipulation import unfold_app
+from LeanPy.Structures.Expression.ExpressionDebug import App, Const, Expression, NatLit, StrLit
+from LeanPy.Structures.Expression.ExpressionManipulationDebug import unfold_app
 def nat_add(a : int, b : int) -> int: return a + b
 def nat_sub(a : int, b : int) -> int: return max(0, a - b)
 def nat_mul(a : int, b : int) -> int: return a * b

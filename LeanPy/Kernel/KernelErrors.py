@@ -1,6 +1,6 @@
 from typing import Type
 from LeanPy.Structures.Environment.LocalContext import LocalContext
-from LeanPy.Structures.Expression.Expression import Expression
+from LeanPy.Structures.Expression.ExpressionDebug import Expression
 
 class PanicError(Exception):
     def __init__(self, message : str):

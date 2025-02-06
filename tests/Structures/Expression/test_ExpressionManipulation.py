@@ -1,6 +1,6 @@
 from typeguard import typechecked
-from LeanPy.Structures.Expression.ExpressionManipulation import fold_apps, unfold_app
-from LeanPy.Structures.Expression.Expression import App, Const, Pi, Sort
+from LeanPy.Structures.Expression.ExpressionManipulationDebug import fold_apps, unfold_app
+from LeanPy.Structures.Expression.ExpressionDebug import App, Const, Pi, Sort
 from LeanPy.Structures.Expression.Level import LevelZero
 from LeanPy.Structures.Name import Anonymous, SubName
 

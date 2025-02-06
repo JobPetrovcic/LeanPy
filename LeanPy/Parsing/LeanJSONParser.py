@@ -5,7 +5,7 @@ from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import * 
 tag_to_level_class = {c.__name__ : c for c in level_constructors}
 
-from LeanPy.Structures.Expression.Expression import *
+from LeanPy.Structures.Expression.ExpressionDebug import *
 tag_to_expr_class = {c.__name__ : c for c in expr_constructors}
 
 from LeanPy.Structures.Environment.Declarations.Declaration import *
