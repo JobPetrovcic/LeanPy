@@ -78,3 +78,29 @@ def test_normalize6():
     assert isinstance(nt, LevelZero), f"Expected {LevelZero()} but got {nt}"
 
     assert is_equivalent(t, LevelZero()), f"Expected {nt} but got {t}"
+
+def test_normalize7():
+    # imax (u_2 + 1) (u_1 + 1) + 1 = max (u_2 + 2) (u_1 + 2)
+    u_1 = create_name("u_1")
+    u_2 = create_name("u_2")
+    t1 = LevelSucc(LevelIMax(LevelSucc(LevelParam(u_2)), LevelSucc(LevelParam(u_1))))
+    
+    nt1 = normalize(t1)
+
+    t2 = LevelMax(LevelSucc(LevelSucc(LevelParam(u_2))), LevelSucc(LevelSucc(LevelParam(u_1))))
+    nt2 = normalize(t2)
+
+    print(nt1)
+    print(nt2)
+
+    assert nt1.totally_equal(nt2), f"Expected {nt2} but got {nt1}"
+
+def test_noramlize8():
+    # max (u_1 + 1) (u_2 + 1) + 1 = max (u_1 + 2) (u_2 + 2)
+    u_1 = create_name("u_1")
+    u_2 = create_name("u_2")
+    t1 = LevelSucc(LevelMax(LevelSucc(LevelParam(u_1)), LevelSucc(LevelParam(u_2))))
+    t2 = LevelMax(LevelSucc(LevelSucc(LevelParam(u_1))), LevelSucc(LevelSucc(LevelParam(u_2))))
+    nt1 = normalize(t1)
+    nt2 = normalize(t2)
+    assert nt1.totally_equal(nt2), f"Expected {nt2} but got {nt1}"

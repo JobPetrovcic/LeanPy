@@ -117,7 +117,7 @@ def normalize(l : Level) -> Level:
     elif isinstance(r, LevelZero) or isinstance(r, LevelParam): return l
     elif isinstance(r, LevelIMax):
         im = make_imax(normalize(r.lhs), normalize(r.rhs))
-        if not isinstance(im, LevelIMax): im = normalize(im) # this is not in the original code and I am unsure why not
+        if not isinstance(im, LevelIMax): return normalize(from_offset(im, offset)) # this is not in the original code and I am unsure why not
         return from_offset(im, offset)
     elif isinstance(r, LevelMax):
         todo : List[Level] = []
