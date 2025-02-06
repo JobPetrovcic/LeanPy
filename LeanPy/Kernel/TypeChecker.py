@@ -1137,17 +1137,17 @@ class TypeChecker:
 
         e = let
         while isinstance(e, Let):
-            val_type = self.instantiate_multiple(e.domain, fvars[::-1])
+            l_type = self.instantiate_multiple(e.domain, fvars[::-1])
             val = self.instantiate_multiple(e.val, fvars[::-1])
-            fvars.append(self.create_fvar(e.bname, val_type, val=val, is_let=True))
+            fvars.append(self.create_fvar(e.bname, l_type, val=val, is_let=True))
             vals.append(val)
 
             if not infer_only:
-                self.ensure_sort(self.infer_core(val_type, infer_only))
+                self.ensure_sort(self.infer_core(l_type, infer_only))
                 inferred_val_type = self.infer_core(val, infer_only)
 
-                if not self.def_eq(val_type, inferred_val_type):
-                    raise ExpectedEqualExpressionsError(val_type, inferred_val_type)
+                if not self.def_eq(inferred_val_type, l_type):
+                    raise ExpectedEqualExpressionsError(inferred_val_type, l_type)
             
             e = e.body
         
@@ -1158,7 +1158,7 @@ class TypeChecker:
 
         mark_used(fvars, r, used)
         for i in range(len(fvars)-1, -1, -1):
-            if not used[i]: # if the i-th fvar is not used in the r (the body of the let binding) then we don't need to check which other fvars are used in the value of it
+            if used[i]: # if the i-th fvar is not used in the r (the body of the let binding) then we don't need to check which other fvars are used in the value of it
                 # go through and mark all the fvars that are used in the value of the i-th let binding
                 # since for i-th fvars i+1, ..., n-th fvars are not used, we don't need to check them
                 mark_used(fvars[:i], vals[i], used)
