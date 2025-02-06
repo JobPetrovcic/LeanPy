@@ -17,6 +17,9 @@ class MetaInfo:
     def add_func_that_changed(self, func_name : str):
         self.func_that_changed.append(func_name)
 
+    def __str__(self) -> str:
+        return f"MI({self.func_that_changed})"
+
 class Expression:
     #@typechecked
     def __init__(self, meta_info : Optional[MetaInfo] = None):
@@ -51,6 +54,10 @@ class Expression:
     @abstractmethod
     def __str__(self) -> str:
         raise NotImplementedError(f"Method __str__ not implemented for clas {self.__class__.__name__}")
+    
+    def __debug_str__(self) -> str:
+        ds = self.__str__() + f"<--{self.meta_info}"
+        return f"({ds})"
     
     @abstractmethod
     def totally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:

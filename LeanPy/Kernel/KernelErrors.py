@@ -1,6 +1,6 @@
 from typing import Type
 from LeanPy.Structures.Environment.LocalContext import LocalContext
-from LeanPy.Structures.Expression.ExpressionDebug import Expression
+from LeanPy.Structures.Expression.ExpressionDebug import *
 
 class PanicError(Exception):
     def __init__(self, message : str):
@@ -18,7 +18,7 @@ class ExpectedEqualExpressionsConstructorsError(KernelError):
 
 class ExpectedEqualExpressionsError(KernelError):
     def __init__(self, expected : Expression, got : Expression, local_context : LocalContext | None = None):
-        super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}" + (f"\nLocal context:\n{local_context}" if local_context is not None else ""))
+        super().__init__(f"Expected type\n\t{expected.__debug_str__()}\nbut got\n\t{got.__debug_str__()}" + (f"\nLocal context:\n{local_context}" if local_context is not None else ""))
 
 class ProjectionError(KernelError):
     def __init__(self, message : str):
