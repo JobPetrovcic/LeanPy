@@ -6,7 +6,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         'typeguard',
-        'typing_extensions'
+        'typing_extensions',
+        'tqdm'
     ],
     extras_require={
         'dev': ['mypy', 'pytest', 'stubgen'],
