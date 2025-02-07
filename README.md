@@ -1,6 +1,6 @@
-# PyLean
+# LeanPy
 
-PyLean is an external Python typechecker for Lean 4.
+LeanPy is an external Python typechecker for Lean 4.
 
 ## Installation
 
