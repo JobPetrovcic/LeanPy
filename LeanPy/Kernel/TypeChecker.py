@@ -1,4 +1,3 @@
-import sys
 from typing import List, Optional, Sequence, Tuple
 from LeanPy.Kernel.Cache.Cache import InferCache, PairCache, WHNFCache # TODO: Pair cache is redundant, can be replace by map from tuple to value
 from LeanPy.Kernel.Cache.EquivManager import EquivManager, FailureCache
@@ -44,23 +43,37 @@ class TypeChecker:
         self.local_context.remove_fvar(fvar)
 
     def create_fvar(self, name: Name, type: Expression, val : Optional[Expression], is_let : bool) -> FVar:
+        """
+        Creates an FVar and adds it to the local context. It should have a value iff is_let is True.
+        """
         fvar = FVar(name, type, val, is_let=is_let)
         self.local_context.add_fvar(fvar)
         return fvar
     
     def cleanup_fvars(self, fvars : List[FVar]):
+        """
+        Removes the fvars from the local context. Note that the fvars should be in the order of the outermost bound variable to the innermost bound variable.
+        """
         for fvar in fvars[::-1]:
             self.remove_fvar(fvar)
     
     def get_type_of_fvar(self, fvar : FVar) -> Expression:
+        """
+        Returns the type of the fvar and makes sure that the fvar is in the local context.
+        """
         return self.local_context.get_fvar_type(fvar)
     
     def get_value_of_fvar(self, fvar : FVar) -> Optional[Expression]:
+        """
+        Returns the value of the fvar and makes sure that the fvar is in the local context.
+        """
         return self.local_context.get_fvar_value(fvar)
     
     def instantiate(self, body : Expression, val : Expression) -> Expression:
         """
-        Replace the outermost bound variable in the body with the value. Clones the body(!).
+        Replace the outermost bound variable in the body with the value. 
+        IMPORTANT:
+        - it does NOT do this in place, but instead creates new nodes when some of its children were replaced.
         """
         cached_inst_body = self.instantiation_cache.get(body, val)
         if cached_inst_body is not None: 
@@ -72,8 +85,10 @@ class TypeChecker:
     
     def instantiate_multiple(self, body : Expression, vals : Sequence[Expression]) -> Expression:
         """
-        Replace the outermost bound variables in the body with the values. Clones the body(!).
-        IMPORTANT: vals should be in order of the innermost bound variable to the outermost bound variable.
+        Replace the outermost bound variables in the body with the values. 
+        IMPORTANT:
+        - it does NOT do this in place, but instead creates new nodes when some of its children were replaced,
+        - vals should be in order of the innermost bound variable to the outermost bound variable.
         """
         vals_tuple = tuple(vals)
         cached_inst_body = self.instantiation_multiple_cache.get(body, vals_tuple)
@@ -101,6 +116,9 @@ class TypeChecker:
         return subst_expr
     
     def get_declaration_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level]) -> Expression:
+        """
+        Substitute the level parameters in the declaration type with the levels. 
+        """
         if len(decl.lvl_params) != len(subs):
             raise DeclarationError(f"""
             Declaration {decl.name} has {len(decl.lvl_params)} level parameters, but {len(subs)} substitutions were provided.
@@ -111,6 +129,9 @@ class TypeChecker:
         return self.subst_level_params(decl.type, decl.lvl_params, subs)
     
     def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level]) -> Expression:
+        """
+        Substitute the level parameters in the declaration value with the levels.
+        """
         if len(decl.lvl_params) != len(subs):
             raise DeclarationError(f"""
             Declaration {decl.name} has {len(decl.lvl_params)} level parameters, but {len(subs)} substitutions were provided.
@@ -120,7 +141,10 @@ class TypeChecker:
             """)
         return self.subst_level_params(decl.value, decl.lvl_params, subs)
     
-    def ensure_pi(self, expr : Expression) -> Pi: # CHECKED
+    def ensure_pi(self, expr : Expression) -> Pi:
+        """
+        Ensures that the expression is a Pi type. If this is not immediate it tries reducing it using whnf. Throws an error if the expression is not a Pi type.
+        """
         if isinstance(expr, Pi): 
             return expr
         
@@ -131,6 +155,10 @@ class TypeChecker:
             raise ExpectedEqualExpressionsConstructorsError(Pi, whnfed_expr.__class__)
     
     def ensure_sort(self, e : Expression) -> Sort:
+        """
+        Ensures that the expression is a Sort. If this is not immediate it tries reducing it using whnf. Throws an error if the expression is not a Sort.
+        """
+
         if isinstance(e, Sort): 
             return e
         whnfd_e = self.whnf(e)
@@ -140,12 +168,18 @@ class TypeChecker:
         raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__)
     
     def is_structure_like(self, decl_name : Name) -> bool:
+        """
+        A structure is an inductive type with only on constructor, with no indices, and no recursive arguments.
+        """
         decl = self.environment.get_declaration_under_name(decl_name)
         if not isinstance(decl, Inductive): 
             return False
         return decl.number_of_constructors == 1 and decl.num_indices == 0 and not decl.is_recursive
     
     def is_prop(self, e : Expression, cheap_rec : bool = False, cheap_proj : bool = False) -> bool:
+        """
+        Returns if an expressions is a proposition. A proposition is a type that is a sort with level 0.
+        """
         if cheap_rec:
             inferred_type = self.whnf_core(self.infer_core(e, infer_only=(self.allow_unstrict_infer and True)), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         else:
@@ -154,6 +188,9 @@ class TypeChecker:
     
     # DEFINITIONAL EQUALITY
     def def_eq_offset(self, t : Expression, s : Expression) -> Optional[bool]:
+        """
+        Checks if the expressions representing natural numbers are equal (either in NatLit form or as an application of Nat.zero or Nat.succ).
+        """
         if is_nat_zero(self.environment, t) and is_nat_zero(self.environment, s):
             return True
         pred_t = is_nat_succ(self.environment, t)
@@ -163,23 +200,25 @@ class TypeChecker:
         return None
 
     def def_eq_sort(self, l : Sort, r : Sort) -> bool:
-        """Sorts are equal if their levels satisfy antisymmetry.
-        The comparsion function does not change anything, so def_eq_sort is safe to use when passing by reference.
+        """
+        The sorts are definitonally equal if their levels are considered equivalent.
         """
         return is_equivalent(l.level, r.level)
     
     def def_eq_const(self, l : Const, r : Const) -> bool:
         """
         If the names are the same, and the level parameters are equal, then the constants are equal.
-        Since nothing is changed, this function is safe to use when passing by reference.
         """
         if l.cname == r.cname:
             if is_equivalent_list(l.lvl_params, r.lvl_params): 
                 return True
-            else: print(f"Constants {l} and {r} have the same name but different level parameters : {[str(lvl) for lvl in l.lvl_params]} and {[str(lvl) for lvl in r.lvl_params]}", file=sys.stderr)
+            #else: print(f"Constants {l} and {r} have the same name but different level parameters : {[str(lvl) for lvl in l.lvl_params]} and {[str(lvl) for lvl in r.lvl_params]}", file=sys.stderr)
         return False
     
     def def_eq_app(self, l : App, r : App) -> bool:
+        """
+        Check if the applications are equal by checking if the functions are definitionally equal and the arguments are definitionally equal.
+        """
         f_fn, f_args = unfold_app(l)
         g_fn, g_args = unfold_app(r)
         if not self.def_eq(f_fn, g_fn):
@@ -193,6 +232,9 @@ class TypeChecker:
         return True
 
     def def_eq_pi(self, init_t : Pi , init_s : Pi) -> bool:
+        """
+        Check if the Pis are equal by checking if the domains are equal (first it tries greedy structural equality, then it tries definitional equality) and then checking if the codomains are definitionally equal.
+        """
         subs : List[FVar] = []
     
         t : Expression = init_t
@@ -220,6 +262,10 @@ class TypeChecker:
         return ret
     
     def def_eq_lambda(self, init_it : Lambda , init_s : Lambda) -> bool:
+        """
+        Check if the Lambdas are equal by checking if the domains are equal (first it tries greedy structural equality, then it tries definitional equality) and then checking if the bodies are definitionally equal.
+        """
+
         subs : List[FVar] = []
     
         t : Expression = init_it
@@ -246,6 +292,9 @@ class TypeChecker:
         return ret
 
     def are_struct_eq_exprs(self, a : Expression, b : Expression, use_hash : bool) -> bool:
+        """
+        This function checks if two expressions are structurally equal OR if they have been found to be equal by the equivalence manager.
+        """
         if a is b: 
             return True
         if use_hash and a.hash != b.hash: 
@@ -285,6 +334,9 @@ class TypeChecker:
         return result
 
     def def_eq_easy(self, l: Expression, r: Expression, use_hash : bool = False) -> Optional[bool]:
+        """
+        If the expressions are easily compared (Sort, BVar, Const, FVar, App, Lambda, Pi, NatLit, StrLit), then this function compares them. Otherwise, it returns None and expressions are compared using def_eq_core.
+        """
         if self.are_struct_eq_exprs(l, r, use_hash): 
             return True
 
@@ -305,7 +357,9 @@ class TypeChecker:
             return l.val == r.val
 
     def def_eq_proof_irrel(self, t : Expression, s : Expression) -> Optional[bool]:
-        """ Proof irrelevance support for propositions. If two expressions have equal types, and the types are proposition, then the expressions are considered equal. """
+        """ 
+        Proof irrelevance support for propositions. If two expressions have equal types (i. e. proposition statements), and the types are proposition, then the expressions are considered equal. 
+        """
         t_type = self.infer_core(t, infer_only=(self.allow_unstrict_infer and True))
         if not self.is_prop(t_type):
             return None
@@ -313,6 +367,10 @@ class TypeChecker:
         return self.def_eq(t_type, s_type)
     
     def def_eq_unit_like(self, t : Expression, s : Expression) -> bool:
+        """
+        If the expressions are both of a structure with no fields, then they are equal if their types are equal.
+        """
+
         t_type = self.whnf(self.infer_core(t, infer_only=(self.allow_unstrict_infer and True)))
         inductive_const = get_app_function(t_type)
 
@@ -329,6 +387,20 @@ class TypeChecker:
         return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)))
     
     def def_eq_core(self, l: Expression, r: Expression) -> bool:
+        """
+        The main function for checking definitional equality. It tries to compare the expressions in multiple stages:
+        1. It tries to compare in the easy cases (see def_eq_easy)
+        2. If the expressions are not easily compared, then they are reduced to weak head normal form and compared.
+        3. proof irrelevance is tried
+        4. lazy delta reduction is tried (reducing the expressions by unfolding definitions and compares when it looks promising)
+        5. If the expressions are constants, fvars, or projections, then they are compared naively.
+        6. They are more strongly reduced to weak head normal by also reducing projections and compared.
+        7. If the expressions are applications, then they are compared by comparing the functions and the arguments.
+        8. eta expansion is tried
+        9. structural eta expansion is tried
+        10. unit-like structures are compared
+        Finally, if none of the above steps return a definitive answer, then they are not considered equal (although in easy cases, the negative answer might be returned earlier).
+        """
         is_easy = self.def_eq_easy(l, r, use_hash=True)
         if is_easy is not None: 
             return is_easy
@@ -388,6 +460,9 @@ class TypeChecker:
         return False
     
     def def_eq(self, l: Expression, r: Expression) -> bool:
+        """
+        Same as def_eq_core, but also adds the expressions to the equivalence manager if they are equal.
+        """
         ret = self.def_eq_core(l, r)
         if ret: self.equiv_manager.add_equiv_expressions(l, r)
         return ret
@@ -395,7 +470,7 @@ class TypeChecker:
     # EXPANSIONS
     def try_eta_expansion_core(self, t : Expression, s : Expression) -> bool:
         """
-        Tries to eta expand s: if s is a function, then by eta expansion, it is equal to the expression "fun x => s x".
+        Tries to eta expand s: if s is a function, then by eta expansion, it is equal to the expression "fun x => s x". This is not symmetric.
         """
         if not (isinstance(t, Lambda) and (not isinstance(s, Lambda))): 
             return False
@@ -408,11 +483,15 @@ class TypeChecker:
     
     def try_eta_expansion(self, t : Expression, s : Expression) -> bool:
         """
-        Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y.
+        Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y. This is symmetric.
         """
         return self.try_eta_expansion_core(t, s) or self.try_eta_expansion_core(s, t)
     
-    def try_structural_eta_expansion_core(self, t : Expression, s : Expression) -> bool: # CHECKED
+    def try_structural_eta_expansion_core(self, t : Expression, s : Expression) -> bool:
+        """
+        If the t and s are applications of a constructor of a structure, then they are equal if the types are equal and the arguments are equal. This is done non-symmetrically: arguments of s are compared to projections of t (the projections then correspond to the arguments of t).
+        """
+
         # First part: deconstruct s, ensure it is an application of a constructor
         s_fn, s_args = unfold_app(s)
 
@@ -448,17 +527,26 @@ class TypeChecker:
         return True
     
     def try_structural_eta_expansion(self, t : Expression, s : Expression) -> bool:
+        """
+        Tries to eta expand s and compares it to t, then tries to eta expand t and compares it to s. This is symmetric.
+        """
         return self.try_structural_eta_expansion_core(t, s) or self.try_structural_eta_expansion_core(s, t)
     
 
     # CONSTRUCTORS
     def get_constructor(self, constructor_name : Name) -> Constructor:
+        """
+        Ensures that the declaration under the name is a constructor and returns it.
+        """
         decl = self.environment.get_declaration_under_name(constructor_name)
         if not isinstance(decl, Constructor):
             raise DeclarationError(f"Name {constructor_name} is not a constructor.")
         return decl
     
     def expand_eta_struct(self, e_type : Expression, e : Expression):
+        """
+        Tries to eta expand the expression e: it gets the first constructor of the structure, and then constructs the application of the constructor with the arguments replaced by projections of e to corresponding fields.
+        """
         fn, args = unfold_app(e_type)
         if not isinstance(fn, Const): 
             return e
@@ -475,6 +563,9 @@ class TypeChecker:
         return result
 
     def to_constructor_when_structure(self, inductive_name : Name, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
+        """
+        If e is an instance of a structure A, but is not seen to created using the constructor of A, then this function tries to convert e to the application of the (only) constructor of A.
+        """
         if not self.is_structure_like(inductive_name): 
             return e
 
@@ -493,6 +584,9 @@ class TypeChecker:
         return self.expand_eta_struct(e_type, e)
 
     def get_first_constructor(self, inductive_name : Name) -> Optional[Constructor]:
+        """
+        Gets the first constructor of the inductive type.
+        """
         decl = self.environment.get_declaration_under_name(inductive_name)
         if not isinstance(decl, Inductive): 
             return None
@@ -501,6 +595,9 @@ class TypeChecker:
         return self.get_constructor(decl.constructor_names[0])
     
     def mk_nullary_constructor(self, type_e : Expression, num_params : int) -> Optional[Expression]:
+        """
+        Auxiliary function for to_constructor_when_K. It constructs the application of the constructor of the inductive type supporting K-axiom. It reaplces the arguments of the type with that of the constructor. The main use case is for Eq type, see comments in to_constructor_when_K.
+        """
         d, args = unfold_app(type_e)
         if not isinstance(d, Const): 
             return None
@@ -513,18 +610,20 @@ class TypeChecker:
         return fold_apps(Const(cname=constructor.name, lvl_params=d.lvl_params), args)
 
     def to_constructor_when_K(self, recursor : Recursor, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
-        """See https://stackoverflow.com/questions/39239363/what-is-axiom-k
+        """
+        See https://stackoverflow.com/questions/39239363/what-is-axiom-k
         For datatypes that support K-axiom, given `e` an element of that type, we convert (if possible)
-        to the default constructor. For example, if `e : a = a`, then this method returns `eq.refl a` """
+        to the default constructor. For example, if `e : a = a`, then this method returns `eq.refl a` 
+        """
         assert recursor.isK, "Cannot apply K-axiom to a recursor that is not K."
         app_type = self.infer_core(e, infer_only=(self.allow_unstrict_infer and True))
         app_type = self.whnf_core(app_type, cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_rec else self.whnf(app_type)
-        app_type_inductive, app_type_args = unfold_app(app_type)
+        app_type_inductive, app_type_args = unfold_app(app_type) # get the arguments of the type
 
         if not isinstance(app_type_inductive, Const): 
             return e
-        if app_type_inductive.cname != recursor.get_major_induct(): 
-            return e # type incorrect
+        if app_type_inductive.cname != recursor.get_major_induct(): # type of the major premise for the recursor should be the inductive type of the application
+            return e
 
         # special handling of mvars
         if app_type.has_expr_mvars:
@@ -533,18 +632,23 @@ class TypeChecker:
                 if app_type_args[i].has_expr_mvars:
                     return e
 
+        # convert the expression to the application of the (only) constructor
         new_constructor_app = self.mk_nullary_constructor(app_type, recursor.num_params)
         if not new_constructor_app: 
             return e
         new_type = self.infer_core(new_constructor_app, infer_only=(self.allow_unstrict_infer and True))
 
+        # ensure that the type is preserved after the conversion
         if not self.def_eq(app_type, new_type): 
             return e
         return new_constructor_app
     
     # REDUCTIONS
 
-    def cheap_beta_reduce(self, e : Expression) -> Expression: 
+    def cheap_beta_reduce(self, e : Expression) -> Expression:
+        """
+        Tries to naively simplify the expression by removing the arguments that are not used in the body of the lambdas.
+        """
         if not isinstance(e, App): 
             return e
         fn, args = unfold_app(e)
@@ -558,10 +662,10 @@ class TypeChecker:
         
         if not fn.has_loose_bvars:
             return fold_apps(fn, args[i:])
-        elif isinstance(fn, BVar):
+        elif isinstance(fn, BVar): # the body is a single bound variable, so just replace it with the value of it args[i - fn.db_index - 1]
             if i <= fn.db_index:
-                raise PanicError(f"Unreachable code reached: i = {i} <= fn.db_index = {fn.db_index}.")
-            return fold_apps(args[i - fn.db_index - 1], args[i:])
+                raise UnboundVariableError(f"Unbound variable {fn} in the body of the lambda.")
+            return fold_apps(args[i - fn.db_index - 1], args[i:]) # fold back the rest of the arguments
         else:
             return e
 
@@ -586,7 +690,18 @@ class TypeChecker:
         return fold_apps(inst_f, rest_args)
     
     def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression]]]:
-        """Checks if the expression is delta reducible: if it is an application of a declaration, then it returns the declaration and the arguments. Otherwise, it returns None."""
+        """
+        Checks if the expression is delta reducible: if it is an application of a declaration, then it returns the Constant referring to the declaration, the declaration, and the arguments. Otherwise, it returns None.
+
+        Args:
+            expr : Expression
+                The expression to check if it is delta reducible.
+            
+        Returns:
+            Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression]]]
+                If the expression is delta reducible, then it returns the Constant referring to the declaration, the declaration, and the arguments. Otherwise, it returns None.
+
+        """
         fn, args = unfold_app(expr)
         if not isinstance(fn, Const): 
             return None
@@ -597,11 +712,28 @@ class TypeChecker:
         return fn, decl, args
     
     def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression:
+        """
+        Unfold the definition of the declaration and folds back the arguments.
+
+        Args:
+            fn : Const
+                The constant referring to the declaration.
+            decl : Definition | Opaque | Theorem
+                The declaration to unfold.
+            args : List[Expression]
+                The arguments of the application.
+
+        Returns:
+            Expression
+                The expression after the delta reduction.
+        """
         decl_val = self.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params)
         return fold_apps(decl_val, args)
     
     def delta_reduction(self, expr : Expression) -> Optional[Expression]:
-        """ Unfolds the applications of the expression. If the function is a declaration, then it unfolds it. """
+        """ 
+        Checks if the function of the application expr is a constant that can be unfolded, and if so, unfolds it.
+        """
         is_d = self.is_delta(expr)
         if is_d is None: 
             return None
@@ -609,7 +741,8 @@ class TypeChecker:
         return ret
     
     def reduce_proj_core(self, proj_struct : Expression, idx : int) -> Optional[Expression]:
-        """ If we have a projection of an expression that is an application of a constructor, then we reduce it to the corresponding argument of the constructor. 
+        """ 
+        If we have a projection of an expression that is an application of a constructor, then we reduce it to the corresponding argument of the constructor. 
         
         For example, proj 0 (Prod.mk (A) (B) (a : A) (b : B)) would be reduced to a. Note that in this case A B are parameters of the constructor, and a and b are the actual arguments, used in the projection.
         """
@@ -628,6 +761,9 @@ class TypeChecker:
         return proj_struct_args[constructor_decl.num_params + idx]
     
     def reduce_proj(self, proj : Proj, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]:
+        """
+        Reduces the projection by whnf-ing the expression and then checking the index-th argument using reduce_proj_core.
+        """
         idx = proj.index
         c = proj.expr
         # use whnf to unfold the definitions if cheap_proj is False
@@ -635,6 +771,9 @@ class TypeChecker:
         return self.reduce_proj_core(c, idx)
     
     def try_unfold_proj_app(self, e : Expression) -> Optional[Expression]: 
+        """
+        If the expression is an application of a projection, then it tries to reduce it using whnf_core, used only in lazy_delta_reduction_step.
+        """
         f = get_app_function(e)
         if not isinstance(f, Proj): 
             return None
@@ -644,6 +783,9 @@ class TypeChecker:
         return e_new
     
     def def_eq_args(self, t : Expression, s : Expression) -> bool:
+        """
+        Compares the arguments of the applications t and s.
+        """
         while isinstance(t, App) and isinstance(s, App):
             if not self.def_eq(t.arg, s.arg): 
                 return False
@@ -652,6 +794,19 @@ class TypeChecker:
         return (not isinstance(t, App)) and (not isinstance(s, App))
 
     def lazy_delta_reduction_step(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, ReductionStatus]:
+        """
+        Tries to unfold the definitions of the function of the applications t_n and s_n, and compare the results. This is done in a lazy way: it tries to compare the expressions if they can be compared easily, and if not, then it unfolds the definitions and compares the results. Priorities are given to unfolding application where the function is a projection. If both t_n and s_n are definitions to be unfolded it first unfold the one which has a more pressing reducibility hint. If both have the same reducibility hint, then it unfolds both.
+
+        Args:
+            t_n : Expression
+                The first expression to compare.
+            s_n : Expression
+                The second expression to compare.
+        
+        Returns:
+            Tuple[Expression, Expression, ReductionStatus]
+                The expressions after the reduction, and the status of the reduction.
+        """
         id_t = self.is_delta(t_n)
         id_s = self.is_delta(s_n)
 
@@ -690,6 +845,19 @@ class TypeChecker:
             return t_n, s_n, ReductionStatus.CONTINUE
 
     def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]:
+        """
+        Tries to compare the expressions t_n and s_n by unfolding the definitions of the functions of the applications. It loops until the expressions are equal, not equal, or definition unfolding will not help. 
+
+        Args:
+            t_n : Expression
+                The first expression to compare.
+            s_n : Expression
+                The second expression to compare.
+
+        Returns:
+            Tuple[Expression, Expression, Optional[bool]]
+                The expressions after the reduction, and the result of the comparison 
+        """
         while True:
             try_offset = self.def_eq_offset(t_n, s_n)
             if try_offset is not None:
@@ -722,6 +890,9 @@ class TypeChecker:
             else: raise PanicError("Unknown reduction status.")
 
     def lazy_delta_proj_reduction(self, t_n : Expression, s_n : Expression, idx : int) -> bool:
+        """
+        Tries to lazy delta reduce the projections of the expressions t_n and s_n as much as possible. If in the end they are applications of projections, then it tries to reduce the projections using reduce_proj_core and compares the results.
+        """
         while True:
             t_n, s_n, status = self.lazy_delta_reduction_step(t_n, s_n)
             if status is ReductionStatus.CONTINUE: continue
@@ -736,6 +907,9 @@ class TypeChecker:
                 return self.def_eq_core(t_n, s_n)
     
     def reduce_nat_lit(self, e : Expression) -> Optional[Expression]:
+        """
+        If the expression is natural number (without free variables), then it tries to get the value of it using Python's built-in functions: +, -, *, **, etc to speed up computations.
+        """
         if e.has_fvars: 
             return None
         
@@ -792,6 +966,9 @@ class TypeChecker:
         return None
     
     def quot_reduce_rec(self, e : Expression) -> Optional[Expression]:
+        """
+        Built in reduction for quotient recursor.
+        """
         fn, args = unfold_app(e)
         if not isinstance(fn, Const): 
             return None
@@ -828,6 +1005,9 @@ class TypeChecker:
         return r
     
     def inductive_reduce_rec(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]:
+        """
+        Reduce the recursor application for inductive types.
+        """
         # Second unfold the application and get the recursor
         rec_fn, rec_args = unfold_app(e)
         if not isinstance(rec_fn, Const): 
@@ -837,15 +1017,18 @@ class TypeChecker:
         if not isinstance(rec_decl, Recursor): 
             return None
 
-        major_index = rec_decl.get_major_index()
+        major_index = rec_decl.get_major_index() # the position of the major premise
 
         if major_index >= len(rec_args): 
             return None
-        major = rec_args[major_index]
+        major = rec_args[major_index] # the arguments of the major premise
 
+        # if K-axiom is enabled, then we try to convert the major premise to the (only) constructor, see to_constructor_when_K
         if rec_decl.isK:
             major = self.to_constructor_when_K(rec_decl, major, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
 
+        # if the major premise is a literal, then we convert it to the corresponding constructor
+        # if it is a structure, then we convert it to the (only) constructor, see to_constructor_when_structure
         major = self.whnf_core(major, cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_rec else self.whnf(major) 
         if isinstance(major, NatLit):
             major = nat_lit_to_constructor(self.environment, major)
@@ -869,8 +1052,6 @@ class TypeChecker:
         assert rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors < len(rec_args), "Recursor application does not have enough arguments."
         rhs = fold_apps(rhs, rec_args[:rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors]) # this is the actual reduction of the recursor
 
-        #TODO : find what is the difference between params and indices
-
         # TODO: The number of parameters in the constructor is not necessarily
         #equal to the number of parameters in the recursor when we have
         #nested inductive types. 
@@ -888,6 +1069,9 @@ class TypeChecker:
         return rhs
     
     def reduce_recursor(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]:
+        """
+        Tries to reduce the recursor application (either quotient or inductive).
+        """
         # First check if it is a quotient recursor and can be reduced
         r = self.quot_reduce_rec(e)
         if r is not None:
@@ -901,6 +1085,9 @@ class TypeChecker:
         return None
 
     def reduce_native(self, e : Expression) -> Optional[Expression]:
+        """
+        TODO
+        """
         if not isinstance(e, App): 
             return None
         if not isinstance(e.arg, Const): 
@@ -924,6 +1111,9 @@ class TypeChecker:
 
     # WHNF
     def whnf_fvar(self, fvar : FVar, cheap_rec : bool, cheap_proj : bool) -> Expression:
+        """
+        Reduces the value of the free variable to weak head normal form.
+        """
         fvar_val = self.get_value_of_fvar(fvar) 
         if fvar_val is None:
             return fvar
@@ -931,6 +1121,20 @@ class TypeChecker:
             return self.whnf_core(fvar_val, cheap_rec=cheap_rec, cheap_proj=cheap_proj) 
 
     def whnf_core(self, expr : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
+        """
+        The main function that reduces the expression to weak head normal form:
+        - expressions that are already in whnf (BVar, Sort, MVar, Pi, Lambda, NatLit, StrLit, Const) are returned as is
+        - if it is a let fvar, then it reduces the value of the fvar
+        - checks cache for the result of more complex expressions,
+        - if it is a projection, then it tries to reduce it using reduce_proj,
+        - if it is an application it splits cases:
+            - if the function is a lambda, then it beta reduces the application,
+            - if the function is actaully an application of a recursor, then it tries to reduce it using reduce_recursor,
+            - otherwise, it tries to reduce the function and the arguments and then fold them back and whnf further,
+            - if it is a let, then it instantiates the body with the value and whnfs further.
+        
+        Caches the results of the more complex expressions when cheap_rec and cheap_proj are False.
+        """
         if isinstance(expr, BVar) or isinstance(expr, Sort) or isinstance(expr, MVar) or isinstance(expr, Pi) or isinstance(expr, Lambda) or isinstance(expr, NatLit) or isinstance(expr, StrLit) or isinstance(expr, Const): 
             return expr
         elif isinstance(expr, FVar):
@@ -991,20 +1195,24 @@ class TypeChecker:
         # harder cases
         t = e
         while True:
+            # first try to get whnf without unfolding definitions
             t1 = self.whnf_core(t, cheap_rec=False, cheap_proj=False)
 
+            # if the expression is an application of a signal from lean to use Python's built in functions for faster computation for bools and nats
             v = self.reduce_native(t1)
             if v is not None:
                 # cache the result of native reduction
                 self.whnf_cache.put(e, v)
                 return v
 
+            # if the expressions is nat it tries to reduce it using Python's built-in functions
             v = self.reduce_nat_lit(t1)
             if v is not None: 
                 # cache the result of nat_lit reduction
                 self.whnf_cache.put(e, v)
                 return v
-            
+
+            # Finally try to unfold definitions
             next_t = self.delta_reduction(t1)
             if next_t is not None:
                 t = next_t
@@ -1016,9 +1224,15 @@ class TypeChecker:
 
     # INFERENCE
     def infer_fvar(self, fvar : FVar):
+        """
+        Return the type belonging to the free variable.
+        """
         return self.get_type_of_fvar(fvar)
     
     def infer_app(self, app : App, infer_only : bool) -> Expression:
+        """
+        Infers the type of the application. Splits two cases not infer_only and infer_only. If infer_only is False, then it checks that the type of the function is a pi type and that the argument matches the domain of the function. If infer_only is True, then it only checks that the type of the function is a pi type and keeps substituting the arguments into the function type's codomain as deep as possible.
+        """
         if not infer_only:
             # the function should be a pi type
             fn_type = self.ensure_pi(self.infer_core(app.fn, infer_only=(self.allow_unstrict_infer and infer_only)))
@@ -1050,9 +1264,22 @@ class TypeChecker:
             return self.instantiate_multiple(fn_type, args[j:][::-1])
             
     def infer_sort(self, sort : Sort) -> Expression:
+        """
+        The type of Sort l is Sort (l+1).
+        """
         return Sort(LevelSucc(sort.level))
     
     def infer_pi(self, pi : Pi, infer_only : bool) -> Expression:
+        """
+        Infers the type of the pi type. If pi is of the form (a_1 : A_1) ->( a_2 : A_2) -> ... -> (a_n : A_n) -> B, then the type of the pi is a sort with level
+            imax lvl(type(A_1)) (imax lvl(type(A_2)) (... imax lvl(type(A_n)) lvl(type(B)) ...))
+        
+        where imax is the impredicative maximum, defined as:
+
+        imax l m = \\begin{cases} 0 & \\text{if } m = 0 \\\\ max l m & \\text{if } m \\neq 0 \\end{cases}.
+
+        The intuition for this definition is that if B is a proposition then the whole pi is a proposition.
+        """
         fvars : List[FVar] = []
         us : List[Level] = []
         e = pi
@@ -1074,11 +1301,24 @@ class TypeChecker:
         return Sort(level=lvl)
     
     def infer_const(self, c : Const) -> Expression:
+        """
+        The type of a constant is the type of the declaration of the constant.
+        """
         if len(c.lvl_params) != len(self.environment.get_declaration_under_name(c.cname).lvl_params):
             raise PanicError("The number of level parameters of the constant does not match the number of level parameters in the environment.")
         return self.get_declaration_type_with_substituted_level_params(self.environment.get_declaration_under_name(c.cname), c.lvl_params)
 
     def make_pi_binding(self, fvars : List[FVar], b : Expression) -> Expression:
+        """
+        If we have a body with free variables fvars, then we abstract the body, replacing the free variables with bound variables, and then create Pi bindings corresponding to the bound variables. Also abstracts the domains of the pi bindings.
+
+        Args:
+            fvars : List[FVar]
+                The list of free variables to be abstracted.
+            b : Expression
+                The body of the pi binding to be abstracted.
+        """
+
         r = abstract_multiple_bvars(fvars[::-1], b)
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
@@ -1089,6 +1329,9 @@ class TypeChecker:
         return r
 
     def infer_lambda(self, lam : Lambda, infer_only : bool) -> Expression:
+        """
+        The type of a lambda is the pi type with the same domain and codomain the type of the body of the lambda. The function also tries to cheaply reduce the number of free variables in the body of the lambda.
+        """
         fvars : List[FVar] = []
         e = lam
 
@@ -1110,12 +1353,21 @@ class TypeChecker:
         return r
     
     def infer_nat_lit(self, n : NatLit) -> Expression:
+        """
+        The type of a natural number literal is Nat.
+        """
         return Const(self.environment.Nat_name, [])
     
     def infer_string_lit(self, s : StrLit) -> Expression:
+        """
+        The type of a string literal is String.
+        """
         return Const(self.environment.String_name, [])
 
     def make_let_binding(self, fvars : List[FVar], b : Expression) -> Expression:
+        """
+        If we have a body with free variables fvars, then we abstract the body, replacing the free variables with bound variables, and then create Let bindings corresponding to the bound variables (if they are present in the abstracted body). Also abstracts the domains and values of the let bindings. 
+        """
         r = abstract_multiple_bvars(fvars[::-1], b)
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
@@ -1130,6 +1382,11 @@ class TypeChecker:
         return r
     
     def infer_let(self, let : Let, infer_only : bool) -> Expression:
+        """
+        The type of a let binding is the type of the body of the let binding where the value of the let binding is substituted for the bound variable in the body. The function tries to do this as deep as possible. It tries to cheaply reduce the number of lets in the body of the inferred type.
+
+        If infer_only is False, then it checks that the type of the value of the let binding is equal to the domain of the let binding, and that the domain is a sort. 
+        """
         fvars : List[FVar] = []
         vals : List[Expression] = []
 
@@ -1173,6 +1430,9 @@ class TypeChecker:
 
 
     def infer_proj(self, proj : Proj, infer_only : bool) -> Expression:
+        """
+        The type of the projections is the type of the i-th field of the constructor of the structure. First it get the structure name and the corresponding constructor. Then it instantiates the arguments into the constructor until the i-th field is reached. Finally it returns the type of the i-th field. If the projection is a proposition, then it checks that it remains a proposition during the instantiation process. 
+        """
         struct_type = self.infer_core(proj.expr, infer_only=(self.allow_unstrict_infer and infer_only))
         struct_type = self.whnf(struct_type)
 
@@ -1240,12 +1500,12 @@ class TypeChecker:
 
     def infer_core(self, expr : Expression, infer_only : bool) -> Expression:
         """
-        The main TC function: infers the type of an expression. If inference fails it raises an error. 
+        The main type checking function: infers the type of an expression. If inference fails it raises an error. It also caches the results of the inference.
         Note that infer_core (infer_core expr) results in a Sort expression.
 
         Args:
             expr : Expression : The expression to infer the type of.
-            infer_only : bool : If we know an expression is well-typed, we can use the `InferOnly` flag to skip some parts of the inference and checking.
+            infer_only : bool : If we know an expression is well-typed, we can use the `infer_only` flag to skip some parts of the inference for performance reasons when we know that the expresssion is well-typed. 
         
         Returns:
             Expression : The inferred type of the expression.
@@ -1293,6 +1553,9 @@ class TypeChecker:
         return inferred_type
     
     def clear_caches(self):
+        """
+        Clears all the caches in the type checker. Recommended to call this after each call to infer.
+        """
         self.whnf_cache.clear()
         self.whnf_core_cache.clear()
         self.infer_cache[False].clear()
@@ -1304,6 +1567,10 @@ class TypeChecker:
         self.lvl_param_subst_cache.clear()
 
     def infer(self, expr : Expression, clear_caches : bool = True) -> Expression:
+        """
+        A wrapper around infer_core that checks if the local context is empty before inferring the type of the expression. It also clears the caches if clear_caches is True.
+        """
+
         if not self.local_context.is_empty():
             raise PanicError(f"Local context is not empty when inferring: {self.local_context}")
         
@@ -1315,6 +1582,13 @@ class TypeChecker:
     
     # DECLARATION CHECKING
     def check_declaration_info(self, decl : Declaration):
+        """
+        Checks the declaration info of a declaration:
+        - the level parameters must be unique
+        - the type must not contain free variables
+        - the type must be well-formed
+        - the inferred sort of the type must be a sort
+        """
         if not are_unique_level_params(decl.lvl_params):
             raise EnvironmentError(f"Level parameters in declaration info {decl.info} are not unique.")
         if decl.type.has_fvars:
@@ -1324,6 +1598,9 @@ class TypeChecker:
         self.ensure_sort(inferred_sort)
         
     def check_declaration_value(self, decl : Declaration):
+        """
+        Checks that the declaration value is well-typed and it is definitionally equal to the expected type provided by the declaration info.
+        """
         if not (isinstance(decl, Definition) or isinstance(decl, Theorem) or isinstance(decl, Opaque)):
             raise DeclarationError(f"Declaration {decl} is not a Definition, Theorem, or Opaque, when checking declaration value. It is a {decl.__class__.__name__}.")
 
@@ -1332,27 +1609,48 @@ class TypeChecker:
             raise DeclarationError(f"Declaration {decl} ({decl.__class__.__name__}) has type {decl.info.type} but inferred type {inferred_type}") 
 
     def check_definition(self, d : Definition):
+        """
+        Checks the definition by checking its declaration info and value.
+        """
         self.check_declaration_info(d)
         self.check_declaration_value(d)
 
     def check_theorem(self, t : Theorem):
+        """
+        Checks the theorem by checking its declaration info and value.
+        """
         self.check_declaration_info(t)
         self.check_declaration_value(t)
 
     def check_opaque(self, o : Opaque):
+        """
+        Checks the opaque declaration by checking its declaration info and value.
+        """
         self.check_declaration_info(o)
         self.check_declaration_value(o)
 
     def check_axiom(self, a : Axiom):
+        """
+        Checks the axiom by checking its declaration info. Axioms do not have values.
+        """
         self.check_declaration_info(a)
     
     def check_inductive(self, ind : Inductive):
+        """
+        Checks the inductive type. This is the only instance in the Lean 4 where the dependencies form a cycle. See check_inductive_declaration_infos for more information.
+        """
         self.check_inductive_declaration_infos(ind.name)
 
     def check_constructor(self, constructor : Constructor):
+        """
+        Checks the constructor by checking. Since it is one of the dependencies of the inductive type, it is checked using check_inductive_declaration_infos.
+        """
         self.check_inductive_declaration_infos(constructor.inductive_name)
 
     def number_of_added_constructors(self, inductive_decl : Inductive) -> int:
+        """
+        Get the number of constructors present in the environment that are associated with the inductive type.
+        """
         count = 0
         for constructor_name in inductive_decl.constructor_names:
             if self.environment.exists_declaration_under_name(constructor_name):
@@ -1362,6 +1660,9 @@ class TypeChecker:
         return count
     
     def check_quotient(self, q : Quot):
+        """
+        Checks the quotient by checking its declaration info. Quotients do not have values.
+        """
         self.check_declaration_info(q)
     
     def check_inductive_declaration_infos(self, inductive : Name):
@@ -1405,6 +1706,9 @@ class TypeChecker:
         self.environment.checking_inductive = False # CHANGES INDUCTIVE, BUT THIS IS OK
 
     def check_recursor(self, recursor : Recursor):
+        """
+        Checks the recursor by checking its declaration info and the recursor rules. The recursor rules are only checked for the presence of the associated constructors; their types are not checked.
+        """
         self.check_declaration_info(recursor)
 
         for rec_rule in recursor.recursor_rules:
@@ -1413,6 +1717,9 @@ class TypeChecker:
                 raise DeclarationError(f"Recursor rule {rec_rule} is not associated with a constructor; found {constructor_decl.__class__.__name__} with name {constructor_decl.info.ciname} instead.")
 
     def check_declaration(self, decl : Declaration):
+        """
+        The main function that checks the declaration. It splits the cases based on the type of the declaration and calls the appropriate check function.
+        """
         print(f"Checking declaration {decl.name}")
         if isinstance(decl, Definition): self.check_definition(decl)
         elif isinstance(decl, Theorem): self.check_theorem(decl)

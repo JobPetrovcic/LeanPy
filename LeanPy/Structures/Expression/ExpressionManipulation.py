@@ -78,7 +78,9 @@ def replace_expression_w_depth_aux(
         depth : int,
         replace_cache : Dict[Tuple[Expression, int], Expression]
     ) -> Expression:
-
+    """
+    Recursively replaces subexpressions in the given expression using the given function. 
+    """
     # first check if we have already replaced this expression
     key = (expr, depth)
     if key in replace_cache: return replace_cache[key]
@@ -160,6 +162,9 @@ def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int
     return replace_expression_w_depth_aux(expr, fn, depth, {})
 
 def do_fn_aux(e : Expression, visited : Set[Expression], fn : Callable[[Expression], None]):
+    """
+    Auxiliary function for do_fn. Recursively applies the given function to the expression and its subexpressions. Caches the visited expressions to avoid exponential blowup.
+    """
     if e in visited: return
     fn(e)
     visited.add(e)
@@ -230,6 +235,9 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
     return replace_expression_w_depth(body, instantiation_fn, 0)
 
 def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
+    """
+    Turns fvar into a bound variable in the given expression.
+    """
     # turns fvar into a bound variable with de Bruijn index depth
     assert not fvar.type.has_loose_bvars, f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}"
     if fvar.val is not None:
@@ -244,6 +252,9 @@ def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     return replace_expression_w_depth(body, abstraction_fn, 0)
 
 def abstract_multiple_bvars(fvars : List[FVar], body : Expression) -> Expression:
+    """
+    Turns all fvars into bound variables in the given expression with indices determined by the order in the list (+ offset).
+    """
     for fvar in fvars:
         assert not fvar.type.has_loose_bvars, f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}"
         if fvar.val is not None:
@@ -258,7 +269,9 @@ def abstract_multiple_bvars(fvars : List[FVar], body : Expression) -> Expression
     return replace_expression_w_depth(body, replace_fn, 0)
 
 def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression]]:
-    """ If expr is of form (... ((f a1) a2) ... an), returns f, [a1, a2, ..., an]. """
+    """ 
+    If expr is of form (... ((f a1) a2) ... an), returns f, [a1, a2, ..., an]. 
+    """
     fn, args = unfold_app_rev(expr)
     return fn, list(reversed(args))
 
@@ -272,30 +285,42 @@ def unfold_app_rev(expr : Expression) -> Tuple[Expression, List[Expression]]:
     return fn, args
 
 def get_app_function(expr : Expression) -> Expression:
-    """ If expr is of form (... ((f a1) a2) ... an), returns f. """
+    """ 
+    If expr is of form (... ((f a1) a2) ... an), returns f. 
+    """
     while isinstance(expr, App):
         expr = expr.fn
     return expr
 
 def fold_apps(fn : Expression, args : List[Expression]) -> Expression:
-    """ Folds a function and a list of arguments into a single application expression. """
+    """ 
+    Folds a function and a list of arguments into a single application expression. 
+    """
     result = fn
     for arg in args:
         result = App(fn=result, arg=arg)
     return result
 
 def level_zip(lvl_params : List[LevelParam], lvl_values : List[Level]) -> LevelSubList:
-    """ Checks if the two lists of levels have the same length and zips them together. """
+    """ 
+    Checks if the two lists of levels have the same length and zips them together. 
+    """
     if len(lvl_params) != len(lvl_values): raise ValueError("Found different number of level parameters.")
     return list(zip(lvl_params, lvl_values))
 
 class ReductionStatus(Enum):
+    """
+    Enum for the status of a lazy delta reduction step.
+    """
     NOT_EQUAL = 0
     EQUAL = 1
     CONTINUE = 2
     UNKNOWN = 3
 
 def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expression:
+    """
+    Replace all bvars with the corresponding fvars in the given expression. Used for printing.
+    """
     if isinstance(expr, BVar):
         return fvar_list[-expr.db_index-1]
     elif isinstance(expr, App):

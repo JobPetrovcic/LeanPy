@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import override
 from LeanPy.Structures.Name import Name
 
 class Level:
@@ -6,6 +7,9 @@ class Level:
         self.update_bookkeeping()
     
     def update_bookkeeping(self):
+        """
+        Updates the hash and number of metavariables in the level.
+        """
         self.hash = self.get_hash()
         self.num_mvars = self.get_num_mvars()
 
@@ -13,31 +17,46 @@ class Level:
         raise NotImplementedError("Method __str__ not implemented for abstract class Level")
 
     @abstractmethod
-    def totally_equal(self, other: 'Level') -> bool:
-        raise NotImplementedError("Method totally_equal not implemented for abstract class Level")
+    def structurally_equal(self, other: 'Level') -> bool:
+        raise NotImplementedError("Method structurally_equal not implemented for abstract class Level")
     
-    def __hash__(self) -> int: return self.hash
-    def get_num_mvars(self) -> int: raise NotImplementedError("Method get_num_mvars not implemented for abstract class Level")
-    def get_hash(self) -> int: raise NotImplementedError("Method get_hash not implemented for abstract class Level")
+    def __hash__(self) -> int: 
+        return self.hash
+
+    def get_num_mvars(self) -> int: 
+        raise NotImplementedError("Method get_num_mvars not implemented for abstract class Level")
+
+    def get_hash(self) -> int: 
+        raise NotImplementedError("Method get_hash not implemented for abstract class Level")
 
 class LevelZero(Level):
+    @override
     def __init__(self):
         Level.__init__(self)
         
+    @override
     def __str__(self) -> str:
         return "0"
 
-    def totally_equal(self, other: 'Level') -> bool:
+    @override
+    def structurally_equal(self, other: 'Level') -> bool:
         return isinstance(other, LevelZero)
 
-    def get_hash(self) -> int: return hash("Zero")
-    def get_num_mvars(self) -> int: return 0
+    @override
+    def get_hash(self) -> int: 
+        return hash("Zero")
+
+    @override
+    def get_num_mvars(self) -> int: 
+        return 0
 
 class LevelSucc(Level):
+    @override
     def __init__(self, anc: Level):
         self.anc = anc
         Level.__init__(self)
     
+    @override
     def __str__(self) -> str:
         r = self
         o = 0
@@ -49,64 +68,111 @@ class LevelSucc(Level):
         else:
             return f"{r} + {o}"
 
-    def totally_equal(self, other: 'Level') -> bool:
-        return isinstance(other, LevelSucc) and self.anc.totally_equal(other.anc)
+    @override
+    def structurally_equal(self, other: 'Level') -> bool:
+        return isinstance(other, LevelSucc) and self.anc.structurally_equal(other.anc)
     
-    def get_hash(self) -> int: return hash((self.anc, "Succ"))
-    def get_num_mvars(self) -> int: return self.anc.num_mvars
-    
+    @override
+    def get_hash(self) -> int: 
+        return hash((self.anc, "Succ"))
+
+    @override
+    def get_num_mvars(self) -> int: 
+        return self.anc.num_mvars
+
 class LevelMax(Level):
+    @override
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
         Level.__init__(self)
     
+    @override
     def __str__(self) -> str:
         return f"max ({self.lhs}) ({self.rhs})"
 
-    def totally_equal(self, other: 'Level') -> bool:
-        return isinstance(other, LevelMax) and self.lhs.totally_equal(other.lhs) and self.rhs.totally_equal(other.rhs)
+    @override
+    def structurally_equal(self, other: 'Level') -> bool:
+        return (
+            isinstance(other, LevelMax) and 
+            self.lhs.structurally_equal(other.lhs) and 
+            self.rhs.structurally_equal(other.rhs)
+        )
     
-    def get_hash(self) -> int: return hash((self.lhs, self.rhs, "Max"))
-    def get_num_mvars(self) -> int: return self.lhs.num_mvars + self.rhs.num_mvars
+    @override
+    def get_hash(self) -> int: 
+        return hash((self.lhs, self.rhs, "Max"))
+
+    @override
+    def get_num_mvars(self) -> int: 
+        return self.lhs.num_mvars + self.rhs.num_mvars
 
 class LevelIMax(Level):
+    @override
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
         Level.__init__(self)
     
+    @override
     def __str__(self) -> str:
         return f"imax ({self.lhs}) ({self.rhs})"
 
-    def totally_equal(self, other: 'Level') -> bool:
-        return isinstance(other, LevelIMax) and self.lhs.totally_equal(other.lhs) and self.rhs.totally_equal(other.rhs)
+    @override
+    def structurally_equal(self, other: 'Level') -> bool:
+        return (
+            isinstance(other, LevelIMax) and 
+            self.lhs.structurally_equal(other.lhs) and 
+            self.rhs.structurally_equal(other.rhs)
+        )
     
-    def get_hash(self) -> int: return hash((self.lhs, self.rhs, "IMax"))
-    def get_num_mvars(self) -> int: return self.lhs.num_mvars + self.rhs.num_mvars
+    @override
+    def get_hash(self) -> int: 
+        return hash((self.lhs, self.rhs, "IMax"))
+
+    @override
+    def get_num_mvars(self) -> int: 
+        return self.lhs.num_mvars + self.rhs.num_mvars
 
 class LevelParam(Level):
+    @override
     def __init__(self, pname: Name):
         self.pname = pname
         Level.__init__(self)
     
+    @override
     def __str__(self) -> str:
         return f"{self.pname}"
     
-    def totally_equal(self, other: 'Level') -> bool:
-        return isinstance(other, LevelParam) and self.pname==other.pname
+    @override
+    def structurally_equal(self, other: 'Level') -> bool:
+        return isinstance(other, LevelParam) and self.pname == other.pname
     
-    def get_hash(self) -> int: return hash(("Param", self.pname))
-    def get_num_mvars(self) -> int: return 0
+    @override
+    def get_hash(self) -> int: 
+        return hash(("Param", self.pname))
+
+    @override
+    def get_num_mvars(self) -> int: 
+        return 0
 
 class LevelMVar(Level):
+    @override
     def __init__(self):
         Level.__init__(self)
     
-    def __str__(self) -> str: return "?l"
+    @override
+    def __str__(self) -> str: 
+        return "?l"
 
-    def get_hash(self) -> int: return hash("MVar")
-    def get_num_mvars(self) -> int: return 1
+    @override
+    def get_hash(self) -> int: 
+        return hash("MVar")
+
+    @override
+    def get_num_mvars(self) -> int: 
+        return 1
+
 level_constructors = [LevelZero, LevelSucc, LevelMax, LevelIMax, LevelParam]
 
-__all__ = ['Level', 'LevelZero', 'LevelSucc', 'LevelMax', 'LevelIMax', 'LevelParam', 'level_constructors']    
+__all__ = ['Level', 'LevelZero', 'LevelSucc', 'LevelMax', 'LevelIMax', 'LevelParam', 'level_constructors']

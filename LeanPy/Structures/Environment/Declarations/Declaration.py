@@ -174,7 +174,10 @@ class Recursor(Declaration):
         """
         return self.num_params + self.num_motives + self.num_minors + self.num_indices
     
-    def get_major_induct(self) -> Name: # DOES NOT CHANGE ANYTHING
+    def get_major_induct(self) -> Name:
+        """
+        Gets the inductive type of the major premise of the recursor.
+        """
         n = self.get_major_index()
         t = self.type
 
