@@ -15,6 +15,9 @@ from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Environment.Declarations.Declaration import *
 
+import sys
+sys.setrecursionlimit(10**9)
+
 class TypeChecker:
     def __init__(
             self, 
