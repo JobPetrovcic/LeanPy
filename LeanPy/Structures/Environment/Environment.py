@@ -1,5 +1,5 @@
 from typing import Dict
-from LeanPy.Structures.Environment.Declarations.Declaration import Constructor, Declaration, Inductive
+from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.Expression import *
@@ -83,13 +83,6 @@ class Environment:
         if name not in self.name_dict:
             raise ValueError(f"Name {name} does not exist in environment.")
         found = self.name_dict[name]
-        if self.checking_inductive:
-            if isinstance(found, Inductive):
-                if not found.is_checked:
-                    raise ValueError(f"Inductive type {name} has not been checked.")
-            elif isinstance(found, Constructor):
-                if not found.is_checked:
-                    raise ValueError(f"Constructor {name} has not been checked.")
         
         return found
     

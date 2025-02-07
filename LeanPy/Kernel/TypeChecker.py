@@ -16,11 +16,10 @@ from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Environment.Declarations.Declaration import *
 
-
 class TypeChecker:
     def __init__(
             self, 
-            allow_unstrict_infer : bool = False, # TODO: change this after testing
+            allow_unstrict_infer : bool = True, # TODO: change this after testing
             environment : Environment | None = None
         ):
         self.allow_unstrict_infer = allow_unstrict_infer
@@ -528,7 +527,6 @@ class TypeChecker:
             return e # type incorrect
 
         # special handling of mvars
-        # TODO: check if this is correct
         if app_type.has_expr_mvars:
             # if app_type has mvars, then we can apply K-axiom only if all the arguments are mvar-free
             for i in range(recursor.num_params, len(app_type_args)):
@@ -546,7 +544,7 @@ class TypeChecker:
     
     # REDUCTIONS
 
-    def cheap_beta_reduce(self, e : Expression) -> Expression: # TODO: check again
+    def cheap_beta_reduce(self, e : Expression) -> Expression: 
         if not isinstance(e, App): 
             return e
         fn, args = unfold_app(e)
@@ -1044,12 +1042,12 @@ class TypeChecker:
                 if isinstance(fn_type, Pi):
                     fn_type = fn_type.codomain
                 else:
-                    fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1]) # TODO: check if -1 is correct
+                    fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1])
                     fn_type = self.ensure_pi(fn_type)
                     fn_type = fn_type.codomain
                     j = i
             
-            return self.instantiate_multiple(fn_type, args[j:][::-1]) # TODO: check if -1 is correct
+            return self.instantiate_multiple(fn_type, args[j:][::-1])
             
     def infer_sort(self, sort : Sort) -> Expression:
         return Sort(LevelSucc(sort.level))
@@ -1131,7 +1129,7 @@ class TypeChecker:
         
         return r
     
-    def infer_let(self, let : Let, infer_only : bool) -> Expression: # TODO check again
+    def infer_let(self, let : Let, infer_only : bool) -> Expression:
         fvars : List[FVar] = []
         vals : List[Expression] = []
 
@@ -1174,7 +1172,7 @@ class TypeChecker:
         return r
 
 
-    def infer_proj(self, proj : Proj, infer_only : bool) -> Expression: # TODO: check again
+    def infer_proj(self, proj : Proj, infer_only : bool) -> Expression:
         struct_type = self.infer_core(proj.expr, infer_only=(self.allow_unstrict_infer and infer_only))
         struct_type = self.whnf(struct_type)
 
@@ -1219,7 +1217,7 @@ class TypeChecker:
             if not isinstance(r, Pi):
                 raise ProjectionError(f"Expected a Pi type when reducing projection indices but got {r.__class__}")
             
-            if r.codomain.has_loose_bvars: # TODO is this ok?
+            if r.codomain.has_loose_bvars:
                 r = self.instantiate(
                     body=r.codomain, 
                     val=Proj(I_name, i, proj.expr)
@@ -1322,10 +1320,8 @@ class TypeChecker:
         if decl.type.has_fvars:
             raise EnvironmentError(f"Type in declaration info {decl.info} contains free variables.")
 
-        inferred_type = self.infer(decl.type)
-        
-        if not isinstance(inferred_type, Sort):
-            raise EnvironmentError(f"Type of declaration info {decl.info} is not a sort.")
+        inferred_sort = self.infer(decl.type)
+        self.ensure_sort(inferred_sort)
         
     def check_declaration_value(self, decl : Declaration):
         if not (isinstance(decl, Definition) or isinstance(decl, Theorem) or isinstance(decl, Opaque)):
@@ -1335,40 +1331,26 @@ class TypeChecker:
         if not self.def_eq(inferred_type, decl.info.type):
             raise DeclarationError(f"Declaration {decl} ({decl.__class__.__name__}) has type {decl.info.type} but inferred type {inferred_type}") 
 
-    def add_definition(self, d : Definition, type_check : bool = True):
-        if type_check:
-            self.check_declaration_info(d)
-            self.check_declaration_value(d)
-        self.environment.add_declaration(d)
+    def check_definition(self, d : Definition):
+        self.check_declaration_info(d)
+        self.check_declaration_value(d)
 
-    def add_theorem(self, t : Theorem, type_check : bool = True):
-        if type_check:
-            self.check_declaration_info(t)
-            self.check_declaration_value(t)
-        self.environment.add_declaration(t)
+    def check_theorem(self, t : Theorem):
+        self.check_declaration_info(t)
+        self.check_declaration_value(t)
 
-    def add_opaque(self, o : Opaque, type_check : bool = True):
-        if type_check:
-            self.check_declaration_info(o)
-            self.check_declaration_value(o)
-        self.environment.add_declaration(o)
+    def check_opaque(self, o : Opaque):
+        self.check_declaration_info(o)
+        self.check_declaration_value(o)
 
-    def add_axiom(self, a : Axiom, type_check : bool = True):
-        if type_check:
-            self.check_declaration_info(a)
-        self.environment.add_declaration(a)
+    def check_axiom(self, a : Axiom):
+        self.check_declaration_info(a)
     
-    def add_inductive(self, ind : Inductive, type_check : bool = True):
-        self.environment.add_declaration(ind)
+    def check_inductive(self, ind : Inductive):
+        self.check_inductive_declaration_infos(ind.name)
 
-        if type_check:
-            self.check_inductive_declaration_infos(ind.name)
-
-    def add_constructor(self, constructor : Constructor, type_check : bool = True):
-        self.environment.add_declaration(constructor)
-
-        if type_check:
-            self.check_inductive_declaration_infos(constructor.inductive_name)
+    def check_constructor(self, constructor : Constructor):
+        self.check_inductive_declaration_infos(constructor.inductive_name)
 
     def number_of_added_constructors(self, inductive_decl : Inductive) -> int:
         count = 0
@@ -1379,10 +1361,8 @@ class TypeChecker:
                 count += 1
         return count
     
-    def add_quotient(self, q : Quot, type_check : bool = True):
-        if type_check:
-            self.check_declaration_info(q)
-        self.environment.add_declaration(q)
+    def check_quotient(self, q : Quot):
+        self.check_declaration_info(q)
     
     def check_inductive_declaration_infos(self, inductive : Name):
         """
@@ -1398,7 +1378,7 @@ class TypeChecker:
         if found_constructors < inductive_decl.number_of_constructors: return
         assert(found_constructors == inductive_decl.number_of_constructors), "Sanity check failed: number of found constructors does not match the number of expected constructors."
 
-        self.environment.checking_inductive = False # TODO: set this to true and debug
+        self.environment.checking_inductive = True
         # After all the constructors have been added, we can check the inductive type and its constructors
         self.check_declaration_info(inductive_decl)
 
@@ -1415,7 +1395,6 @@ class TypeChecker:
             if inductive_decl.num_params != constructor_decl.num_params:
                 raise DeclarationError(f"Constructor {constructor_name} has {constructor_decl.num_params} parameters but the inductive type {constructor_decl.inductive_name} has {inductive_decl.num_params} parameters.")
 
-        # Finally chec 
         inductive_decl.is_checked = True
         for constructor_name in inductive_decl.constructor_names:
             constructor_decl = self.environment.get_declaration_under_name(constructor_name)
@@ -1425,24 +1404,22 @@ class TypeChecker:
             constructor_decl.is_checked = True # CHANGES INDUCTIVE, BUT THIS IS OK
         self.environment.checking_inductive = False # CHANGES INDUCTIVE, BUT THIS IS OK
 
-    def add_recursor(self, recursor : Recursor, type_check : bool = True):
-        if type_check:
-            self.check_declaration_info(recursor)
-        self.environment.add_declaration(recursor) # add the recursor to the environment before checking the recursion rules, since they refer to the recursor
+    def check_recursor(self, recursor : Recursor):
+        self.check_declaration_info(recursor)
 
         for rec_rule in recursor.recursor_rules:
             constructor_decl = self.environment.get_declaration_under_name(rec_rule.constructor)
             if not isinstance(constructor_decl, Constructor):
                 raise DeclarationError(f"Recursor rule {rec_rule} is not associated with a constructor; found {constructor_decl.__class__.__name__} with name {constructor_decl.info.ciname} instead.")
 
-    def add_declaration(self, decl : Declaration, type_check : bool = True):
-        print(f"Adding declaration {decl.name}")
-        if isinstance(decl, Definition): self.add_definition(decl, type_check)
-        elif isinstance(decl, Theorem): self.add_theorem(decl, type_check)
-        elif isinstance(decl, Opaque): self.add_opaque(decl, type_check)
-        elif isinstance(decl, Axiom): self.add_axiom(decl, type_check)
-        elif isinstance(decl, Inductive): self.add_inductive(decl, type_check)
-        elif isinstance(decl, Constructor): self.add_constructor(decl, type_check)
-        elif isinstance(decl, Recursor): self.add_recursor(decl, type_check)
-        elif isinstance(decl, Quot): self.add_quotient(decl, type_check)
+    def check_declaration(self, decl : Declaration):
+        print(f"Checking declaration {decl.name}")
+        if isinstance(decl, Definition): self.check_definition(decl)
+        elif isinstance(decl, Theorem): self.check_theorem(decl)
+        elif isinstance(decl, Opaque): self.check_opaque(decl)
+        elif isinstance(decl, Axiom): self.check_axiom(decl)
+        elif isinstance(decl, Inductive): self.check_inductive(decl)
+        elif isinstance(decl, Constructor): self.check_constructor(decl)
+        elif isinstance(decl, Recursor): self.check_recursor(decl)
+        elif isinstance(decl, Quot): self.check_quotient(decl)
         else: raise DeclarationError(f"Unknown declaration type {decl.__class__.__name__}")
