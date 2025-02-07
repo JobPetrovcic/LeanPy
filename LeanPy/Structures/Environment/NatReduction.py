@@ -61,7 +61,6 @@ def str_to_char_list(environment : Environment, s : str) -> Expression:
     l = get_char_list_nil_const(environment)
     for c in s[::-1]:
         l = get_char_list_cons_app(environment, c, l)
-    print(l)
     return l
 
 def str_lit_to_constructor(environment : Environment, s : StrLit) -> Expression:
