@@ -1,5 +1,5 @@
 from typing import List, Tuple
-from LeanPy.Parsing.LeanTextParser import LeanTextParser
+from LeanPy.Parsing.Lean4ExportParser import Lean4ExportParser
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.Expression import *
@@ -9,15 +9,15 @@ from LeanPy.Structures.Expression.ExpressionToPython import ExpressionToPython
 
 
 #def test_lean_format_parser1():
-#    LeanTextParser.from_file("Exports/MyNat.export")
+#    Lean4ExportParser.from_file("Exports/MyNat.export")
 #
 #def test_lean_format_parser2():
-#    LeanTextParser.from_file("Exports/db_application.export")
+#    Lean4ExportParser.from_file("Exports/db_application.export")
 #
 #def test_lean_format_parser3():
-#    LeanTextParser.from_file("Exports/double.export")
+#    Lean4ExportParser.from_file("Exports/double.export")
 #
-#    parsed = LeanTextParser.from_file("Exports/double.export")
+#    parsed = Lean4ExportParser.from_file("Exports/double.export")
 #    environment = parsed.type_checker.environment
 #
 #    exporter = ExpressionToPython()
