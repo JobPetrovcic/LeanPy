@@ -450,9 +450,10 @@ class TypeChecker:
             return True
         if self.try_structural_eta_expansion(l_n_n_n, r_n_n_n):
             return True
-        #
-        ##r = try_string_lit_expansion(t_n, s_n); TODO
-        ##if (r != l_undef) return r == l_true;
+        
+        try_lit_expansion = self.try_string_lit_expansion(l_n_n_n, r_n_n_n)
+        if try_lit_expansion is not None:
+            return try_lit_expansion
 
         if self.def_eq_unit_like(l_n_n_n, r_n_n_n): 
             return True
@@ -532,6 +533,16 @@ class TypeChecker:
         """
         return self.try_structural_eta_expansion_core(t, s) or self.try_structural_eta_expansion_core(s, t)
     
+    def try_string_lit_expansion_core(self, t : Expression, s : Expression) -> Optional[bool]:
+        if isinstance(t, StrLit) and isinstance(s, App) and get_app_function(s) == Const(self.environment.String_mk_name, []):
+            return self.def_eq_core(str_lit_to_constructor(self.environment, t), s)
+        return None
+
+    def try_string_lit_expansion(self, t : Expression, s : Expression) -> Optional[bool]:
+        r = self.try_string_lit_expansion_core(t, s)
+        if r is not None: 
+            return r
+        return self.try_string_lit_expansion_core(s, t)
 
     # CONSTRUCTORS
     def get_constructor(self, constructor_name : Name) -> Constructor:

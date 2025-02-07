@@ -1,7 +1,5 @@
 from typing import Callable, Optional
 
-from typeguard import typechecked
-
 from LeanPy.Structures.Environment.Environment import Environment
 from LeanPy.Structures.Expression.Expression import App, Const, Expression, NatLit, StrLit
 from LeanPy.Structures.Expression.ExpressionManipulation import unfold_app
@@ -27,7 +25,6 @@ def reduce_bin_nat_pred(environment : Environment, op : Callable[[int, int], boo
     if op(arg1, arg2): return Const(cname=environment.Bool_true_name, lvl_params=[])
     else: return Const(cname=environment.Bool_false_name, lvl_params=[])
 
-@typechecked
 def nat_lit_to_constructor(environment : Environment, nat_lit : NatLit) -> Expression:
     """ Returns the constructor form of the given natural literal. """
     if nat_lit.val == 0: return Const(cname=environment.Nat_zero_name, lvl_params=[])
@@ -36,36 +33,39 @@ def nat_lit_to_constructor(environment : Environment, nat_lit : NatLit) -> Expre
         NatLit(nat_lit.val-1)
     )
 
-@typechecked
 def char_to_expression(environment : Environment, c : str) -> Expression:
     return App(
         Const(cname=environment.Char_name, lvl_params=[]),
         NatLit(ord(c))
     )
 
-@typechecked
-def str_to_char_list(environment : Environment, s : str, ind : int = 0) -> Expression:
-    assert ind >= 0, "Index must be non-negative when converting a string literal to a constructor."
-    if ind == len(s): 
-        return App(
-            Const(cname=environment.List_nil_name, lvl_params=[environment.level_one]),
-            Const(cname=environment.Char_name, lvl_params=[])
-        )
-    else:
-        return  App(
-            App(
-                App(
-                    Const(cname=environment.List_cons_name, lvl_params=[environment.level_one]),
-                    Const(cname=environment.Char_name, lvl_params=[])
-                ),
-                char_to_expression(environment, s[ind])
-            ),
-            str_to_char_list(environment, s, ind+1)
-        )
+def get_char_list_nil_const(environment : Environment):
+    return App(
+        Const(cname=environment.List_nil_name, lvl_params=[environment.level_zero]),
+        Const(cname=environment.Char_name, lvl_params=[])
+    )
 
-@typechecked
+def get_char_list_cons_app(environment : Environment, c : str, tail : Expression):
+    return App(
+        App(
+            App(
+                Const(cname=environment.List_cons_name, lvl_params=[environment.level_zero]),
+                Const(cname=environment.Char_name, lvl_params=[])
+            ),
+            char_to_expression(environment, c)
+        ),
+        tail
+    )
+
+def str_to_char_list(environment : Environment, s : str) -> Expression:
+    l = get_char_list_nil_const(environment)
+    for c in s[::-1]:
+        l = get_char_list_cons_app(environment, c, l)
+    print(l)
+    return l
+
 def str_lit_to_constructor(environment : Environment, s : StrLit) -> Expression:
-    char_list = str_to_char_list(environment, s.val, 0)
+    char_list = str_to_char_list(environment, s.val)
     return App(
         Const(cname=environment.String_mk_name, lvl_params=[]),
         char_list
@@ -101,4 +101,4 @@ __all__ = [
     'reduce_bin_nat_op', 'reduce_bin_nat_pred',
 
     'nat_lit_to_constructor', 'str_lit_to_constructor'
-    ]
+]
