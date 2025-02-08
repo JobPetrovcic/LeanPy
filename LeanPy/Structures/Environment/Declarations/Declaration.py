@@ -224,9 +224,9 @@ def compare_reducibility_hints(d1 : Declaration, d2 : Declaration) -> int:
         else:
             return 0 # reduce both
     else:
-        if isinstance(h1, Opaque):
+        if isinstance(h1, OpaqueHint):
             return 1 # reduce d2
-        elif isinstance(h2, Opaque):
+        elif isinstance(h2, OpaqueHint):
             return -1 # reduce d1
         elif isinstance(h1, Abbrev):
             return -1 # reduce d1

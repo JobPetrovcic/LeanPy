@@ -12,6 +12,9 @@ class OpaqueHint(ReducibilityHint):
     
     def get_height(self):
         return 0
+    
+    def __str__(self) -> str:
+        return "Opaque"
 
 class Regular(ReducibilityHint):
     def __init__(self, depth : int):
@@ -20,6 +23,9 @@ class Regular(ReducibilityHint):
     
     def get_height(self):
         return self.depth
+    
+    def __str__(self) -> str:
+        return f"Regular: {self.depth}"
 
 class Abbrev(ReducibilityHint):
     def __init__(self):
@@ -27,5 +33,8 @@ class Abbrev(ReducibilityHint):
     
     def get_height(self):
         return 0
+    
+    def __str__(self) -> str:
+        return super().__str__()
 
 __all__ = ['ReducibilityHint', 'OpaqueHint', 'Regular', 'Abbrev']

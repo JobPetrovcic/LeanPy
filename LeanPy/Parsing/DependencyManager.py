@@ -9,7 +9,7 @@ from LeanPy.Parsing import LeanJSONParser
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 
 class DependencyManager:
-    def __init__(self, folder : str, already_checked_file_path : str | None = None):
+    def __init__(self, folder : str, checked_file_path : str | None = None):
         """
         The DependencyManager class is responsible for managing the dependencies of declarations. The declaration can be in the following states:
         - Not loaded
@@ -19,7 +19,7 @@ class DependencyManager:
         - Checked (also loaded and all of the dependencies are loaded)
         """
         self.folder = folder
-        self.already_checked_file_path = already_checked_file_path
+        self.checked_file_path = checked_file_path
         self.type_checker = TypeChecker()
 
         self.loaded : Set[str] = set()
@@ -30,17 +30,13 @@ class DependencyManager:
         self.file_name_to_dependencies : dict[str, List[str]] = {}
         self.file_name_to_declaration : dict[str, Declaration] = {}
 
-        if already_checked_file_path is not None:
+        if checked_file_path is not None:
             # if the file exists, load it
-            if os.path.exists(already_checked_file_path):
-                with open(already_checked_file_path, "rb") as f:
-                    self.already_checked = pickle.load(f)
-                for decl_file_name in self.already_checked:
+            if os.path.exists(checked_file_path):
+                with open(checked_file_path, "rb") as f:
+                    self.checked = pickle.load(f)
+                for decl_file_name in self.checked:
                     self.load_and_load_dependencies(decl_file_name)
-            else:
-                self.already_checked : Set[str] = set()
-        else:
-            self.already_checked : Set[str] = set()
 
     def is_checked(self, decl_file_name : str) -> bool:
         """
@@ -130,8 +126,8 @@ class DependencyManager:
         self.being_checked.remove(decl_file_name)
 
     def save_checked(self):
-        if (len(self.checked) + 1) % 100 == 0 and self.already_checked_file_path is not None:
-            with open(self.already_checked_file_path, "wb") as f:
+        if len(self.checked) % 100 == 0 and self.checked_file_path is not None:
+            with open(self.checked_file_path, "wb") as f:
                 pickle.dump(self.checked, f)
 
     def __len__(self):
@@ -142,9 +138,12 @@ class DependencyManager:
         Returns the number of files in the folder that end with ".json"
         """
         return len([f for f in os.listdir(self.folder) if f.endswith(".json")])
+    
+    def n_checked(self):
+        return len(self.checked)
 
     def update_tqdm(self, tqdm_instance : tqdm.tqdm):
         tqdm_instance.total = self.__total__()
-        tqdm_instance.n = len(self)
+        tqdm_instance.n = self.n_checked()
         tqdm_instance.refresh()
         
