@@ -11,7 +11,7 @@ def nat_gcd(a : int, b : int) -> int:
     while b:
         a, b = b, a % b
     return a
-def nat_mod(a : int, b : int) -> int: return 0 if b == 0 else a % b
+def nat_mod(a : int, b : int) -> int: return a if b == 0 else a % b
 def nat_div(a : int, b : int) -> int: return 0 if b == 0 else a // b
 def nat_beq(a : int, b : int) -> bool: return a == b
 def nat_ble(a : int, b : int) -> bool: return a <= b
