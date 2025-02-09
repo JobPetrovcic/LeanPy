@@ -568,7 +568,7 @@ class NatLit(Expression):
 
     @override
     def __str__(self) -> str:
-        return "N"+str(self.val)
+        return str(self.val)
     
     @override
     def structurally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
