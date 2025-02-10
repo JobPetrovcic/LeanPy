@@ -2,6 +2,8 @@ from typing import Type
 from LeanPy.Structures.Environment.LocalContext import LocalContext
 from LeanPy.Structures.Expression.Expression import Expression
 
+should_print_expressions = False
+
 # Fatal errors
 class PanicError(Exception):
     def __init__(self, message : str):
@@ -14,7 +16,6 @@ class CacheError(Exception):
 class DeclarationError(Exception):
     def __init__(self, message : str):
         super().__init__(message)
-
 
 # Kernel errors
 class KernelError(Exception):
@@ -29,7 +30,10 @@ class ExpectedEqualExpressionsConstructorsError(KernelError):
 
 class ExpectedEqualExpressionsError(KernelError):
     def __init__(self, expected : Expression, got : Expression, source : Expression, local_context : LocalContext | None = None):
-        super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}" + (f"\nLocal context:\n{local_context}" if local_context is not None else ""), source)
+        if should_print_expressions:
+           super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}" + (f"\nLocal context:\n{local_context}" if local_context is not None else ""), source)
+        else:
+            super().__init__(f"Expected types to be the same", source)
 
 class ProjectionError(KernelError):
     def __init__(self, message : str, source : Expression):

@@ -326,7 +326,7 @@ class TypeChecker:
         # what about MData?
         elif isinstance(a, Proj) and isinstance(b, Proj): result = (a.index == b.index) and self.are_struct_eq_exprs(a.expr, b.expr, use_hash)
         elif isinstance(a, Let) and isinstance(b, Let): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.val, b.val, use_hash) and self.are_struct_eq_exprs(a.body, b.body, use_hash)
-        else: raise PanicError(f"Unreachable code reached: Cannot compare expressions {a} and {b} of class {a.__class__} and {b.__class__}.")
+        else: raise PanicError(f"Unreachable code reached: Cannot compare expressions of class {a.__class__.__name__} and {b.__class__.__name__}.")
         
         if result:
             self.equiv_manager.add_equiv(dsu_ra, dsu_rb)
@@ -678,7 +678,7 @@ class TypeChecker:
             return fold_apps(fn, args[i:], sources=arg_sources[i:])
         elif isinstance(fn, BVar): # the body is a single bound variable, so just replace it with the value of it args[i - fn.db_index - 1]
             if i <= fn.db_index:
-                raise UnboundVariableError(f"Unbound variable {fn} in the body of the lambda.", fn.source)
+                raise UnboundVariableError(f"Unbound variable in the body of the lambda.", fn.source)
             return fold_apps(args[i - fn.db_index - 1], args[i:], sources=arg_sources[i:]) # fold back the rest of the arguments
         else:
             return e
@@ -1471,14 +1471,14 @@ class TypeChecker:
 
         inductive_fn, args, _ = unfold_app(struct_type)
         if not isinstance(inductive_fn, Const):
-            raise ProjectionError(f"Expected a constant when unfolding the struct type for projection but got {inductive_fn.__class__}", source=proj.source)
+            raise ProjectionError(f"Expected a constant when unfolding the struct type for projection but got {inductive_fn.__class__.__name__}", source=proj.source)
         if inductive_fn.cname != proj.sname:
             raise ProjectionError(f"Expected the struct name to be {proj.sname} but got {inductive_fn.cname}", source=proj.source)
         I_name = inductive_fn.cname
 
         I_decl = self.environment.get_declaration_under_name(I_name)
         if not isinstance(I_decl, Inductive):
-            raise ProjectionError(f"Expected an inductive type when unfolding the struct type for projection but got {I_decl} which is a {I_decl.__class__}", source=proj.source)
+            raise ProjectionError(f"Expected an inductive type when unfolding the struct type for projection but got {I_decl.__class__.__name__}", source=proj.source)
         
         if I_decl.number_of_constructors != 1:
             raise ProjectionError(f"Expected the inductive type {I_name} to have exactly one constructor but got {I_decl.number_of_constructors}", source=proj.source)
@@ -1489,7 +1489,7 @@ class TypeChecker:
         constructor_decl = self.environment.get_declaration_under_name(I_decl.constructor_names[0])
 
         if not isinstance(constructor_decl, Constructor):
-            raise DeclarationError(f"Expected a constructor declaration for the first constructor of the inductive type {I_name} but got {constructor_decl} which is a {constructor_decl.__class__}")
+            raise DeclarationError(f"Expected a constructor declaration for the first constructor of the inductive type {I_name} but got {constructor_decl.__class__.__name__}")
 
         if constructor_decl.num_params != I_decl.num_params:
             raise DeclarationError(f"Sanity check failed: number of parameters in inductive type and constructor do not match.")
@@ -1501,7 +1501,7 @@ class TypeChecker:
                 raise ProjectionError(f"Ran out of arguments when instantiating projection args.", source=proj.source)
             r = self.whnf(r)
             if not isinstance(r, Pi):
-                raise ProjectionError(f"Expected a Pi type when instantiating projection args but got {r.__class__}", source=proj.source)
+                raise ProjectionError(f"Expected a Pi type when instantiating projection args but got {r.__class__.__name__}", source=proj.source)
             r = self.instantiate(body=r.codomain, val=args[i])
         
         is_prop_type = self.is_prop(r)
@@ -1509,7 +1509,7 @@ class TypeChecker:
         for i in range(proj.index):
             r = self.whnf(r)
             if not isinstance(r, Pi):
-                raise ProjectionError(f"Expected a Pi type when reducing projection indices but got {r.__class__}", source=proj.source)
+                raise ProjectionError(f"Expected a Pi type when reducing projection indices but got {r.__class__.__name__}", source=proj.source)
             
             if r.codomain.has_loose_bvars:
                 r = self.instantiate(
@@ -1523,7 +1523,7 @@ class TypeChecker:
         
         r = self.whnf(r)
         if not isinstance(r, Pi):
-            raise ProjectionError(f"Expected a Pi type for projection index but got {r.__class__}", source=proj.source)
+            raise ProjectionError(f"Expected a Pi type for projection index but got {r.__class__.__name__}", source=proj.source)
 
         r = r.domain
 
@@ -1624,9 +1624,9 @@ class TypeChecker:
         - the inferred sort of the type must be a sort
         """
         if not are_unique_level_params(decl.lvl_params):
-            raise DeclarationError(f"Level parameters in declaration info {decl.info} are not unique.")
+            raise DeclarationError(f"Level parameters {[str(l) for l in decl.lvl_params]} in declaration {decl.name} are not unique.")
         if decl.type.has_fvars:
-            raise DeclarationError(f"Type in declaration info {decl.info} contains free variables.")
+            raise DeclarationError(f"Type of declaration {decl.name} contains free variables.")
 
         inferred_sort = self.infer(decl.type)
         self.ensure_sort(inferred_sort, sort_source=decl.type.source)
@@ -1636,11 +1636,11 @@ class TypeChecker:
         Checks that the declaration value is well-typed and it is definitionally equal to the expected type provided by the declaration info.
         """
         if not (isinstance(decl, Definition) or isinstance(decl, Theorem) or isinstance(decl, Opaque)):
-            raise DeclarationError(f"Declaration {decl} is not a Definition, Theorem, or Opaque, when checking declaration value. It is a {decl.__class__.__name__}.")
+            raise DeclarationError(f"Declaration {decl.name} is not a Definition, Theorem, or Opaque, when checking declaration value. It is a {decl.__class__.__name__}.")
 
         inferred_type = self.infer(decl.value)
         if not self.def_eq(inferred_type, decl.info.type):
-            raise DeclarationError(f"Declaration {decl} ({decl.__class__.__name__}) has type {decl.info.type} but inferred type {inferred_type}") 
+            raise DeclarationError(f"Declaration {decl.name} ({decl.__class__.__name__}) has type differnt from the expected type. ") 
 
     def check_definition(self, d : Definition):
         """
@@ -1749,7 +1749,7 @@ class TypeChecker:
         for rec_rule in recursor.recursor_rules:
             constructor_decl = self.environment.get_declaration_under_name(rec_rule.constructor)
             if not isinstance(constructor_decl, Constructor):
-                raise DeclarationError(f"Recursor rule {rec_rule} is not associated with a constructor; found {constructor_decl.__class__.__name__} with name {constructor_decl.info.ciname} instead.")
+                raise DeclarationError(f"Recursor rule for {rec_rule.constructor} is not associated with a constructor; found {constructor_decl.__class__.__name__} with name {constructor_decl.info.ciname} instead.")
 
     def check_declaration(self, decl : Declaration):
         """
