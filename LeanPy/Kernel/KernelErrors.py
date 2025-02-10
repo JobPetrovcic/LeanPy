@@ -1,5 +1,4 @@
 from typing import Type
-from LeanPy.Structures.Environment.LocalContext import LocalContext
 from LeanPy.Structures.Expression.Expression import Expression
 
 should_print_expressions = False
@@ -30,9 +29,9 @@ class ExpectedEqualExpressionsConstructorsError(KernelError):
         super().__init__(f"Expected expression of type {expected.__name__} but got {got.__name__}", source)
 
 class ExpectedEqualExpressionsError(KernelError):
-    def __init__(self, expected : Expression, got : Expression, source : Expression, local_context : LocalContext | None = None):
+    def __init__(self, expected : Expression, got : Expression, source : Expression):
         if should_print_expressions:
-           super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}" + (f"\nLocal context:\n{local_context}" if local_context is not None else ""), source)
+           super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}", source)
         else:
             super().__init__(f"Expected types to be the same", source)
 
@@ -61,5 +60,5 @@ class UnfinishedExpressionError(KernelError):
         super().__init__(message, source)
 
 class LocalContextError(KernelError):
-    def __init__(self, message : str, source : Expression, local_context : LocalContext):
+    def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
