@@ -10,7 +10,8 @@ from LeanPy.Structures.Name import *
 EXPR_COMPARE_RAW_THRESHOLD = 100 # the threshold for when to compare expressions without using the cache
 
 class Expression:
-    def __init__(self):
+    def __init__(self, source : Optional['Expression']):
+        self.source = source if source is not None else self
         self.update_bookkeeping()
 
     def update_bookkeeping(self):
@@ -110,9 +111,9 @@ class Expression:
         return self.num_fvars > 0
 
 class BVar(Expression):
-    def __init__(self, db_index : int):
+    def __init__(self, db_index : int, source : Optional['Expression']):
         self.db_index = db_index
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -151,12 +152,12 @@ class BVar(Expression):
         return isinstance(other, BVar) and self.db_index == other.db_index
 
 class FVar(Expression):
-    def __init__(self, name : Name, type : Expression, val : Optional[Expression], is_let : bool):
+    def __init__(self, name : Name, type : Expression, val : Optional[Expression], is_let : bool, source : Optional['Expression']):
         self.name = name
         self.type = type
         self.val = val
         self.is_let = is_let
-        Expression.__init__(self)
+        Expression.__init__(self, source)
 
     def full_identifier(self) -> str:
         return f"{self.name}-{hex(id(self))}"# : ({self.type}) := ({self.val})"
@@ -204,9 +205,9 @@ class FVar(Expression):
         return self is other
 
 class Sort(Expression):
-    def __init__(self, level : Level):
+    def __init__(self, level : Level, source : Optional['Expression']):
         self.level = level
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -245,10 +246,10 @@ class Sort(Expression):
         return isinstance(other, Sort) and self.level.structurally_equal(other.level)
 
 class Const(Expression):
-    def __init__(self, cname : Name, lvl_params : List[Level]):
+    def __init__(self, cname : Name, lvl_params : List[Level], source : Optional['Expression']):
         self.cname = cname
         self.lvl_params = lvl_params
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -294,10 +295,10 @@ class Const(Expression):
                 all([l1.structurally_equal(l2) for l1, l2 in zip(self.lvl_params, other.lvl_params)]))
 
 class App(Expression):
-    def __init__(self, fn : Expression, arg : Expression):
+    def __init__(self, fn : Expression, arg : Expression, source : Optional['Expression']):
         self.fn = fn
         self.arg = arg
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -344,11 +345,11 @@ class App(Expression):
                 self.arg.check_cache_and_compare(other.arg, compare_cache, use_cache))
 
 class Pi(Expression):
-    def __init__(self, bname : Name, domain : Expression, codomain : Expression):
+    def __init__(self, bname : Name, domain : Expression, codomain : Expression, source : Optional['Expression']):
         self.bname = bname
         self.domain = domain
         self.codomain = codomain
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -392,11 +393,11 @@ class Pi(Expression):
                 self.codomain.check_cache_and_compare(other.codomain, compare_cache, use_cache)) # don't need to check bname
 
 class Lambda(Expression):
-    def __init__(self, bname : Name, domain : Expression, body : Expression):
+    def __init__(self, bname : Name, domain : Expression, body : Expression, source : Optional['Expression']):
         self.bname = bname
         self.domain = domain
         self.body = body
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -440,12 +441,12 @@ class Lambda(Expression):
                 self.body.check_cache_and_compare(other.body, compare_cache, use_cache)) # don't need to check bname
 
 class Let(Expression):
-    def __init__(self, bname : Name, domain : Expression, val : Expression, body : Expression):
+    def __init__(self, bname : Name, domain : Expression, val : Expression, body : Expression, source : Optional['Expression']):
         self.bname = bname
         self.domain = domain
         self.val = val
         self.body = body
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -487,11 +488,11 @@ class Let(Expression):
                 self.body.check_cache_and_compare(other.body, compare_cache, use_cache)) # don't need to check bname
 
 class Proj(Expression):
-    def __init__(self, sname : Name, index : int, expr : Expression):
+    def __init__(self, sname : Name, index : int, expr : Expression, source : Optional['Expression']):
         self.sname = sname
         self.index = index
         self.expr = expr
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -533,10 +534,10 @@ class Proj(Expression):
                 self.expr.check_cache_and_compare(other.expr, compare_cache, use_cache)) # check the name since it refers to the structure we are projecting
 
 class NatLit(Expression):
-    def __init__(self, val : int):
+    def __init__(self, val : int, source : Optional['Expression']):
         assert val >= 0, "Natural number literals must be non-negative"
         self.val = val
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -575,9 +576,9 @@ class NatLit(Expression):
         return isinstance(other, NatLit) and self.val == other.val
 
 class StrLit(Expression):
-    def __init__(self, val : str):
+    def __init__(self, val : str, source : Optional['Expression']):
         self.val = val
-        Expression.__init__(self)
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int: 
@@ -616,8 +617,8 @@ class StrLit(Expression):
         return isinstance(other, StrLit) and self.val == other.val
     
 class MVar(Expression):
-    def __init__(self):
-        Expression.__init__(self)
+    def __init__(self, source : Optional['Expression']):
+        Expression.__init__(self, source)
     
     @override
     def get_hash(self) -> int:

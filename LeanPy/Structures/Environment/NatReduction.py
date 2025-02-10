@@ -21,54 +21,61 @@ def nat_lor(a : int, b : int) -> int: return a | b
 def nat_xor(a : int, b : int) -> int: return a ^ b
 def nat_shiftl(a : int, b : int) -> int:return a << b
 def nat_shiftr(a : int, b : int) -> int:return a >> b
-def reduce_bin_nat_op(op : Callable[[int, int], int], arg1 : int, arg2 : int) -> NatLit: return NatLit(op(arg1, arg2))
-def reduce_bin_nat_pred(environment : Environment, op : Callable[[int, int], bool], arg1 : int, arg2 : int) -> Expression: 
-    if op(arg1, arg2): return Const(cname=environment.Bool_true_name, lvl_params=[])
-    else: return Const(cname=environment.Bool_false_name, lvl_params=[])
+def reduce_bin_nat_op(op : Callable[[int, int], int], arg1 : int, arg2 : int, source : Expression) -> NatLit: return NatLit(op(arg1, arg2), source=source.source)
+def reduce_bin_nat_pred(environment : Environment, op : Callable[[int, int], bool], arg1 : int, arg2 : int, source : Expression) -> Expression: 
+    if op(arg1, arg2): return Const(cname=environment.Bool_true_name, lvl_params=[], source=source.source)
+    else: return Const(cname=environment.Bool_false_name, lvl_params=[], source=source.source)
 
 def nat_lit_to_constructor(environment : Environment, nat_lit : NatLit) -> Expression:
     """ Returns the constructor form of the given natural literal. """
-    if nat_lit.val == 0: return Const(cname=environment.Nat_zero_name, lvl_params=[])
+    if nat_lit.val == 0: return Const(cname=environment.Nat_zero_name, lvl_params=[], source=nat_lit.source)
     return App(
-        Const(cname=environment.Nat_succ_name, lvl_params=[]),
-        NatLit(nat_lit.val-1)
+        Const(cname=environment.Nat_succ_name, lvl_params=[], source=nat_lit.source),
+        NatLit(nat_lit.val-1, source=nat_lit.source),
+        source=nat_lit.source
     )
 
-def char_to_expression(environment : Environment, c : str) -> Expression:
+def char_to_expression(environment : Environment, c : str, source : Expression) -> Expression:
     return App(
-        Const(cname=environment.Char_name, lvl_params=[]),
-        NatLit(ord(c))
+        Const(cname=environment.Char_name, lvl_params=[], source=source.source),
+        NatLit(ord(c), source=source.source),
+        source=source.source
     )
 
-def get_char_list_nil_const(environment : Environment):
+def get_char_list_nil_const(environment : Environment, source : Expression) -> Expression:
     return App(
-        Const(cname=environment.List_nil_name, lvl_params=[environment.level_zero]),
-        Const(cname=environment.Char_name, lvl_params=[])
+        Const(cname=environment.List_nil_name, lvl_params=[environment.level_zero], source=source.source),
+        Const(cname=environment.Char_name, lvl_params=[], source=source.source),
+        source=source.source
     )
 
-def get_char_list_cons_app(environment : Environment, c : str, tail : Expression):
+def get_char_list_cons_app(environment : Environment, c : str, tail : Expression, source : Expression):
     return App(
         App(
             App(
-                Const(cname=environment.List_cons_name, lvl_params=[environment.level_zero]),
-                Const(cname=environment.Char_name, lvl_params=[])
+                Const(cname=environment.List_cons_name, lvl_params=[environment.level_zero], source=source.source),
+                Const(cname=environment.Char_name, lvl_params=[], source=source.source),
+                source=source.source
             ),
-            char_to_expression(environment, c)
+            char_to_expression(environment, c, source=source.source),
+            source=source.source
         ),
-        tail
+        tail,
+        source=source.source
     )
 
-def str_to_char_list(environment : Environment, s : str) -> Expression:
-    l = get_char_list_nil_const(environment)
+def str_to_char_list(environment : Environment, s : str, source : Expression) -> Expression:
+    l = get_char_list_nil_const(environment, source=source.source)
     for c in s[::-1]:
-        l = get_char_list_cons_app(environment, c, l)
+        l = get_char_list_cons_app(environment, c, l, source=source.source)
     return l
 
 def str_lit_to_constructor(environment : Environment, s : StrLit) -> Expression:
-    char_list = str_to_char_list(environment, s.val)
+    char_list = str_to_char_list(environment, s.val, source=s.source)
     return App(
-        Const(cname=environment.String_mk_name, lvl_params=[]),
-        char_list
+        Const(cname=environment.String_mk_name, lvl_params=[], source=s.source),
+        char_list,
+        source=s.source
     )
 
 def is_nat_zero_const(environment : Environment, t : Expression) -> bool:
@@ -91,8 +98,8 @@ def is_nat_zero(environment : Environment, t : Expression) -> bool:
 def is_nat_succ(environment : Environment, t : Expression) -> Optional[Expression]:
     if isinstance(t, NatLit):
         if t.val == 0: return None
-        return NatLit(t.val-1)
-    fn, apps = unfold_app(t)
+        return NatLit(t.val-1, source=t.source)
+    fn, apps, _ = unfold_app(t)
     if is_nat_succ_const(environment, fn) and len(apps) == 1:
         return apps[0]
     return None

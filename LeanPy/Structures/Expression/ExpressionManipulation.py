@@ -29,27 +29,27 @@ def replace_expression_aux(
             r_fn = replace_expression_aux(expr.fn, fn, replace_cache)
             r_arg = replace_expression_aux(expr.arg, fn, replace_cache) 
             if expr.fn is r_fn and expr.arg is r_arg: new_expr = expr
-            else: new_expr = App(fn=r_fn, arg=r_arg)
+            else: new_expr = App(fn=r_fn, arg=r_arg, source=expr.source)
         elif isinstance(expr, Lambda): 
             r_domain = replace_expression_aux(expr.domain, fn, replace_cache)
             r_body = replace_expression_aux(expr.body, fn, replace_cache)
             if expr.domain is r_domain and expr.body is r_body: new_expr = expr
-            else: new_expr = Lambda(bname=expr.bname, domain=r_domain, body=r_body)
+            else: new_expr = Lambda(bname=expr.bname, domain=r_domain, body=r_body, source=expr.source)
         elif isinstance(expr, Pi): 
             r_domain = replace_expression_aux(expr.domain, fn, replace_cache)
             r_codomain = replace_expression_aux(expr.codomain, fn, replace_cache)
             if expr.domain is r_domain and expr.codomain is r_codomain: new_expr = expr
-            else: new_expr = Pi(bname=expr.bname, domain=r_domain, codomain=r_codomain)
+            else: new_expr = Pi(bname=expr.bname, domain=r_domain, codomain=r_codomain, source=expr.source)
         elif isinstance(expr, Let): 
             r_domain = replace_expression_aux(expr.domain, fn, replace_cache)
             r_val = replace_expression_aux(expr.val, fn, replace_cache)
             r_body = replace_expression_aux(expr.body, fn, replace_cache)
             if expr.domain is r_domain and expr.val is r_val and expr.body is r_body: new_expr = expr
-            else: new_expr = Let(bname=expr.bname, domain=r_domain, val=r_val, body=r_body)
+            else: new_expr = Let(bname=expr.bname, domain=r_domain, val=r_val, body=r_body, source=expr.source)
         elif isinstance(expr, Proj): 
             r_expr = replace_expression_aux(expr.expr, fn, replace_cache)
             if expr.expr is r_expr: new_expr = expr
-            else: new_expr = Proj(sname=expr.sname, index=expr.index, expr=r_expr)
+            else: new_expr = Proj(sname=expr.sname, index=expr.index, expr=r_expr, source=expr.source)
         elif isinstance(expr, NatLit): new_expr = expr
         elif isinstance(expr, StrLit): new_expr = expr
         else: raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
@@ -88,10 +88,10 @@ def replace_expression_w_depth_aux(
 
     new_expr = fn(expr, depth)
     if new_expr is None:
-        if isinstance(expr, BVar): new_expr = BVar(db_index=expr.db_index)
+        if isinstance(expr, BVar): new_expr = BVar(db_index=expr.db_index, source=expr.source)
         elif isinstance(expr, FVar): new_expr = expr # fvars differentiate by reference
-        elif isinstance(expr, Sort): new_expr = Sort(level=expr.level) # don't copy the level
-        elif isinstance(expr, Const): new_expr = Const(cname=expr.cname, lvl_params=expr.lvl_params)  # don't copy the name
+        elif isinstance(expr, Sort): new_expr = Sort(level=expr.level, source=expr.source) # don't copy the level
+        elif isinstance(expr, Const): new_expr = Const(cname=expr.cname, lvl_params=expr.lvl_params, source=expr.source)  # don't copy the name
         elif isinstance(expr, App): 
             r_fn = replace_expression_w_depth_aux(expr.fn, fn, depth, replace_cache)
             r_arg = replace_expression_w_depth_aux(expr.arg, fn, depth, replace_cache)
@@ -100,7 +100,8 @@ def replace_expression_w_depth_aux(
             if expr.fn is r_fn and expr.arg is r_arg: new_expr = expr
             else: new_expr = App(
                 fn=r_fn,
-                arg=r_arg
+                arg=r_arg,
+                source=expr.source
             )
         elif isinstance(expr, Lambda):
             r_domain = replace_expression_w_depth_aux(expr.domain, fn, depth, replace_cache)
@@ -109,7 +110,8 @@ def replace_expression_w_depth_aux(
             else: new_expr = Lambda(
                 bname=expr.bname, 
                 domain=r_domain,
-                body=r_body
+                body=r_body,
+                source=expr.source
             )
         elif isinstance(expr, Pi):
             r_domain = replace_expression_w_depth_aux(expr.domain, fn, depth, replace_cache)
@@ -118,7 +120,8 @@ def replace_expression_w_depth_aux(
             else: new_expr = Pi(
                 bname=expr.bname, 
                 domain=r_domain,
-                codomain=r_codomain
+                codomain=r_codomain,
+                source=expr.source
             )
         elif isinstance(expr, Let): 
             r_domain = replace_expression_w_depth_aux(expr.domain, fn, depth, replace_cache)
@@ -129,7 +132,8 @@ def replace_expression_w_depth_aux(
                 bname=expr.bname, 
                 domain=r_domain,
                 val=r_val,
-                body=r_body
+                body=r_body,
+                source=expr.source
             )
         elif isinstance(expr, Proj): 
             r_expr = replace_expression_w_depth_aux(expr.expr, fn, depth, replace_cache)
@@ -137,7 +141,9 @@ def replace_expression_w_depth_aux(
             else: new_expr = Proj(
                 sname=expr.sname, 
                 index=expr.index, 
-                expr=r_expr)
+                expr=r_expr,
+                source=expr.source
+            )
         elif isinstance(expr, NatLit): 
             new_expr = expr
         elif isinstance(expr, StrLit): 
@@ -205,9 +211,9 @@ def substitute_level_params_in_expression(body : Expression, params : LevelSubLi
     """ Replaces all level parameters in the given"""
     def replace_level_params(expr : Expression) -> Optional[Expression]:
         if isinstance(expr, Sort):
-            return Sort(level=substitute_level_params_level(expr.level, params)) # copy the levels since we are changing them
+            return Sort(level=substitute_level_params_level(expr.level, params), source=expr.source) # copy the levels since we are changing them
         elif isinstance(expr, Const):
-            return Const(cname=expr.cname, lvl_params=[substitute_level_params_level(l, params) for l in expr.lvl_params]) # copy the levels since we are changing them
+            return Const(cname=expr.cname, lvl_params=[substitute_level_params_level(l, params) for l in expr.lvl_params], source=expr.source) # copy the levels since we are changing them
         return None
 
     return replace_expression(body, replace_level_params)
@@ -250,7 +256,7 @@ def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
         if not expr.has_fvars: return expr
         if isinstance(expr, FVar):
             if expr is fvar:
-                return BVar(db_index=depth)
+                return BVar(db_index=depth, source=expr.source)
         return None
     
     return replace_expression_w_depth(body, abstraction_fn, 0)
@@ -270,25 +276,27 @@ def abstract_multiple_bvars(fvars : List[FVar], body : Expression) -> Expression
         if not expr.has_fvars: return expr
         if isinstance(expr, FVar):
             for i, fvar in enumerate(fvars):
-                if fvar is expr: return BVar(db_index=depth + i)
+                if fvar is expr: return BVar(db_index=depth + i, source=expr.source)
         return None
     return replace_expression_w_depth(body, replace_fn, 0)
 
-def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression]]:
+def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression], List[Expression]]:
     """ 
     If expr is of form (... ((f a1) a2) ... an), returns f, [a1, a2, ..., an]. 
     """
-    fn, args = unfold_app_rev(expr)
-    return fn, list(reversed(args))
+    fn, args, sources = unfold_app_rev(expr)
+    return fn, list(reversed(args)), sources
 
-def unfold_app_rev(expr : Expression) -> Tuple[Expression, List[Expression]]:
+def unfold_app_rev(expr : Expression) -> Tuple[Expression, List[Expression], List[Expression]]:
     """ If expr is of form (...((f a1) a2) ... an), returns f, [an, ..., a2, a1]. """
     fn = expr
     args : List[Expression] = []
+    sources : List[Expression] = []
     while isinstance(fn, App):
         args.append(fn.arg)
+        sources.append(fn.source)
         fn = fn.fn
-    return fn, args
+    return fn, args, sources
 
 def get_app_function(expr : Expression) -> Expression:
     """ 
@@ -298,13 +306,14 @@ def get_app_function(expr : Expression) -> Expression:
         expr = expr.fn
     return expr
 
-def fold_apps(fn : Expression, args : List[Expression]) -> Expression:
+def fold_apps(fn : Expression, args : List[Expression], sources : List[Expression]) -> Expression:
     """ 
     Folds a function and a list of arguments into a single application expression. 
     """
+    assert len(args) == len(sources)
     result = fn
-    for arg in args:
-        result = App(fn=result, arg=arg)
+    for i, arg in enumerate(args):
+        result = App(fn=result, arg=arg, source=sources[i].source)
     return result
 
 def level_zip(lvl_params : List[LevelParam], lvl_values : List[Level]) -> LevelSubList:
@@ -330,28 +339,28 @@ def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expressi
     if isinstance(expr, BVar):
         return fvar_list[-expr.db_index-1]
     elif isinstance(expr, App):
-        return App(fn=replace_bvars_by_fvar(expr.fn, fvar_list), arg=replace_bvars_by_fvar(expr.arg, fvar_list))
+        return App(fn=replace_bvars_by_fvar(expr.fn, fvar_list), arg=replace_bvars_by_fvar(expr.arg, fvar_list), source=expr.source)
     elif isinstance(expr, Lambda):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, None, False))
+        fvar_list.append(FVar(expr.bname, domain, None, False, source=expr.source))
         body = replace_bvars_by_fvar(expr.body, fvar_list)
         fvar_list.pop()
-        return Lambda(bname=expr.bname, domain=domain, body=body)
+        return Lambda(bname=expr.bname, domain=domain, body=body, source=expr.source)
     elif isinstance(expr, Pi):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, None, False))
+        fvar_list.append(FVar(expr.bname, domain, None, False, source=expr.source))
         codomain = replace_bvars_by_fvar(expr.codomain, fvar_list)
         fvar_list.pop()
-        return Pi(bname=expr.bname, domain=domain, codomain=codomain)
+        return Pi(bname=expr.bname, domain=domain, codomain=codomain, source=expr.source)
     elif isinstance(expr, Let):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
         val = replace_bvars_by_fvar(expr.val, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, val, False))
+        fvar_list.append(FVar(expr.bname, domain, val, False, source=expr.source))
         body = replace_bvars_by_fvar(expr.body, fvar_list)
         fvar_list.pop()
-        return Let(bname=expr.bname, domain=domain, val=val, body=body)
+        return Let(bname=expr.bname, domain=domain, val=val, body=body, source=expr.source)
     elif isinstance(expr, Proj):
-        return Proj(sname=expr.sname, index=expr.index, expr=replace_bvars_by_fvar(expr.expr, fvar_list))
+        return Proj(sname=expr.sname, index=expr.index, expr=replace_bvars_by_fvar(expr.expr, fvar_list), source=expr.source)
     elif isinstance(expr, NatLit):
         return expr
     elif isinstance(expr, StrLit):

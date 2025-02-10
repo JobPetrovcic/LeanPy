@@ -45,11 +45,11 @@ class TypeChecker:
     def remove_fvar(self, fvar: FVar):
         self.local_context.remove_fvar(fvar)
 
-    def create_fvar(self, name: Name, type: Expression, val : Optional[Expression], is_let : bool) -> FVar:
+    def create_fvar(self, name: Name, type: Expression, val : Optional[Expression], is_let : bool, source : Expression) -> FVar:
         """
         Creates an FVar and adds it to the local context. It should have a value iff is_let is True.
         """
-        fvar = FVar(name, type, val, is_let=is_let)
+        fvar = FVar(name, type, val, is_let=is_let, source = source.source)
         self.local_context.add_fvar(fvar)
         return fvar
     
@@ -219,8 +219,8 @@ class TypeChecker:
         """
         Check if the applications are equal by checking if the functions are definitionally equal and the arguments are definitionally equal.
         """
-        f_fn, f_args = unfold_app(l)
-        g_fn, g_args = unfold_app(r)
+        f_fn, f_args, _ = unfold_app(l)
+        g_fn, g_args, _ = unfold_app(r)
         if not self.def_eq(f_fn, g_fn):
             return False
         
@@ -250,9 +250,9 @@ class TypeChecker:
             if t.codomain.has_loose_bvars or s.codomain.has_loose_bvars:
                 if var_s_type is None:
                     var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False))
+                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=var_s_type.source))
             else:
-                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False))
+                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=self.environment.filler_const.source))
             t = t.codomain
             s = s.codomain
         ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]))
@@ -281,9 +281,9 @@ class TypeChecker:
             if t.body.has_loose_bvars or s.body.has_loose_bvars:
                 if var_s_type is None:
                     var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False))
+                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=var_s_type.source))
             else:
-                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False))
+                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=self.environment.filler_const.source))
             t = t.body
             s = s.body
             
@@ -405,9 +405,9 @@ class TypeChecker:
         if is_easy is not None: 
             return is_easy
 
-        if not l.has_fvars and isinstance(r, Const) and r == Const(cname=self.environment.Bool_true_name, lvl_params=[]):
+        if not l.has_fvars and isinstance(r, Const) and r == Const(cname=self.environment.Bool_true_name, lvl_params=[], source=None):
             whnfd_l = self.whnf(l)
-            if isinstance(whnfd_l, Const) and whnfd_l == Const(cname=self.environment.Bool_true_name, lvl_params=[]):
+            if isinstance(whnfd_l, Const) and whnfd_l == Const(cname=self.environment.Bool_true_name, lvl_params=[], source=None):
                 return True
 
         l_n = self.whnf_core(l, cheap_rec=False, cheap_proj=True)
@@ -479,7 +479,7 @@ class TypeChecker:
         s_type = self.whnf(self.infer_core(s, infer_only=(self.allow_unstrict_infer and False)))
         if not isinstance(s_type, Pi): 
             return False
-        new_s = Lambda(bname=s_type.bname, domain=s_type.domain, body=App(s, BVar(0)))
+        new_s = Lambda(bname=s_type.bname, domain=s_type.domain, body=App(s, BVar(0, source=s.source), s.source), source=s_type.domain.source)
         return self.def_eq(t, new_s)
     
     def try_eta_expansion(self, t : Expression, s : Expression) -> bool:
@@ -494,7 +494,7 @@ class TypeChecker:
         """
 
         # First part: deconstruct s, ensure it is an application of a constructor
-        s_fn, s_args = unfold_app(s)
+        s_fn, s_args, _ = unfold_app(s)
 
         if not isinstance(s_fn, Const): 
             return False
@@ -520,7 +520,7 @@ class TypeChecker:
         # s was decomposed, so we know the arguments
         # for t we don't know the arguments, so we use proj to get them
         for i in range(decl.num_params, len(s_args)):
-            t_i_proj = Proj(sname=decl.inductive_name, index=i-decl.num_params, expr=t)
+            t_i_proj = Proj(sname=decl.inductive_name, index=i-decl.num_params, expr=t, source=t.source)
 
             # compare the arguments
             if not self.def_eq(t_i_proj, s_args[i]): 
@@ -534,7 +534,7 @@ class TypeChecker:
         return self.try_structural_eta_expansion_core(t, s) or self.try_structural_eta_expansion_core(s, t)
     
     def try_string_lit_expansion_core(self, t : Expression, s : Expression) -> Optional[bool]:
-        if isinstance(t, StrLit) and isinstance(s, App) and get_app_function(s) == Const(self.environment.String_mk_name, []):
+        if isinstance(t, StrLit) and isinstance(s, App) and get_app_function(s) == Const(self.environment.String_mk_name, [], source=None):
             return self.def_eq_core(str_lit_to_constructor(self.environment, t), s)
         return None
 
@@ -558,7 +558,7 @@ class TypeChecker:
         """
         Tries to eta expand the expression e: it gets the first constructor of the structure, and then constructs the application of the constructor with the arguments replaced by projections of e to corresponding fields.
         """
-        fn, args = unfold_app(e_type)
+        fn, args, arg_sources = unfold_app(e_type)
         if not isinstance(fn, Const): 
             return e
 
@@ -569,8 +569,9 @@ class TypeChecker:
         if len(args) < constructor.num_params:
             raise StructureError(f"Expected {constructor.num_params} parameters, but got {len(args)}.")
         args = args[:constructor.num_params]
-        result = fold_apps(Const(cname=constructor.name, lvl_params=fn.lvl_params), args)
-        result = fold_apps(result, [Proj(sname=fn.cname, index=i, expr=e) for i in range(constructor.num_fields)])
+        arg_sources = arg_sources[:constructor.num_params]
+        result = fold_apps(Const(cname=constructor.name, lvl_params=fn.lvl_params, source=fn.source), args, sources=arg_sources)
+        result = fold_apps(result, [Proj(sname=fn.cname, index=i, expr=e, source=e.source) for i in range(constructor.num_fields)], sources=[e.source]*constructor.num_fields)
         return result
 
     def to_constructor_when_structure(self, inductive_name : Name, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
@@ -609,7 +610,7 @@ class TypeChecker:
         """
         Auxiliary function for to_constructor_when_K. It constructs the application of the constructor of the inductive type supporting K-axiom. It reaplces the arguments of the type with that of the constructor. The main use case is for Eq type, see comments in to_constructor_when_K.
         """
-        d, args = unfold_app(type_e)
+        d, args, arg_sources = unfold_app(type_e)
         if not isinstance(d, Const): 
             return None
         constructor = self.get_first_constructor(d.cname)
@@ -618,7 +619,8 @@ class TypeChecker:
         if len(args) < num_params:
             raise StructureError(f"Expected at least {num_params} parameters, but got {len(args)}.")
         args = args[:num_params]
-        return fold_apps(Const(cname=constructor.name, lvl_params=d.lvl_params), args)
+        arg_sources = arg_sources[:num_params]
+        return fold_apps(Const(cname=constructor.name, lvl_params=d.lvl_params, source=d.source), args, sources=arg_sources)
 
     def to_constructor_when_K(self, recursor : Recursor, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
         """
@@ -630,7 +632,7 @@ class TypeChecker:
             raise PanicError("Cannot apply K-axiom to a recursor that is not K.")
         app_type = self.infer_core(e, infer_only=(self.allow_unstrict_infer and True))
         app_type = self.whnf_core(app_type, cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_rec else self.whnf(app_type)
-        app_type_inductive, app_type_args = unfold_app(app_type) # get the arguments of the type
+        app_type_inductive, app_type_args, _ = unfold_app(app_type) # get the arguments of the type
 
         if not isinstance(app_type_inductive, Const): 
             return e
@@ -663,7 +665,7 @@ class TypeChecker:
         """
         if not isinstance(e, App): 
             return e
-        fn, args = unfold_app(e)
+        fn, args, arg_sources = unfold_app(e)
         if not isinstance(fn, Lambda):
             return e
         
@@ -673,17 +675,18 @@ class TypeChecker:
             fn = fn.body
         
         if not fn.has_loose_bvars:
-            return fold_apps(fn, args[i:])
+            return fold_apps(fn, args[i:], sources=arg_sources[i:])
         elif isinstance(fn, BVar): # the body is a single bound variable, so just replace it with the value of it args[i - fn.db_index - 1]
             if i <= fn.db_index:
                 raise UnboundVariableError(f"Unbound variable {fn} in the body of the lambda.")
-            return fold_apps(args[i - fn.db_index - 1], args[i:]) # fold back the rest of the arguments
+            return fold_apps(args[i - fn.db_index - 1], args[i:], sources=arg_sources[i:]) # fold back the rest of the arguments
         else:
             return e
 
     def beta_reduction(self, 
             f : Expression, #  ( ... ((f a_1) a_2) ... a_n -> f, [a_1, a_2, ..., a_n] outermost to innermost
-            args : List[Expression]
+            args : List[Expression],
+            args_sources : List[Expression]
         ) -> Expression:
         """
         Reduces the application by substituting the argument in the body.
@@ -699,9 +702,9 @@ class TypeChecker:
         
         inst_f = self.instantiate_multiple(f, successful_args)
 
-        return fold_apps(inst_f, rest_args)
+        return fold_apps(inst_f, rest_args, sources=args_sources)
     
-    def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression]]]:
+    def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression], List[Expression]]]:
         """
         Checks if the expression is delta reducible: if it is an application of a declaration, then it returns the Constant referring to the declaration, the declaration, and the arguments. Otherwise, it returns None.
 
@@ -714,7 +717,7 @@ class TypeChecker:
                 If the expression is delta reducible, then it returns the Constant referring to the declaration, the declaration, and the arguments. Otherwise, it returns None.
 
         """
-        fn, args = unfold_app(expr)
+        fn, args, arg_sources = unfold_app(expr)
         if not isinstance(fn, Const): 
             return None
         decl = self.environment.get_declaration_under_name(fn.cname)
@@ -722,9 +725,9 @@ class TypeChecker:
             return None
         if not (isinstance(decl, Definition) or isinstance(decl, Opaque) or isinstance(decl, Theorem)):
             raise DeclarationError(f"Declaration {fn.cname} is not a Definition, Opaque, or Theorem.")
-        return fn, decl, args
+        return fn, decl, args, arg_sources
     
-    def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression:
+    def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression], arg_sources: List[Expression]) -> Expression:
         """
         Unfold the definition of the declaration and folds back the arguments.
 
@@ -741,7 +744,7 @@ class TypeChecker:
                 The expression after the delta reduction.
         """
         decl_val = self.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params)
-        return fold_apps(decl_val, args)
+        return fold_apps(decl_val, args, sources=arg_sources)
     
     def delta_reduction(self, expr : Expression) -> Optional[Expression]:
         """ 
@@ -761,7 +764,7 @@ class TypeChecker:
         """
         if isinstance(proj_struct, StrLit): proj_struct = str_lit_to_constructor(self.environment, proj_struct)
         
-        proj_struct_fn, proj_struct_args = unfold_app(proj_struct)
+        proj_struct_fn, proj_struct_args, _ = unfold_app(proj_struct)
         if not isinstance(proj_struct_fn, Const): 
             return None
         constructor_decl = self.environment.get_declaration_under_name(proj_struct_fn.cname)
@@ -926,16 +929,16 @@ class TypeChecker:
         if e.has_fvars: 
             return None
         
-        fn, args = unfold_app(e)
+        fn, args, _ = unfold_app(e)
         if not isinstance(fn, Const): 
             return None
         if len(args) == 1:
             if fn.cname == self.environment.Nat_succ_name:
                 arg = self.whnf(args[0])
                 if isinstance(arg, NatLit): 
-                    return NatLit(arg.val + 1)
+                    return NatLit(arg.val + 1, source=e.source)
                 if is_nat_zero_const(self.environment, arg): 
-                    return NatLit(1)
+                    return NatLit(1, source=e.source)
                 return None
             
         if len(args) == 2:
@@ -950,40 +953,40 @@ class TypeChecker:
             if len(fn.lvl_params) != 0:
                 raise DeclarationError(f"Expected no level parameters, but got {len(fn.lvl_params)} when reducing natural numbers.")
             if name == self.environment.Nat_add_name: 
-                return reduce_bin_nat_op(nat_add, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_add, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_sub_name: 
-                return reduce_bin_nat_op(nat_sub, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_sub, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_mul_name: 
-                return reduce_bin_nat_op(nat_mul, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_mul, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_pow_name: 
-                return reduce_bin_nat_op(nat_pow, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_pow, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_gcd_name: 
-                return reduce_bin_nat_op(nat_gcd, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_gcd, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_mod_name: 
-                return reduce_bin_nat_op(nat_mod, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_mod, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_div_name: 
-                return reduce_bin_nat_op(nat_div, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_div, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_eq_name: 
-                return reduce_bin_nat_pred(self.environment, nat_beq, arg1.val, arg2.val)
+                return reduce_bin_nat_pred(self.environment, nat_beq, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_le_name: 
-                return reduce_bin_nat_pred(self.environment, nat_ble, arg1.val, arg2.val)
+                return reduce_bin_nat_pred(self.environment, nat_ble, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_land_name: 
-                return reduce_bin_nat_op(nat_land, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_land, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_lor_name: 
-                return reduce_bin_nat_op(nat_lor, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_lor, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_lxor_name: 
-                return reduce_bin_nat_op(nat_xor, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_xor, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_shiftl_name: 
-                return reduce_bin_nat_op(nat_shiftl, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_shiftl, arg1.val, arg2.val, e.source)
             elif name == self.environment.Nat_shiftr_name: 
-                return reduce_bin_nat_op(nat_shiftr, arg1.val, arg2.val)
+                return reduce_bin_nat_op(nat_shiftr, arg1.val, arg2.val, e.source)
         return None
     
     def quot_reduce_rec(self, e : Expression) -> Optional[Expression]:
         """
         Built in reduction for quotient recursor.
         """
-        fn, args = unfold_app(e)
+        fn, args, arg_sources = unfold_app(e)
         if not isinstance(fn, Const): 
             return None
         mk_pos = 0 # the position of the Quot r argument
@@ -1000,7 +1003,7 @@ class TypeChecker:
         if len(args) <= mk_pos: return None
         mk = self.whnf(args[mk_pos]) # whnf to expose the Quot_mk
 
-        mk_fn, mk_args = unfold_app(mk)
+        mk_fn, mk_args, _ = unfold_app(mk)
 
         if not isinstance(mk_fn, Const): 
             return None
@@ -1012,11 +1015,12 @@ class TypeChecker:
         if not isinstance(mk, App):
             raise PanicError("Wrong unfold_app result.")
         f = args[arg_pos] # get the function we are lifting/inducing
-        r = App(f, mk.arg) # get the class representative and apply f on it
+        # e.source or mk.source?
+        r = App(f, mk.arg, source=e.source) # get the class representative and apply f on it
 
         elim_arity = mk_pos+1
         if len(args) > elim_arity:
-            r = fold_apps(r, args[elim_arity:]) # reapply the arguments that were not relevant for the recursor
+            r = fold_apps(r, args[elim_arity:], arg_sources[elim_arity:]) # reapply the arguments that were not relevant for the recursor
         return r
     
     def inductive_reduce_rec(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]:
@@ -1024,7 +1028,7 @@ class TypeChecker:
         Reduce the recursor application for inductive types.
         """
         # Second unfold the application and get the recursor
-        rec_fn, rec_args = unfold_app(e)
+        rec_fn, rec_args, rec_arg_sources = unfold_app(e)
         if not isinstance(rec_fn, Const): 
             return None
         
@@ -1056,7 +1060,7 @@ class TypeChecker:
         if rule is None: 
             return None
 
-        _, major_args = unfold_app(major)
+        _, major_args, major_arg_sources = unfold_app(major)
         if len(major_args) < rule.num_fields: 
             return None 
         if len(rec_fn.lvl_params) != len(rec_decl.lvl_params): 
@@ -1066,7 +1070,7 @@ class TypeChecker:
         # apply parameters, motives and minor premises from recursor application.
         if rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors >= len(rec_args):
             RecursionError("Recursor application does not have enough arguments.")
-        rhs = fold_apps(rhs, rec_args[:rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors]) # this is the actual reduction of the recursor
+        rhs = fold_apps(rhs, rec_args[:rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors], rec_arg_sources[:rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors]) # this is the actual reduction of the recursor
 
         # TODO: The number of parameters in the constructor is not necessarily
         #equal to the number of parameters in the recursor when we have
@@ -1076,12 +1080,13 @@ class TypeChecker:
         if nparams + rule.num_fields > len(major_args):
             raise RecursionError(f"Major premise does not have the expected number of fields. Expected at least {nparams + rule.num_fields}, but got {len(major_args)}.")
         selected_major_args = major_args[nparams: nparams + rule.num_fields]
+        selected_major_arg_sources = major_arg_sources[nparams: nparams + rule.num_fields]
         if len(selected_major_args) != rule.num_fields: raise RecursorError("Major premise does not have the expected number of fields.")
-        rhs = fold_apps(rhs, selected_major_args) # reapply the indices' arguments back
+        rhs = fold_apps(rhs, selected_major_args, selected_major_arg_sources) # reapply the indices' arguments back
 
         # the remaining arguments are not relevant for the recursor; they are just applied back to whatever we got from the reduction
         if len(rec_args) > major_index + 1: 
-            rhs = fold_apps(rhs, rec_args[major_index + 1:])
+            rhs = fold_apps(rhs, rec_args[major_index + 1:], rec_arg_sources[major_index + 1:])
         
         return rhs
     
@@ -1109,7 +1114,7 @@ class TypeChecker:
             return None
         if not isinstance(e.arg, Const): 
             return None
-        if e.fn == Const(cname=self.environment.Bool_reduce_name, lvl_params=[]):
+        if e.fn == Const(cname=self.environment.Bool_reduce_name, lvl_params=[], source=None):
             raise NotImplementedError("TODO")
             #object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
             #if (!lean_is_scalar(r)) {
@@ -1117,7 +1122,7 @@ class TypeChecker:
             #    throw kernel_exception(env, "type checker failure, unexpected result value for 'Lean.reduceBool'");
             #}
             #return lean_unbox(r) == 0 ? some_expr(mk_bool_false()) : some_expr(mk_bool_true());
-        if e.fn == Const(cname=self.environment.Nat_reduce_name, lvl_params=[]):
+        if e.fn == Const(cname=self.environment.Nat_reduce_name, lvl_params=[], source=None):
             raise NotImplementedError("TODO")
             #object * r = ir::run_boxed(env, options(), const_name(arg), 0, nullptr);
             #if (lean_is_scalar(r) || lean_is_mpz(r)) {
@@ -1172,11 +1177,11 @@ class TypeChecker:
             else:
                 r = self.whnf_core(pos_red, cheap_rec=cheap_rec, cheap_proj=cheap_proj)     
         elif isinstance(expr, App):
-            raw_fn, raw_args = unfold_app(expr)
+            raw_fn, raw_args, raw_arg_sources = unfold_app(expr)
             
             fn = self.whnf_core(raw_fn, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
             if isinstance(fn, Lambda):
-                r = self.whnf_core(self.beta_reduction(fn, raw_args), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
+                r = self.whnf_core(self.beta_reduction(fn, raw_args, raw_arg_sources), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
             elif fn == raw_fn:
                 r = self.reduce_recursor(expr, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
                 if r is not None: 
@@ -1185,7 +1190,7 @@ class TypeChecker:
                 else: 
                     return expr
             else:
-                r = self.whnf_core(fold_apps(fn, raw_args), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
+                r = self.whnf_core(fold_apps(fn, raw_args, raw_arg_sources), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         elif isinstance(expr, Let):
             r = self.whnf_core(self.instantiate(body=expr.body, val=expr.val), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         
@@ -1265,7 +1270,7 @@ class TypeChecker:
             return infered_type
         else:
             # If infer_only is true we only check that the type of fn is a pi type and keep substituting the arguments into the function type's codomain. We don't check that arguments match the function type's domain.
-            fn, args = unfold_app(app)
+            fn, args, _ = unfold_app(app)
             fn_type = self.infer_core(fn, infer_only=(self.allow_unstrict_infer and infer_only))
             
             j = 0
@@ -1284,7 +1289,7 @@ class TypeChecker:
         """
         The type of Sort l is Sort (l+1).
         """
-        return Sort(LevelSucc(sort.level))
+        return Sort(LevelSucc(sort.level), source=sort.source)
     
     def infer_pi(self, pi : Pi, infer_only : bool) -> Expression:
         """
@@ -1304,7 +1309,7 @@ class TypeChecker:
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
             t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only))
             us.append(t1.level)
-            fvars.append(self.create_fvar(e.bname, inst_domain, None, False))
+            fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=inst_domain.source))
             e = e.codomain
 
         e = self.instantiate_multiple(e, fvars[::-1])
@@ -1315,7 +1320,7 @@ class TypeChecker:
 
         self.cleanup_fvars(fvars)
 
-        return Sort(level=lvl)
+        return Sort(level=lvl, source=pi.source)
     
     def infer_const(self, c : Const) -> Expression:
         """
@@ -1325,7 +1330,7 @@ class TypeChecker:
             raise PanicError("The number of level parameters of the constant does not match the number of level parameters in the environment.")
         return self.get_declaration_type_with_substituted_level_params(self.environment.get_declaration_under_name(c.cname), c.lvl_params)
 
-    def make_pi_binding(self, fvars : List[FVar], b : Expression) -> Expression:
+    def make_pi_binding(self, fvars : List[FVar], b : Expression, pi_sources : List[Expression]) -> Expression:
         """
         If we have a body with free variables fvars, then we abstract the body, replacing the free variables with bound variables, and then create Pi bindings corresponding to the bound variables. Also abstracts the domains of the pi bindings.
 
@@ -1342,7 +1347,7 @@ class TypeChecker:
             if c_fvar.is_let:
                 raise PanicError("Cannot have a let binding in a pi binding.")
             abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
-            r = Pi(c_fvar.name, abs_type, r)
+            r = Pi(c_fvar.name, abs_type, r, source=pi_sources[i])
         
         return r
 
@@ -1353,9 +1358,11 @@ class TypeChecker:
         fvars : List[FVar] = []
         e = lam
 
+        pi_sources : List[Expression] = []
         while isinstance(e, Lambda):
+            pi_sources.append(e.source)
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
-            fvars.append(self.create_fvar(e.bname, inst_domain, None, False))
+            fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=inst_domain.source))
             if not infer_only:
                 self.ensure_sort(self.infer_core(inst_domain, infer_only))
             e = e.body
@@ -1366,7 +1373,7 @@ class TypeChecker:
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
 
-        r = self.make_pi_binding(fvars, r)
+        r = self.make_pi_binding(fvars, r, pi_sources)
 
         self.cleanup_fvars(fvars)
         return r
@@ -1375,15 +1382,15 @@ class TypeChecker:
         """
         The type of a natural number literal is Nat.
         """
-        return Const(self.environment.Nat_name, [])
+        return Const(self.environment.Nat_name, [], source=n.source)
     
     def infer_string_lit(self, s : StrLit) -> Expression:
         """
         The type of a string literal is String.
         """
-        return Const(self.environment.String_name, [])
+        return Const(self.environment.String_name, [], source=s.source)
 
-    def make_let_binding(self, fvars : List[FVar], b : Expression) -> Expression:
+    def make_let_binding(self, fvars : List[FVar], b : Expression, let_sources : List[Expression]) -> Expression:
         """
         If we have a body with free variables fvars, then we abstract the body, replacing the free variables with bound variables, and then create Let bindings corresponding to the bound variables (if they are present in the abstracted body). Also abstracts the domains and values of the let bindings. 
         """
@@ -1398,7 +1405,7 @@ class TypeChecker:
             abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
             abs_val = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.val)
 
-            r = Let(bname=c_fvar.name, domain=abs_type, val=abs_val, body=r)
+            r = Let(bname=c_fvar.name, domain=abs_type, val=abs_val, body=r, source=let_sources[i])
         
         return r
     
@@ -1410,13 +1417,15 @@ class TypeChecker:
         """
         fvars : List[FVar] = []
         vals : List[Expression] = []
+        let_sources : List[Expression] = []
 
         e = let
         while isinstance(e, Let):
             l_type = self.instantiate_multiple(e.domain, fvars[::-1])
             val = self.instantiate_multiple(e.val, fvars[::-1])
-            fvars.append(self.create_fvar(e.bname, l_type, val=val, is_let=True))
+            fvars.append(self.create_fvar(e.bname, l_type, val=val, is_let=True, source=l_type.source))
             vals.append(val)
+            let_sources.append(e.source)
 
             if not infer_only:
                 self.ensure_sort(self.infer_core(l_type, infer_only))
@@ -1440,11 +1449,14 @@ class TypeChecker:
                 mark_used(fvars[:i], vals[i], used)
         
         used_fvars : List[FVar] = []
+        used_let_sources : List[Expression] = []
         for i in range(len(fvars)):
             if used[i]:
                 used_fvars.append(fvars[i])
+                used_let_sources.append(let_sources[i])
         
-        r = self.make_let_binding(used_fvars, r)
+        assert len(used_fvars) == len(used_let_sources)
+        r = self.make_let_binding(used_fvars, r, used_let_sources)
 
         self.cleanup_fvars(fvars)
         return r
@@ -1457,7 +1469,7 @@ class TypeChecker:
         struct_type = self.infer_core(proj.expr, infer_only=(self.allow_unstrict_infer and infer_only))
         struct_type = self.whnf(struct_type)
 
-        inductive_fn, args = unfold_app(struct_type)
+        inductive_fn, args, _ = unfold_app(struct_type)
         if not isinstance(inductive_fn, Const):
             raise ProjectionError(f"Expected a constant when unfolding the struct type for projection but got {inductive_fn.__class__}")
         if inductive_fn.cname != proj.sname:
@@ -1502,7 +1514,7 @@ class TypeChecker:
             if r.codomain.has_loose_bvars:
                 r = self.instantiate(
                     body=r.codomain, 
-                    val=Proj(I_name, i, proj.expr)
+                    val=Proj(I_name, i, proj.expr, source=proj.expr.source) # proj.expr.source or proj.source?
                 )
                 if is_prop_type and not self.is_prop(r):
                     raise ProjectionError(f"When substituting proj indices, the body should remain a prop type.")
