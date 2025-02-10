@@ -261,14 +261,14 @@ class TypeChecker:
 
         return ret
     
-    def def_eq_lambda(self, init_it : Lambda , init_s : Lambda) -> bool:
+    def def_eq_lambda(self, init_t : Lambda , init_s : Lambda) -> bool:
         """
         Check if the Lambdas are equal by checking if the domains are equal (first it tries greedy structural equality, then it tries definitional equality) and then checking if the bodies are definitionally equal.
         """
 
         subs : List[FVar] = []
     
-        t : Expression = init_it
+        t : Expression = init_t
         s : Expression = init_s
         while isinstance(t, Lambda) and isinstance(s, Lambda):
             var_s_type = None
