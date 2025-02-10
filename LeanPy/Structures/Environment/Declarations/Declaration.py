@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from LeanPy.Structures.Environment.ReducibilityHint import Abbrev, OpaqueHint, ReducibilityHint, Regular
 from LeanPy.Structures.Expression.ExpressionManipulation import get_app_function
-from LeanPy.Kernel.KernelErrors import PanicError
+from LeanPy.Kernel.KernelErrors import DeclarationError, PanicError
 from LeanPy.Structures.Name import Name
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import LevelParam
@@ -123,7 +123,7 @@ class Inductive(Declaration):
     def get_ith_constructor_name(self, i: int) -> Name:
         assert i>=0, "Constructor index must be non-negative."
         if i < self.number_of_constructors: 
-            raise ValueError(f"Constructor index {i} is out of bounds.")
+            raise DeclarationError(f"Constructor index {i} is out of bounds.")
         return self.constructor_names[i]
 
     def has_value(self, allow_opaque : bool = False) -> bool:
@@ -187,15 +187,15 @@ class Recursor(Declaration):
             elif isinstance(t, Lambda):
                 t = t.body
             else: 
-                raise ValueError(f"Expected Pi or Lambda, got {t} when decomposing major premise of recursor.")
+                raise DeclarationError(f"Expected Pi or Lambda, got {t} when decomposing major premise of recursor.")
 
         if not (isinstance(t, Pi) or isinstance(t, Lambda)):
-            raise ValueError(f"Expected Pi or Lambda, got {t} when decomposing major premise of recursor.")
+            raise DeclarationError(f"Expected Pi or Lambda, got {t} when decomposing major premise of recursor.")
         t = t.domain
         
         fn = get_app_function(t)
         if not isinstance(fn, Const):
-            raise ValueError(f"Expected Const, got {fn} when decomposing major premise of recursor.")
+            raise DeclarationError(f"Expected Const, got {fn} when decomposing major premise of recursor.")
         
         return fn.cname
     

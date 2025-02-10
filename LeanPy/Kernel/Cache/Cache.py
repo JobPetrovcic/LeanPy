@@ -1,4 +1,5 @@
 from typing import Dict, Generic, Optional, Tuple, TypeVar
+from LeanPy.Kernel.KernelErrors import CacheError
 from LeanPy.Structures.Expression.Expression import Expression
 
 class MapCache:
@@ -11,8 +12,10 @@ class MapCache:
     
     def put(self, key : Expression, value : Expression):
         if key in self.cache:
-            if self.cache[key] != value: raise Exception(f"MapCache already contains key {key} with different value (in terms of total equality) {self.cache[key]}")
-            else: return # value is the same
+            if self.cache[key] != value: 
+                raise CacheError(f"MapCache already contains key {key} with different value (in terms of total equality) {self.cache[key]}")
+            else: 
+                return # value is the same
         
         self.cache[key] = value
     
@@ -45,7 +48,7 @@ class PairCache(Generic[N, M, T]):
         key = (expr1, expr2)
         if key in self.cache:
             if self.cache[key] != value:
-                raise Exception(f"PairCache already contains key {key} with different value {self.cache[key]}")
+                raise CacheError(f"PairCache already contains key {key} with different value {self.cache[key]}")
             return
         self.cache[key] = value
     

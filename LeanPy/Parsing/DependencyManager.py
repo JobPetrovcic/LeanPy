@@ -4,6 +4,7 @@ from typing import List, Set
 
 import tqdm
 
+from LeanPy.Kernel.KernelErrors import DeclarationError
 from LeanPy.Kernel.TypeChecker import TypeChecker
 from LeanPy.Parsing import LeanJSONParser
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
@@ -49,7 +50,7 @@ class DependencyManager:
         if decl_file_name not in self.loading:
             self.loading.add(decl_file_name)
         if decl_file_name in self.loaded:
-            raise Exception(f"Declaration {decl_file_name} already loaded")
+            raise DeclarationError(f"Declaration {decl_file_name} already loaded")
         assert decl_file_name in self.loading, f"Declaration {decl_file_name} not loading"
         assert decl_file_name not in self.file_name_to_declaration, f"Declaration {decl_file_name} already in file_name_to_declaration"
         
@@ -57,7 +58,7 @@ class DependencyManager:
         self.file_name_to_declaration[decl_file_name] = declaration
         self.file_name_to_dependencies[decl_file_name] = dependencies
         if self.type_checker.environment.exists_declaration_under_name(declaration.name):
-            raise Exception(f"Declaration {declaration.name} already in environment")
+            raise DeclarationError(f"Declaration {declaration.name} already in environment")
         self.type_checker.environment.add_declaration(declaration)
         self.loaded.add(decl_file_name)
 
@@ -65,7 +66,7 @@ class DependencyManager:
     
     def load_and_load_dependencies(self, decl_file_name : str):
         if decl_file_name in self.loading:
-            raise Exception(f"Declaration {decl_file_name} already loading")
+            raise DeclarationError(f"Declaration {decl_file_name} already loading")
         if decl_file_name in self.loaded_and_dependencies_loaded:
             return self.file_name_to_dependencies[decl_file_name], self.file_name_to_declaration[decl_file_name]
 
@@ -97,9 +98,9 @@ class DependencyManager:
             should_dependencies_be_checked : bool = True,
         ):
         if decl_file_name in self.checked:
-            raise Exception(f"Declaration {decl_file_name} already checked")
+            raise DeclarationError(f"Declaration {decl_file_name} already checked")
         if decl_file_name in self.being_checked:
-            raise Exception(f"Declaration {decl_file_name} already being checked")
+            raise DeclarationError(f"Declaration {decl_file_name} already being checked")
         
         self.being_checked.add(decl_file_name)
         dependencies, _ = self.load_and_load_dependencies(decl_file_name)
@@ -110,13 +111,13 @@ class DependencyManager:
                     self.load_and_check(dependency, is_main = False, should_dependencies_be_checked = should_dependencies_be_checked)
 
         if decl_file_name in self.loading:
-            raise Exception(f"Declaration {decl_file_name} still loading. This should be unreachable.")
+            raise DeclarationError(f"Declaration {decl_file_name} still loading. This should be unreachable.")
         if decl_file_name not in self.loaded:
-            raise Exception(f"Declaration {decl_file_name} not loaded. This should be unreachable.")
+            raise DeclarationError(f"Declaration {decl_file_name} not loaded. This should be unreachable.")
         if decl_file_name not in self.loaded_and_dependencies_loaded:
-            raise Exception(f"Declaration {decl_file_name} not loaded and all dependencies loaded. This should be unreachable.")
+            raise DeclarationError(f"Declaration {decl_file_name} not loaded and all dependencies loaded. This should be unreachable.")
         if decl_file_name not in self.file_name_to_declaration:
-            raise Exception(f"Declaration {decl_file_name} not in file_name_to_declaration")
+            raise DeclarationError(f"Declaration {decl_file_name} not in file_name_to_declaration")
         
         should_check = is_main or should_dependencies_be_checked
         if should_check:
@@ -143,6 +144,12 @@ class DependencyManager:
         return len(self.checked)
 
     def update_tqdm(self, tqdm_instance : tqdm.tqdm):
+        """
+        Update the progress bar indicated by the given tqdm instance.
+
+        This method sets the total number of iterations and the current iteration count for
+        the provided progress bar, then refreshes the display.
+        """
         tqdm_instance.total = self.__total__()
         tqdm_instance.n = self.n_checked()
         tqdm_instance.refresh()

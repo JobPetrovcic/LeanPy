@@ -1,5 +1,6 @@
 from typing import Callable, Optional
 
+from LeanPy.Kernel.KernelErrors import DeclarationError
 from LeanPy.Structures.Environment.Environment import Environment
 from LeanPy.Structures.Expression.Expression import App, Const, Expression, NatLit, StrLit
 from LeanPy.Structures.Expression.ExpressionManipulation import unfold_app
@@ -72,13 +73,15 @@ def str_lit_to_constructor(environment : Environment, s : StrLit) -> Expression:
 
 def is_nat_zero_const(environment : Environment, t : Expression) -> bool:
     if isinstance(t, Const) and t.cname == environment.Nat_zero_name:
-        assert len(t.lvl_params) == 0, f"Expected 0 level parameters for Nat.zero, got {len(t.lvl_params)}."
+        if len(t.lvl_params) != 0:
+            raise DeclarationError(f"Expected 0 level parameters for Nat.zero, got {len(t.lvl_params)}.")
         return True
     return False
 
 def is_nat_succ_const(environment : Environment, t : Expression) -> bool:
     if isinstance(t, Const) and t.cname == environment.Nat_succ_name:
-        assert len(t.lvl_params) == 0, f"Expected 0 level parameters for Nat.succ, got {len(t.lvl_params)}."
+        if len(t.lvl_params) != 0:
+            raise DeclarationError(f"Expected 0 level parameters for Nat.succ, got {len(t.lvl_params)}.")
         return True
     return False
 

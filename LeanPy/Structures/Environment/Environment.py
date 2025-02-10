@@ -1,4 +1,5 @@
 from typing import Dict
+from LeanPy.Kernel.KernelErrors import TCEnvironmentError
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *
@@ -81,14 +82,14 @@ class Environment:
 
     def get_declaration_under_name(self, name : Name) -> Declaration:
         if name not in self.name_dict:
-            raise ValueError(f"Name {name} does not exist in environment.")
+            raise TCEnvironmentError(f"Name {name} does not exist in environment.")
         found = self.name_dict[name]
         
         return found
     
     def add_declaration(self, decl : Declaration):
         if decl.info.ciname in self.name_dict:
-            raise ValueError(f"Name {decl.info.ciname} already exists in environment.")
+            raise TCEnvironmentError(f"Name {decl.info.ciname} already exists in environment.")
         if (len(self.name_dict) + 1) % 100 == 0:
             print(f"Added {len(self.name_dict) + 1} declarations.")
         self.name_dict[decl.info.ciname] = decl

@@ -21,7 +21,6 @@ class EquivManager:
         self.expr_to_dsu : Dict[Expression, DSUObject] = {}
 
     def create_fresh_dsu_object(self, expr : Expression):
-        #assert expr not in self.expr_to_dsu, f"Expression {expr} already in DSU"
         self.expr_to_dsu[expr] = DSUObject()
         return self.expr_to_dsu[expr]
 

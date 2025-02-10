@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar
 
+from LeanPy.Kernel.KernelErrors import DeclarationError, PanicError, UnboundVariableError
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import Level, LevelParam
 from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
@@ -51,7 +52,7 @@ def replace_expression_aux(
             else: new_expr = Proj(sname=expr.sname, index=expr.index, expr=r_expr)
         elif isinstance(expr, NatLit): new_expr = expr
         elif isinstance(expr, StrLit): new_expr = expr
-        else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
+        else: raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
     
     save_result(expr, new_expr, replace_cache)
 
@@ -141,7 +142,7 @@ def replace_expression_w_depth_aux(
             new_expr = expr
         elif isinstance(expr, StrLit): 
             new_expr = expr
-        else: raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
+        else: raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
 
     save_result((expr, depth), new_expr, replace_cache)
     return new_expr
@@ -192,7 +193,8 @@ def mark_used(fvars : List[FVar], expr : Expression, used : List[bool]):
     """
     Marks the fvars that are used in the given expression. Used should be the same length as fvars and will be modified in place.
     """
-    assert len(fvars) <= len(used)
+    if len(fvars) > len(used):
+        raise PanicError("Used list is shorter than the list of free variables.")
     def mark_fn(e : Expression):
         if isinstance(e, FVar):
             for i, fvar in enumerate(fvars):
@@ -230,7 +232,7 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
         if isinstance(expr, BVar): 
             if expr.db_index >= depth: 
                 if expr.db_index - depth < len(vals): return vals[expr.db_index - depth]
-                else: raise ValueError(f"Unbound de Bruijn index {expr.db_index}")
+                else: raise UnboundVariableError(f"Unbound de Bruijn index {expr.db_index}")
         return None
     return replace_expression_w_depth(body, instantiation_fn, 0)
 
@@ -239,9 +241,11 @@ def abstract_bvar(body : Expression, fvar : FVar) -> Expression:
     Turns fvar into a bound variable in the given expression.
     """
     # turns fvar into a bound variable with de Bruijn index depth
-    assert not fvar.type.has_loose_bvars, f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}"
+    if fvar.type.has_loose_bvars:
+        raise PanicError(f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}")
     if fvar.val is not None:
-        assert not fvar.val.has_loose_bvars, f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}"
+        if fvar.val.has_loose_bvars:
+            raise PanicError(f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}")
     def abstraction_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if not expr.has_fvars: return expr
         if isinstance(expr, FVar):
@@ -256,9 +260,11 @@ def abstract_multiple_bvars(fvars : List[FVar], body : Expression) -> Expression
     Turns all fvars into bound variables in the given expression with indices determined by the order in the list (+ offset).
     """
     for fvar in fvars:
-        assert not fvar.type.has_loose_bvars, f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}"
+        if fvar.type.has_loose_bvars:
+            raise UnboundVariableError(f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}")
         if fvar.val is not None:
-            assert not fvar.val.has_loose_bvars, f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}"
+            if fvar.val.has_loose_bvars:
+                raise UnboundVariableError(f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}")
     """ Abstracts multiple free variables in the given expression. """
     def replace_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if not expr.has_fvars: return expr
@@ -305,7 +311,7 @@ def level_zip(lvl_params : List[LevelParam], lvl_values : List[Level]) -> LevelS
     """ 
     Checks if the two lists of levels have the same length and zips them together. 
     """
-    if len(lvl_params) != len(lvl_values): raise ValueError("Found different number of level parameters.")
+    if len(lvl_params) != len(lvl_values): raise DeclarationError("Found different number of level parameters.")
     return list(zip(lvl_params, lvl_values))
 
 class ReductionStatus(Enum):
@@ -357,6 +363,6 @@ def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expressi
     elif isinstance(expr, FVar):
         return expr
     else:
-        raise ValueError(f"Unknown expression type {expr.__class__.__name__}")
+        raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
     
 

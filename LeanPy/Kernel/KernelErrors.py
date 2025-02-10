@@ -24,7 +24,7 @@ class ProjectionError(KernelError):
     def __init__(self, message : str):
         super().__init__(message)
 
-class EnvironmentError(KernelError):
+class TCEnvironmentError(KernelError):
     def __init__(self, message : str):
         super().__init__(message)
 
@@ -44,6 +44,14 @@ class UnfinishedExpressionError(KernelError):
     def __init__(self, message : str):
         super().__init__(message)
 
+class LocalContextError(KernelError):
+    def __init__(self, message : str):
+        super().__init__(message)
+
+
+class CacheError(Exception):
+    def __init__(self, message : str):
+        super().__init__(message)
 
 class DeclarationError(Exception):
     def __init__(self, message : str):

@@ -78,7 +78,8 @@ def is_norm_lt(a : Level, b : Level) -> bool:
 def lt_compare(a : Level, b : Level) -> int:
     if is_norm_lt(a, b): return -1
     if is_norm_lt(b, a): return 1
-    assert a.structurally_equal(b)
+    if not a.structurally_equal(b):
+        raise PanicError("Unreachable code reached in lt_compare")
     return 0
 
 key_lt = functools.cmp_to_key(lt_compare)
@@ -98,7 +99,8 @@ def make_max_pair(l1 : Level, l2 : Level) -> Level:
         p1 = to_offset(l1)
         p2 = to_offset(l2)
         if p1[0].structurally_equal(p2[0]):
-            assert p1[1] != p2[1]
+            if p1[1] == p2[1]:
+                raise PanicError("Unreachable code reached in make_max_pair")
             return l1 if p1[1] > p2[1] else l2
         else:
             return LevelMax(l1, l2)
@@ -197,7 +199,7 @@ def replace_level(level : Level, fn : Callable[[Level], Optional[Level]]) -> Lev
     elif isinstance(level, LevelSucc): return LevelSucc(replace_level(level.anc, fn))
     elif isinstance(level, LevelMax): return LevelMax(replace_level(level.lhs, fn), replace_level(level.rhs, fn))
     elif isinstance(level, LevelIMax): return LevelIMax(replace_level(level.lhs, fn), replace_level(level.rhs, fn))
-    else: raise ValueError(f"Unknown level type {level.__class__.__name__}")
+    else: raise PanicError(f"Unknown level type {level.__class__.__name__}")
 
 LevelSubList = List[Tuple[LevelParam, Level]]
 

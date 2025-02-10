@@ -117,31 +117,28 @@ class TypeChecker:
         self.lvl_param_subst_cache.put(expr, lvl_subst_tuple, subst_expr)
 
         return subst_expr
+
+    def check_level_params_length(self, decl : Declaration, lvl_params : List[LevelParam], subst : List[Level]):
+        if len(decl.lvl_params) != len(subst):
+            raise DeclarationError(f"""
+            Declaration {decl.name} has {len(decl.lvl_params)} level parameters, but {len(subst)} levels were provided.
+
+            Decl parameters : {[str(l) for l in decl.lvl_params]}
+            Subs parameters : {[str(l) for l in subst]}
+            """)
     
     def get_declaration_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level]) -> Expression:
         """
         Substitute the level parameters in the declaration type with the levels. 
         """
-        if len(decl.lvl_params) != len(subs):
-            raise DeclarationError(f"""
-            Declaration {decl.name} has {len(decl.lvl_params)} level parameters, but {len(subs)} substitutions were provided.
-
-            Decl parameters : {[str(l) for l in decl.lvl_params]}
-            Subs parameters : {[str(l) for l in subs]}
-            """)
+        self.check_level_params_length(decl, decl.lvl_params, subs)
         return self.subst_level_params(decl.type, decl.lvl_params, subs)
     
     def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level]) -> Expression:
         """
         Substitute the level parameters in the declaration value with the levels.
         """
-        if len(decl.lvl_params) != len(subs):
-            raise DeclarationError(f"""
-            Declaration {decl.name} has {len(decl.lvl_params)} level parameters, but {len(subs)} substitutions were provided.
-
-            Decl parameters : {[str(l) for l in decl.lvl_params]}
-            Subs parameters : {[str(l) for l in subs]}
-            """)
+        self.check_level_params_length(decl, decl.lvl_params, subs)
         return self.subst_level_params(decl.value, decl.lvl_params, subs)
     
     def ensure_pi(self, expr : Expression) -> Pi:
@@ -629,7 +626,8 @@ class TypeChecker:
         For datatypes that support K-axiom, given `e` an element of that type, we convert (if possible)
         to the default constructor. For example, if `e : a = a`, then this method returns `eq.refl a` 
         """
-        assert recursor.isK, "Cannot apply K-axiom to a recursor that is not K."
+        if not recursor.isK:
+            raise PanicError("Cannot apply K-axiom to a recursor that is not K.")
         app_type = self.infer_core(e, infer_only=(self.allow_unstrict_infer and True))
         app_type = self.whnf_core(app_type, cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_rec else self.whnf(app_type)
         app_type_inductive, app_type_args = unfold_app(app_type) # get the arguments of the type
@@ -722,7 +720,8 @@ class TypeChecker:
         decl = self.environment.get_declaration_under_name(fn.cname)
         if not decl.has_value(): 
             return None
-        assert isinstance(decl, Definition) or isinstance(decl, Opaque) or isinstance(decl, Theorem)
+        if not (isinstance(decl, Definition) or isinstance(decl, Opaque) or isinstance(decl, Theorem)):
+            raise DeclarationError(f"Declaration {fn.cname} is not a Definition, Opaque, or Theorem.")
         return fn, decl, args
     
     def delta_reduction_core(self, fn : Const, decl : Definition | Opaque | Theorem, args : List[Expression]) -> Expression:
@@ -948,7 +947,8 @@ class TypeChecker:
                 return None
             
             name = fn.cname
-            assert len(fn.lvl_params) == 0
+            if len(fn.lvl_params) != 0:
+                raise DeclarationError(f"Expected no level parameters, but got {len(fn.lvl_params)} when reducing natural numbers.")
             if name == self.environment.Nat_add_name: 
                 return reduce_bin_nat_op(nat_add, arg1.val, arg2.val)
             elif name == self.environment.Nat_sub_name: 
@@ -1009,7 +1009,8 @@ class TypeChecker:
         if len(mk_args) != 3: 
             return None # the Quot.mk takes 3 arguments
 
-        assert isinstance(mk, App)
+        if not isinstance(mk, App):
+            raise PanicError("Wrong unfold_app result.")
         f = args[arg_pos] # get the function we are lifting/inducing
         r = App(f, mk.arg) # get the class representative and apply f on it
 
@@ -1063,7 +1064,8 @@ class TypeChecker:
         rhs = self.subst_level_params(rule.value, rec_decl.lvl_params, rec_fn.lvl_params) # clones the rule.value
 
         # apply parameters, motives and minor premises from recursor application.
-        assert rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors < len(rec_args), "Recursor application does not have enough arguments."
+        if rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors >= len(rec_args):
+            RecursionError("Recursor application does not have enough arguments.")
         rhs = fold_apps(rhs, rec_args[:rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors]) # this is the actual reduction of the recursor
 
         # TODO: The number of parameters in the constructor is not necessarily
@@ -1071,7 +1073,8 @@ class TypeChecker:
         #nested inductive types. 
         nparams = len(major_args) - rule.num_fields
         # apply fields from major premise
-        assert nparams + rule.num_fields <= len(major_args), f"Major premise does not have the expected number of fields. Expected at least {nparams + rule.num_fields}, but got {len(major_args)}."
+        if nparams + rule.num_fields > len(major_args):
+            raise RecursionError(f"Major premise does not have the expected number of fields. Expected at least {nparams + rule.num_fields}, but got {len(major_args)}.")
         selected_major_args = major_args[nparams: nparams + rule.num_fields]
         if len(selected_major_args) != rule.num_fields: raise RecursorError("Major premise does not have the expected number of fields.")
         rhs = fold_apps(rhs, selected_major_args) # reapply the indices' arguments back
@@ -1336,7 +1339,8 @@ class TypeChecker:
         r = abstract_multiple_bvars(fvars[::-1], b)
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
-            assert c_fvar.is_let == False, "Cannot have a let binding in a pi binding."
+            if c_fvar.is_let:
+                raise PanicError("Cannot have a let binding in a pi binding.")
             abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
             r = Pi(c_fvar.name, abs_type, r)
         
@@ -1357,7 +1361,8 @@ class TypeChecker:
             e = e.body
         
         r = self.instantiate_multiple(e, fvars[::-1])
-        assert not r.has_loose_bvars
+        if r.has_loose_bvars:
+            raise UnboundVariableError("The body of the lambda has loose bound variables.")
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
 
@@ -1385,8 +1390,10 @@ class TypeChecker:
         r = abstract_multiple_bvars(fvars[::-1], b)
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
-            assert c_fvar.is_let == True, "Cannot have a non-let binding in a let binding."
-            assert c_fvar.val is not None, "Cannot have a let binding without a value."
+            if not c_fvar.is_let:
+                raise PanicError("Cannot have a non-let binding in a let binding.")
+            if c_fvar.val is None:
+                raise PanicError("Cannot have a let binding without a value.")
 
             abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
             abs_val = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.val)
@@ -1472,7 +1479,8 @@ class TypeChecker:
         if not isinstance(constructor_decl, Constructor):
             raise DeclarationError(f"Expected a constructor declaration for the first constructor of the inductive type {I_name} but got {constructor_decl} which is a {constructor_decl.__class__}")
 
-        assert constructor_decl.num_params == I_decl.num_params, "Sanity check failed: number of parameters in inductive type and constructor do not match."
+        if constructor_decl.num_params != I_decl.num_params:
+            raise DeclarationError(f"Sanity check failed: number of parameters in inductive type and constructor do not match.")
 
         r = self.subst_level_params(constructor_decl.type, I_decl.lvl_params, inductive_fn.lvl_params)
         
@@ -1604,9 +1612,9 @@ class TypeChecker:
         - the inferred sort of the type must be a sort
         """
         if not are_unique_level_params(decl.lvl_params):
-            raise EnvironmentError(f"Level parameters in declaration info {decl.info} are not unique.")
+            raise DeclarationError(f"Level parameters in declaration info {decl.info} are not unique.")
         if decl.type.has_fvars:
-            raise EnvironmentError(f"Type in declaration info {decl.info} contains free variables.")
+            raise DeclarationError(f"Type in declaration info {decl.info} contains free variables.")
 
         inferred_sort = self.infer(decl.type)
         self.ensure_sort(inferred_sort)
@@ -1691,7 +1699,8 @@ class TypeChecker:
         
         found_constructors = self.number_of_added_constructors(inductive_decl)
         if found_constructors < inductive_decl.number_of_constructors: return
-        assert(found_constructors == inductive_decl.number_of_constructors), "Sanity check failed: number of found constructors does not match the number of expected constructors."
+        if found_constructors != inductive_decl.number_of_constructors:
+            raise DeclarationError(f"Sanity check failed: number of found constructors does not match the number of expected constructors.")
 
         self.environment.checking_inductive = True
         # After all the constructors have been added, we can check the inductive type and its constructors
