@@ -141,7 +141,7 @@ class TypeChecker:
         self.check_level_params_length(decl, decl.lvl_params, subs)
         return self.subst_level_params(decl.value, decl.lvl_params, subs)
     
-    def ensure_pi(self, expr : Expression) -> Pi:
+    def ensure_pi(self, expr : Expression, pi_source : Expression) -> Pi:
         """
         Ensures that the expression is a Pi type. If this is not immediate it tries reducing it using whnf. Throws an error if the expression is not a Pi type.
         """
@@ -152,9 +152,9 @@ class TypeChecker:
         if  isinstance(whnfed_expr, Pi): 
             return whnfed_expr
         else: 
-            raise ExpectedEqualExpressionsConstructorsError(Pi, whnfed_expr.__class__)
+            raise ExpectedEqualExpressionsConstructorsError(Pi, whnfed_expr.__class__, pi_source.source) # we use pi_source as the source of the error, since there is nothing inherently wrong with expr, but the application using it
     
-    def ensure_sort(self, e : Expression) -> Sort:
+    def ensure_sort(self, e : Expression, sort_source : Expression) -> Sort:
         """
         Ensures that the expression is a Sort. If this is not immediate it tries reducing it using whnf. Throws an error if the expression is not a Sort.
         """
@@ -165,7 +165,7 @@ class TypeChecker:
         if isinstance(whnfd_e, Sort): 
             return whnfd_e
         
-        raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__)
+        raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__, sort_source.source) # we use sort_source as the source of the error, since there is nothing inherently wrong with e, but the context in which it is used
     
     def is_structure_like(self, decl_name : Name) -> bool:
         """
@@ -567,7 +567,7 @@ class TypeChecker:
             return e
 
         if len(args) < constructor.num_params:
-            raise StructureError(f"Expected {constructor.num_params} parameters, but got {len(args)}.")
+            raise StructureError(f"Expected {constructor.num_params} parameters, but got {len(args)}.", source=e_type.source)
         args = args[:constructor.num_params]
         arg_sources = arg_sources[:constructor.num_params]
         result = fold_apps(Const(cname=constructor.name, lvl_params=fn.lvl_params, source=fn.source), args, sources=arg_sources)
@@ -617,7 +617,7 @@ class TypeChecker:
         if constructor is None: 
             return None
         if len(args) < num_params:
-            raise StructureError(f"Expected at least {num_params} parameters, but got {len(args)}.")
+            raise StructureError(f"Expected at least {num_params} parameters, but got {len(args)}.", source=type_e.source)
         args = args[:num_params]
         arg_sources = arg_sources[:num_params]
         return fold_apps(Const(cname=constructor.name, lvl_params=d.lvl_params, source=d.source), args, sources=arg_sources)
@@ -678,7 +678,7 @@ class TypeChecker:
             return fold_apps(fn, args[i:], sources=arg_sources[i:])
         elif isinstance(fn, BVar): # the body is a single bound variable, so just replace it with the value of it args[i - fn.db_index - 1]
             if i <= fn.db_index:
-                raise UnboundVariableError(f"Unbound variable {fn} in the body of the lambda.")
+                raise UnboundVariableError(f"Unbound variable {fn} in the body of the lambda.", fn.source)
             return fold_apps(args[i - fn.db_index - 1], args[i:], sources=arg_sources[i:]) # fold back the rest of the arguments
         else:
             return e
@@ -1081,7 +1081,7 @@ class TypeChecker:
             raise RecursionError(f"Major premise does not have the expected number of fields. Expected at least {nparams + rule.num_fields}, but got {len(major_args)}.")
         selected_major_args = major_args[nparams: nparams + rule.num_fields]
         selected_major_arg_sources = major_arg_sources[nparams: nparams + rule.num_fields]
-        if len(selected_major_args) != rule.num_fields: raise RecursorError("Major premise does not have the expected number of fields.")
+        if len(selected_major_args) != rule.num_fields: raise RecursorError("Major premise does not have the expected number of fields.", source=e.source)
         rhs = fold_apps(rhs, selected_major_args, selected_major_arg_sources) # reapply the indices' arguments back
 
         # the remaining arguments are not relevant for the recursor; they are just applied back to whatever we got from the reduction
@@ -1257,20 +1257,20 @@ class TypeChecker:
         """
         if not infer_only:
             # the function should be a pi type
-            fn_type = self.ensure_pi(self.infer_core(app.fn, infer_only=(self.allow_unstrict_infer and infer_only)))
+            fn_type = self.ensure_pi(self.infer_core(app.fn, infer_only=(self.allow_unstrict_infer and infer_only)), app)
             
             # get the type of the argument
             inferred_domain = self.infer_core(app.arg, infer_only=(self.allow_unstrict_infer and infer_only))
 
             # the domain of the function should be equal to the type of the argument
             if not self.def_eq(inferred_domain, fn_type.domain):
-                raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain)
+                raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain, app.source)
             
             infered_type = self.instantiate(body=fn_type.codomain, val=app.arg)
             return infered_type
         else:
             # If infer_only is true we only check that the type of fn is a pi type and keep substituting the arguments into the function type's codomain. We don't check that arguments match the function type's domain.
-            fn, args, _ = unfold_app(app)
+            fn, args, arg_sources = unfold_app(app)
             fn_type = self.infer_core(fn, infer_only=(self.allow_unstrict_infer and infer_only))
             
             j = 0
@@ -1279,7 +1279,7 @@ class TypeChecker:
                     fn_type = fn_type.codomain
                 else:
                     fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1])
-                    fn_type = self.ensure_pi(fn_type)
+                    fn_type = self.ensure_pi(fn_type, arg_sources[i].source)
                     fn_type = fn_type.codomain
                     j = i
             
@@ -1307,13 +1307,13 @@ class TypeChecker:
         e = pi
         while isinstance(e, Pi):
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
-            t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only))
+            t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
             us.append(t1.level)
             fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=inst_domain.source))
             e = e.codomain
 
         e = self.instantiate_multiple(e, fvars[::-1])
-        t1 = self.ensure_sort(self.infer_core(e, infer_only))
+        t1 = self.ensure_sort(self.infer_core(e, infer_only), sort_source=e.source)
         lvl = t1.level
         for u in us[::-1]:
             lvl = make_imax(u, lvl)
@@ -1364,12 +1364,12 @@ class TypeChecker:
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
             fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=inst_domain.source))
             if not infer_only:
-                self.ensure_sort(self.infer_core(inst_domain, infer_only))
+                self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
             e = e.body
         
         r = self.instantiate_multiple(e, fvars[::-1])
         if r.has_loose_bvars:
-            raise UnboundVariableError("The body of the lambda has loose bound variables.")
+            raise UnboundVariableError("The body of the lambda has loose bound variables.", lam.source)
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
 
@@ -1428,11 +1428,11 @@ class TypeChecker:
             let_sources.append(e.source)
 
             if not infer_only:
-                self.ensure_sort(self.infer_core(l_type, infer_only))
+                self.ensure_sort(self.infer_core(l_type, infer_only), sort_source=e.source)
                 inferred_val_type = self.infer_core(val, infer_only)
 
                 if not self.def_eq(inferred_val_type, l_type):
-                    raise ExpectedEqualExpressionsError(inferred_val_type, l_type)
+                    raise ExpectedEqualExpressionsError(inferred_val_type, l_type, e.source)
             
             e = e.body
         
@@ -1471,20 +1471,20 @@ class TypeChecker:
 
         inductive_fn, args, _ = unfold_app(struct_type)
         if not isinstance(inductive_fn, Const):
-            raise ProjectionError(f"Expected a constant when unfolding the struct type for projection but got {inductive_fn.__class__}")
+            raise ProjectionError(f"Expected a constant when unfolding the struct type for projection but got {inductive_fn.__class__}", source=proj.source)
         if inductive_fn.cname != proj.sname:
-            raise ProjectionError(f"Expected the struct name to be {proj.sname} but got {inductive_fn.cname}")
+            raise ProjectionError(f"Expected the struct name to be {proj.sname} but got {inductive_fn.cname}", source=proj.source)
         I_name = inductive_fn.cname
 
         I_decl = self.environment.get_declaration_under_name(I_name)
         if not isinstance(I_decl, Inductive):
-            raise ProjectionError(f"Expected an inductive type when unfolding the struct type for projection but got {I_decl} which is a {I_decl.__class__}")
+            raise ProjectionError(f"Expected an inductive type when unfolding the struct type for projection but got {I_decl} which is a {I_decl.__class__}", source=proj.source)
         
         if I_decl.number_of_constructors != 1:
-            raise ProjectionError(f"Expected the inductive type {I_name} to have exactly one constructor but got {I_decl.number_of_constructors}")
+            raise ProjectionError(f"Expected the inductive type {I_name} to have exactly one constructor but got {I_decl.number_of_constructors}", source=proj.source)
         
         if len(args) != I_decl.num_params + I_decl.num_indices:
-            raise ProjectionError(f"Expected the {I_decl.num_params + I_decl.num_indices} arguments but got {len(args)}, when unfolding the struct type for projection.")
+            raise ProjectionError(f"Expected the {I_decl.num_params + I_decl.num_indices} arguments but got {len(args)}, when unfolding the struct type for projection.", source=proj.source)
 
         constructor_decl = self.environment.get_declaration_under_name(I_decl.constructor_names[0])
 
@@ -1498,10 +1498,10 @@ class TypeChecker:
         
         for i in range(I_decl.num_params):
             if i >= len(args):
-                raise ProjectionError(f"Ran out of arguments when instantiating projection args.")
+                raise ProjectionError(f"Ran out of arguments when instantiating projection args.", source=proj.source)
             r = self.whnf(r)
             if not isinstance(r, Pi):
-                raise ProjectionError(f"Expected a Pi type when instantiating projection args but got {r.__class__}")
+                raise ProjectionError(f"Expected a Pi type when instantiating projection args but got {r.__class__}", source=proj.source)
             r = self.instantiate(body=r.codomain, val=args[i])
         
         is_prop_type = self.is_prop(r)
@@ -1509,7 +1509,7 @@ class TypeChecker:
         for i in range(proj.index):
             r = self.whnf(r)
             if not isinstance(r, Pi):
-                raise ProjectionError(f"Expected a Pi type when reducing projection indices but got {r.__class__}")
+                raise ProjectionError(f"Expected a Pi type when reducing projection indices but got {r.__class__}", source=proj.source)
             
             if r.codomain.has_loose_bvars:
                 r = self.instantiate(
@@ -1517,18 +1517,18 @@ class TypeChecker:
                     val=Proj(I_name, i, proj.expr, source=proj.expr.source) # proj.expr.source or proj.source?
                 )
                 if is_prop_type and not self.is_prop(r):
-                    raise ProjectionError(f"When substituting proj indices, the body should remain a prop type.")
+                    raise ProjectionError(f"When substituting proj indices, the body should remain a prop type.", source=proj.source)
             else:
                 r = r.codomain
         
         r = self.whnf(r)
         if not isinstance(r, Pi):
-            raise ProjectionError(f"Expected a Pi type for projection index but got {r.__class__}")
+            raise ProjectionError(f"Expected a Pi type for projection index but got {r.__class__}", source=proj.source)
 
         r = r.domain
 
         if is_prop_type and not self.is_prop(r):
-            raise ProjectionError(f"The prop should remain a prop type after reducing the projection index.")
+            raise ProjectionError(f"The prop should remain a prop type after reducing the projection index.", source=proj.source)
 
         return r
 
@@ -1547,7 +1547,7 @@ class TypeChecker:
         Raises: See KernelExceptions.py
         """
         if expr.has_loose_bvars:
-            raise UnboundVariableError("Cannot infer the type of an expression with unbound variables.")
+            raise UnboundVariableError("Cannot infer the type of an expression with unbound variables.", expr.source)
 
         # check if expression is already in infer_cache (separate cache for infer_only)
         cached_inferred_type = self.infer_cache[infer_only].get(expr)
@@ -1559,7 +1559,7 @@ class TypeChecker:
         elif isinstance(expr, FVar): 
             inferred_type = self.infer_fvar(expr)
         elif isinstance(expr, MVar): 
-            raise UnfinishedExpressionError("Cannot infer the type of an expression with metavariables.")
+            raise UnfinishedExpressionError("Cannot infer the type of an expression with metavariables.", expr.source)
         elif isinstance(expr, App): 
             inferred_type = self.infer_app(expr, infer_only=(self.allow_unstrict_infer and infer_only))
         elif isinstance(expr, Sort): 
@@ -1629,7 +1629,7 @@ class TypeChecker:
             raise DeclarationError(f"Type in declaration info {decl.info} contains free variables.")
 
         inferred_sort = self.infer(decl.type)
-        self.ensure_sort(inferred_sort)
+        self.ensure_sort(inferred_sort, sort_source=decl.type.source)
         
     def check_declaration_value(self, decl : Declaration):
         """
