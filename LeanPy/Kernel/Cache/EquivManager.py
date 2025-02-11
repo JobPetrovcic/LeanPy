@@ -29,7 +29,6 @@ class EquivManager:
 
     def expr_to_dsu_root(self, expr : Expression) -> DSUObject:
         key = id(expr)
-        self.cached_exprs.append(expr)
         if key not in self.expr_to_dsu: return self.create_fresh_dsu_object(expr) # if the expression is not in the DSU, create a new DSU object, already in the root
         return self.expr_to_dsu[key].get_root() # get the root of the DSU object
     
