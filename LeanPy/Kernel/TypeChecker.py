@@ -167,11 +167,11 @@ class TypeChecker:
         
         raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__, sort_source.source) # we use sort_source as the source of the error, since there is nothing inherently wrong with e, but the context in which it is used
     
-    def is_structure_like(self, decl_name : Name) -> bool:
+    def is_structure_like(self, decl_name : Name, source : Expression) -> bool:
         """
         A structure is an inductive type with only on constructor, with no indices, and no recursive arguments.
         """
-        decl = self.environment.get_declaration_under_name(decl_name)
+        decl = self.environment.get_declaration_under_name(decl_name, source=source)
         if not isinstance(decl, Inductive): 
             return False
         return decl.number_of_constructors == 1 and decl.num_indices == 0 and not decl.is_recursive
@@ -187,7 +187,7 @@ class TypeChecker:
         return isinstance(inferred_type, Sort) and is_equivalent(inferred_type.level, self.environment.level_zero)
     
     # DEFINITIONAL EQUALITY
-    def def_eq_offset(self, t : Expression, s : Expression) -> Optional[bool]:
+    def def_eq_offset(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
         """
         Checks if the expressions representing natural numbers are equal (either in NatLit form or as an application of Nat.zero or Nat.succ).
         """
@@ -196,16 +196,19 @@ class TypeChecker:
         pred_t = is_nat_succ(self.environment, t)
         pred_s = is_nat_succ(self.environment, s)
         if (pred_t is not None) and (pred_s is not None):
-            return self.def_eq_core(pred_t, pred_s)
+            return self.def_eq_core(pred_t, pred_s, expect_true)
         return None
 
-    def def_eq_sort(self, l : Sort, r : Sort) -> bool:
+    def def_eq_sort(self, l : Sort, r : Sort, expect_true : bool) -> bool:
         """
         The sorts are definitonally equal if their levels are considered equivalent.
         """
-        return is_equivalent(l.level, r.level)
+        ret = is_equivalent(l.level, r.level)
+        if expect_true and not ret:
+            raise DefinitionalEqualityError(l, r)
+        return ret
     
-    def def_eq_const(self, l : Const, r : Const) -> bool:
+    def def_eq_const(self, l : Const, r : Const, expect_true : bool) -> bool:
         """
         If the names are the same, and the level parameters are equal, then the constants are equal.
         """
@@ -213,25 +216,27 @@ class TypeChecker:
             if is_equivalent_list(l.lvl_params, r.lvl_params): 
                 return True
             #else: print(f"Constants {l} and {r} have the same name but different level parameters : {[str(lvl) for lvl in l.lvl_params]} and {[str(lvl) for lvl in r.lvl_params]}", file=sys.stderr)
+        if expect_true:
+            raise DefinitionalEqualityError(l, r)
         return False
     
-    def def_eq_app(self, l : App, r : App) -> bool:
+    def def_eq_app(self, l : App, r : App, expect_true : bool) -> bool:
         """
         Check if the applications are equal by checking if the functions are definitionally equal and the arguments are definitionally equal.
         """
         f_fn, f_args, _ = unfold_app(l)
         g_fn, g_args, _ = unfold_app(r)
-        if not self.def_eq(f_fn, g_fn):
+        if not self.def_eq(f_fn, g_fn, expect_true):
             return False
         
         if len(f_args) != len(g_args): 
             return False
         for f_arg, g_arg in zip(f_args, g_args):
-            if not self.def_eq(f_arg, g_arg):
+            if not self.def_eq(f_arg, g_arg, expect_true):
                 return False
         return True
 
-    def def_eq_pi(self, init_t : Pi , init_s : Pi) -> bool:
+    def def_eq_pi(self, init_t : Pi , init_s : Pi, expect_true : bool) -> bool:
         """
         Check if the Pis are equal by checking if the domains are equal (first it tries greedy structural equality, then it tries definitional equality) and then checking if the codomains are definitionally equal.
         """
@@ -244,7 +249,7 @@ class TypeChecker:
             if not (t.domain == s.domain):
                 var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
                 var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
-                if not self.def_eq(var_t_type, var_s_type):
+                if not self.def_eq(var_t_type, var_s_type, expect_true):
                     self.cleanup_fvars(subs)
                     return False
             if t.codomain.has_loose_bvars or s.codomain.has_loose_bvars:
@@ -255,13 +260,13 @@ class TypeChecker:
                 subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=self.environment.filler_const.source))
             t = t.codomain
             s = s.codomain
-        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]))
+        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]), expect_true)
 
         self.cleanup_fvars(subs)
 
         return ret
     
-    def def_eq_lambda(self, init_t : Lambda , init_s : Lambda) -> bool:
+    def def_eq_lambda(self, init_t : Lambda , init_s : Lambda, expect_true : bool) -> bool:
         """
         Check if the Lambdas are equal by checking if the domains are equal (first it tries greedy structural equality, then it tries definitional equality) and then checking if the bodies are definitionally equal.
         """
@@ -275,7 +280,7 @@ class TypeChecker:
             if not (t.domain == s.domain):
                 var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
                 var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
-                if not self.def_eq(var_t_type, var_s_type):
+                if not self.def_eq(var_t_type, var_s_type, expect_true):
                     self.cleanup_fvars(subs)
                     return False
             if t.body.has_loose_bvars or s.body.has_loose_bvars:
@@ -287,20 +292,24 @@ class TypeChecker:
             t = t.body
             s = s.body
             
-        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]))
+        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]), expect_true)
         self.cleanup_fvars(subs)
         return ret
 
-    def are_struct_eq_exprs(self, a : Expression, b : Expression, use_hash : bool) -> bool:
+    def are_struct_eq_exprs(self, a : Expression, b : Expression, expect_true : bool, use_hash : bool) -> bool:
         """
         This function checks if two expressions are structurally equal OR if they have been found to be equal by the equivalence manager.
         """
         if a is b: 
             return True
-        if use_hash and a.hash != b.hash: 
+        if use_hash and a.hash != b.hash:
+            if expect_true:
+                raise DefinitionalEqualityError(a, b)
             return False
         if isinstance(a, BVar) and isinstance(b, BVar): 
-            return a.db_index == b.db_index
+            ret = a.db_index == b.db_index
+            if expect_true and not ret:
+                raise DefinitionalEqualityError(a, b)
 
         # check the equivalence manager
         dsu_ra = self.equiv_manager.expr_to_dsu_root(a)
@@ -310,53 +319,62 @@ class TypeChecker:
         
         # fall back to structural equality
         if a.__class__ != b.__class__: 
+            if expect_true:
+                raise DefinitionalEqualityError(a, b)
             return False
 
         result = False
         if isinstance(a, BVar) and isinstance(b, BVar): raise PanicError("Unreachable code reached: BVar should have been handled by the first if statement.")
-        elif isinstance(a, Const) and isinstance(b, Const): result = self.def_eq_const(a, b)
+        elif isinstance(a, Const) and isinstance(b, Const): result = self.def_eq_const(a, b, expect_true=expect_true)
         #elif isinstance(a, MVar) and isinstance(b, MVar): result = (a is b)
         elif isinstance(a, FVar) and isinstance(b, FVar): result = (a is b)
-        elif isinstance(a, App) and isinstance(b, App): result = self.are_struct_eq_exprs(a.fn, b.fn, use_hash) and self.are_struct_eq_exprs(a.arg, b.arg, use_hash)
-        elif isinstance(a, Lambda) and isinstance(b, Lambda): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.body, b.body, use_hash)
-        elif isinstance(a, Pi) and isinstance(b, Pi): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.codomain, b.codomain, use_hash)
-        elif isinstance(a, Sort) and isinstance(b, Sort): result = self.def_eq_sort(a, b)
+        elif isinstance(a, App) and isinstance(b, App): result = self.are_struct_eq_exprs(a.fn, b.fn, use_hash=use_hash, expect_true=expect_true) and self.are_struct_eq_exprs(a.arg, b.arg, use_hash=use_hash, expect_true=expect_true)
+        elif isinstance(a, Lambda) and isinstance(b, Lambda): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash=use_hash, expect_true=expect_true) and self.are_struct_eq_exprs(a.body, b.body, use_hash=use_hash, expect_true=expect_true)
+        elif isinstance(a, Pi) and isinstance(b, Pi): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash=use_hash, expect_true=expect_true) and self.are_struct_eq_exprs(a.codomain, b.codomain, use_hash=use_hash, expect_true=expect_true)
+        elif isinstance(a, Sort) and isinstance(b, Sort): result = self.def_eq_sort(a, b, expect_true=expect_true)
         elif isinstance(a, NatLit) and isinstance(b, NatLit): result = (a.val == b.val)
         elif isinstance(a, StrLit) and isinstance(b, StrLit): result = (a.val == b.val)
         # what about MData?
-        elif isinstance(a, Proj) and isinstance(b, Proj): result = (a.index == b.index) and self.are_struct_eq_exprs(a.expr, b.expr, use_hash)
-        elif isinstance(a, Let) and isinstance(b, Let): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash) and self.are_struct_eq_exprs(a.val, b.val, use_hash) and self.are_struct_eq_exprs(a.body, b.body, use_hash)
+        elif isinstance(a, Proj) and isinstance(b, Proj): result = (a.index == b.index) and self.are_struct_eq_exprs(a.expr, b.expr, use_hash=use_hash, expect_true=expect_true)
+        elif isinstance(a, Let) and isinstance(b, Let): result = self.are_struct_eq_exprs(a.domain, b.domain, use_hash=use_hash, expect_true=expect_true) and self.are_struct_eq_exprs(a.val, b.val, use_hash=use_hash, expect_true=expect_true) and self.are_struct_eq_exprs(a.body, b.body, use_hash=use_hash, expect_true=expect_true)
         else: raise PanicError(f"Unreachable code reached: Cannot compare expressions of class {a.__class__.__name__} and {b.__class__.__name__}.")
         
         if result:
             self.equiv_manager.add_equiv(dsu_ra, dsu_rb)
 
+        if expect_true and not result:
+            raise DefinitionalEqualityError(a, b)
+
         return result
 
-    def def_eq_easy(self, l: Expression, r: Expression, use_hash : bool = False) -> Optional[bool]:
+    def def_eq_easy(self, l: Expression, r: Expression, expect_true : bool, use_hash : bool = False) -> Optional[bool]:
         """
         If the expressions are easily compared (Sort, BVar, Const, FVar, App, Lambda, Pi, NatLit, StrLit), then this function compares them. Otherwise, it returns None and expressions are compared using def_eq_core.
         """
-        if self.are_struct_eq_exprs(l, r, use_hash): 
+        if self.are_struct_eq_exprs(l, r, expect_true=False, use_hash=use_hash): 
             return True
 
         if not (l.__class__ == r.__class__): 
             return None # not an easy case
 
         if isinstance(l, Sort) and isinstance(r, Sort): 
-            return self.def_eq_sort(l, r)
+            return self.def_eq_sort(l, r, expect_true)
         elif isinstance(l, BVar) or isinstance(r, BVar): raise PanicError("BVar should have been substituted by now, when comparing expressions for definitional equality.")
         
         elif isinstance(l, Pi) and isinstance(r, Pi):
-            return self.def_eq_pi(l, r)
+            return self.def_eq_pi(l, r, expect_true)
         elif isinstance(l, Lambda) and isinstance(r, Lambda):
-            return self.def_eq_lambda(l, r)
+            return self.def_eq_lambda(l, r, expect_true)
         elif isinstance(l, NatLit) and isinstance(r, NatLit): 
-            return l.val == r.val
+            ret = l.val == r.val
+            if expect_true and not ret:
+                raise DefinitionalEqualityError(l, r)
         elif isinstance(l, StrLit) and isinstance(r, StrLit): 
-            return l.val == r.val
+            ret = l.val == r.val
+            if expect_true and not ret:
+                raise DefinitionalEqualityError(l, r)
 
-    def def_eq_proof_irrel(self, t : Expression, s : Expression) -> Optional[bool]:
+    def def_eq_proof_irrel(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
         """ 
         Proof irrelevance support for propositions. If two expressions have equal types (i. e. proposition statements), and the types are proposition, then the expressions are considered equal. 
         """
@@ -364,9 +382,9 @@ class TypeChecker:
         if not self.is_prop(t_type):
             return None
         s_type = self.infer_core(s, infer_only=(self.allow_unstrict_infer and True))
-        return self.def_eq(t_type, s_type)
+        return self.def_eq(t_type, s_type, expect_true)
     
-    def def_eq_unit_like(self, t : Expression, s : Expression) -> bool:
+    def def_eq_unit_like(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
         If the expressions are both of a structure with no fields, then they are equal if their types are equal.
         """
@@ -374,19 +392,27 @@ class TypeChecker:
         t_type = self.whnf(self.infer_core(t, infer_only=(self.allow_unstrict_infer and True)))
         inductive_const = get_app_function(t_type)
 
-        if not isinstance(inductive_const, Const): 
+        if not isinstance(inductive_const, Const):
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
-        if not self.is_structure_like(inductive_const.cname): 
+        if not self.is_structure_like(inductive_const.cname, source=inductive_const.source): 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
 
-        constructor = self.get_first_constructor(inductive_const.cname)
-        if constructor is None: 
+        constructor = self.get_first_constructor(inductive_const.cname, inductive_name_source=inductive_const.source)
+        if constructor is None:
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
-        if constructor.num_fields != 0: 
+        if constructor.num_fields != 0:
+            if expect_true:
+                raise DefinitionalEqualityError(t, s) 
             return False
-        return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)))
+        return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)), expect_true)
     
-    def def_eq_core(self, l: Expression, r: Expression) -> bool:
+    def def_eq_core(self, l: Expression, r: Expression, expect_true : bool) -> bool:
         """
         The main function for checking definitional equality. It tries to compare the expressions in multiple stages:
         1. It tries to compare in the easy cases (see def_eq_easy)
@@ -401,8 +427,9 @@ class TypeChecker:
         10. unit-like structures are compared
         Finally, if none of the above steps return a definitive answer, then they are not considered equal (although in easy cases, the negative answer might be returned earlier).
         """
-        is_easy = self.def_eq_easy(l, r, use_hash=True)
-        if is_easy is not None: 
+        is_easy = self.def_eq_easy(l, r, expect_true=expect_true, use_hash=True)
+        if is_easy is not None:
+            assert not (expect_true and not is_easy), f"This should be unreachable"
             return is_easy
 
         if not l.has_fvars and isinstance(r, Const) and r == Const(cname=self.environment.Bool_true_name, lvl_params=[], source=None):
@@ -414,81 +441,96 @@ class TypeChecker:
         r_n = self.whnf_core(r, cheap_rec=False, cheap_proj=True)
      
         if (l_n is not l) or (r_n is not r):
-            is_easy = self.def_eq_easy(l_n, r_n)
-            if is_easy is not None: 
+            is_easy = self.def_eq_easy(l_n, r_n, expect_true)
+            if is_easy is not None:
+                assert not (expect_true and not is_easy), f"This should be unreachable"
                 return is_easy
 
-        is_proof_irr = self.def_eq_proof_irrel(l_n, r_n)
-        if is_proof_irr is not None: 
+        is_proof_irr = self.def_eq_proof_irrel(l_n, r_n, expect_true)
+        if is_proof_irr is not None:
+            assert not (expect_true and not is_proof_irr), f"This should be unreachable"
             return is_proof_irr
 
-        l_n_n, r_n_n, try_lazy = self.lazy_delta_reduction(l_n, r_n)
-        if try_lazy is not None: 
+        l_n_n, r_n_n, try_lazy = self.lazy_delta_reduction(l_n, r_n, expect_true=False)
+        if try_lazy is not None:
+            if expect_true and not try_lazy:
+                raise DefinitionalEqualityError(l, r)
             return try_lazy
 
         if isinstance(l_n_n, Const) and isinstance(r_n_n, Const):
-            if self.def_eq_const(l_n_n, r_n_n): 
+            if self.def_eq_const(l_n_n, r_n_n, False): 
                 return True
         if isinstance(l_n_n, FVar) and isinstance(r_n_n, FVar) and (l_n_n is r_n_n): 
             return True
         if isinstance(l_n_n, Proj) and isinstance(r_n_n, Proj) and l_n_n.index == r_n_n.index:
-            if self.lazy_delta_proj_reduction(l_n_n.expr, r_n_n.expr, l_n_n.index): 
+            if self.lazy_delta_proj_reduction(l_n_n.expr, r_n_n.expr, l_n_n.index, expect_true=False): 
                 return True
 
         l_n_n_n = self.whnf_core(l_n_n, cheap_rec=False, cheap_proj=False) # don't use cheap_proj now
         r_n_n_n = self.whnf_core(r_n_n, cheap_rec=False, cheap_proj=False) # don't use cheap_proj now
 
         if (l_n_n_n is not l_n_n) or (r_n_n_n is not r_n_n): 
-            return self.def_eq_core(l_n_n_n, r_n_n_n)
+            return self.def_eq_core(l_n_n_n, r_n_n_n, expect_true)
 
         if isinstance(l_n_n_n, App) and isinstance(r_n_n_n, App):
-            if self.def_eq_app(l_n_n_n, r_n_n_n): 
+            if self.def_eq_app(l_n_n_n, r_n_n_n, expect_true=False): 
                 return True
 
         # Try reductions
-        if self.try_eta_expansion(l_n_n_n, r_n_n_n):
+        if self.try_eta_expansion(l_n_n_n, r_n_n_n, expect_true=False):
             return True
-        if self.try_structural_eta_expansion(l_n_n_n, r_n_n_n):
+        if self.try_structural_eta_expansion(l_n_n_n, r_n_n_n, expect_true=False):
             return True
         
-        try_lit_expansion = self.try_string_lit_expansion(l_n_n_n, r_n_n_n)
+        try_lit_expansion = self.try_string_lit_expansion(l_n_n_n, r_n_n_n, expect_true)
         if try_lit_expansion is not None:
+            assert not (expect_true and not try_lit_expansion), f"This should be unreachable"
             return try_lit_expansion
 
-        if self.def_eq_unit_like(l_n_n_n, r_n_n_n): 
+        if self.def_eq_unit_like(l_n_n_n, r_n_n_n, expect_true=False): 
             return True
+        
+        if expect_true:
+            raise DefinitionalEqualityError(l, r)
 
         return False
     
-    def def_eq(self, l: Expression, r: Expression) -> bool:
+    def def_eq(self, l: Expression, r: Expression, expect_true : bool) -> bool:
         """
         Same as def_eq_core, but also adds the expressions to the equivalence manager if they are equal.
         """
-        ret = self.def_eq_core(l, r)
+        ret = self.def_eq_core(l, r, expect_true)
         if ret: self.equiv_manager.add_equiv_expressions(l, r)
         return ret
 
     # EXPANSIONS
-    def try_eta_expansion_core(self, t : Expression, s : Expression) -> bool:
+    def try_eta_expansion_core(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
         Tries to eta expand s: if s is a function, then by eta expansion, it is equal to the expression "fun x => s x". This is not symmetric.
         """
-        if not (isinstance(t, Lambda) and (not isinstance(s, Lambda))): 
+        if not (isinstance(t, Lambda) and (not isinstance(s, Lambda))):
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
         
         s_type = self.whnf(self.infer_core(s, infer_only=(self.allow_unstrict_infer and False)))
         if not isinstance(s_type, Pi): 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
         new_s = Lambda(bname=s_type.bname, domain=s_type.domain, body=App(s, BVar(0, source=s.source), s.source), source=s_type.domain.source)
-        return self.def_eq(t, new_s)
+        return self.def_eq(t, new_s, expect_true)
     
-    def try_eta_expansion(self, t : Expression, s : Expression) -> bool:
+    def try_eta_expansion(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
         Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y. This is symmetric.
         """
-        return self.try_eta_expansion_core(t, s) or self.try_eta_expansion_core(s, t)
+        ret = self.try_eta_expansion_core(t, s, expect_true=False) or self.try_eta_expansion_core(s, t, expect_true=False)
+        if expect_true and not ret:
+            raise DefinitionalEqualityError(t, s)
+        return ret
     
-    def try_structural_eta_expansion_core(self, t : Expression, s : Expression) -> bool:
+    def try_structural_eta_expansion_core(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
         If the t and s are applications of a constructor of a structure, then they are equal if the types are equal and the arguments are equal. This is done non-symmetrically: arguments of s are compared to projections of t (the projections then correspond to the arguments of t).
         """
@@ -496,24 +538,34 @@ class TypeChecker:
         # First part: deconstruct s, ensure it is an application of a constructor
         s_fn, s_args, _ = unfold_app(s)
 
-        if not isinstance(s_fn, Const): 
+        if not isinstance(s_fn, Const):
+            if expect_true:
+                raise DefinitionalEqualityError(t, s) 
             return False
         
-        decl = self.environment.get_declaration_under_name(s_fn.cname)
+        decl = self.environment.get_declaration_under_name(s_fn.cname, source=s_fn.source)
         if not isinstance(decl, Constructor): 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
 
         # Second part: ensure that the application has the correct number of arguments and that the inductive type is a structure
         if len(s_args) != decl.num_params + decl.num_fields: 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
-        if not self.is_structure_like(decl.inductive_name): 
+        if not self.is_structure_like(decl.inductive_name, source=s_fn.source): 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
             return False
 
         # Third part: ensure that the types are equal
         if not self.def_eq(
             self.infer_core(t, infer_only=(self.allow_unstrict_infer and True)),
             self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)),
+            expect_true
         ): 
+            assert not expect_true, f"This should be unreachable"
             return False
 
         # Fourth part: ensure that the arguments are equal:
@@ -523,33 +575,43 @@ class TypeChecker:
             t_i_proj = Proj(sname=decl.inductive_name, index=i-decl.num_params, expr=t, source=t.source)
 
             # compare the arguments
-            if not self.def_eq(t_i_proj, s_args[i]): 
+            if not self.def_eq(t_i_proj, s_args[i], expect_true):
+                assert not expect_true, f"This should be unreachable"
                 return False
         return True
     
-    def try_structural_eta_expansion(self, t : Expression, s : Expression) -> bool:
+    def try_structural_eta_expansion(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
         Tries to eta expand s and compares it to t, then tries to eta expand t and compares it to s. This is symmetric.
         """
-        return self.try_structural_eta_expansion_core(t, s) or self.try_structural_eta_expansion_core(s, t)
+        ret = self.try_structural_eta_expansion_core(t, s, expect_true=False) or self.try_structural_eta_expansion_core(s, t, expect_true=False)
+        if expect_true and not ret:
+            raise DefinitionalEqualityError(t, s)
+        return ret
     
-    def try_string_lit_expansion_core(self, t : Expression, s : Expression) -> Optional[bool]:
+    def try_string_lit_expansion_core(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
         if isinstance(t, StrLit) and isinstance(s, App) and get_app_function(s) == Const(self.environment.String_mk_name, [], source=None):
-            return self.def_eq_core(str_lit_to_constructor(self.environment, t), s)
+            return self.def_eq_core(str_lit_to_constructor(self.environment, t), s, expect_true)
         return None
 
-    def try_string_lit_expansion(self, t : Expression, s : Expression) -> Optional[bool]:
-        r = self.try_string_lit_expansion_core(t, s)
+    def try_string_lit_expansion(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
+        r = self.try_string_lit_expansion_core(t, s, expect_true=False)
         if r is not None: 
+            if expect_true and not r:
+                raise DefinitionalEqualityError(t, s)
             return r
-        return self.try_string_lit_expansion_core(s, t)
+        ret = self.try_string_lit_expansion_core(s, t, expect_true=False)
+        if ret is not None:
+            if expect_true and not ret:
+                raise DefinitionalEqualityError(t, s)
+            return ret
 
     # CONSTRUCTORS
-    def get_constructor(self, constructor_name : Name) -> Constructor:
+    def get_constructor(self, constructor_name : Name, source : Expression) -> Constructor:
         """
         Ensures that the declaration under the name is a constructor and returns it.
         """
-        decl = self.environment.get_declaration_under_name(constructor_name)
+        decl = self.environment.get_declaration_under_name(constructor_name, source=source)
         if not isinstance(decl, Constructor):
             raise DeclarationError(f"Name {constructor_name} is not a constructor.")
         return decl
@@ -562,7 +624,7 @@ class TypeChecker:
         if not isinstance(fn, Const): 
             return e
 
-        constructor = self.get_first_constructor(fn.cname)
+        constructor = self.get_first_constructor(fn.cname, inductive_name_source=fn.source)
         if not constructor: 
             return e
 
@@ -574,15 +636,15 @@ class TypeChecker:
         result = fold_apps(result, [Proj(sname=fn.cname, index=i, expr=e, source=e.source) for i in range(constructor.num_fields)], sources=[e.source]*constructor.num_fields)
         return result
 
-    def to_constructor_when_structure(self, inductive_name : Name, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
+    def to_constructor_when_structure(self, inductive_name : Name, e : Expression, inductive_name_source : Expression, cheap_rec : bool, cheap_proj : bool) -> Expression:
         """
         If e is an instance of a structure A, but is not seen to created using the constructor of A, then this function tries to convert e to the application of the (only) constructor of A.
         """
-        if not self.is_structure_like(inductive_name): 
+        if not self.is_structure_like(inductive_name, inductive_name_source): 
             return e
 
         f = get_app_function(e)
-        if isinstance(f, Const) and isinstance(self.environment.get_declaration_under_name(f.cname), Constructor): 
+        if isinstance(f, Const) and isinstance(self.environment.get_declaration_under_name(f.cname, source=f.source), Constructor): 
             return e
 
         e_type = self.whnf_core(self.infer_core(e, infer_only=(self.allow_unstrict_infer and True)), cheap_rec=cheap_rec, cheap_proj=cheap_proj) if cheap_rec else self.whnf(self.infer_core(e, infer_only=(self.allow_unstrict_infer and True)))
@@ -595,16 +657,16 @@ class TypeChecker:
             return e
         return self.expand_eta_struct(e_type, e)
 
-    def get_first_constructor(self, inductive_name : Name) -> Optional[Constructor]:
+    def get_first_constructor(self, inductive_name : Name, inductive_name_source : Expression) -> Optional[Constructor]:
         """
         Gets the first constructor of the inductive type.
         """
-        decl = self.environment.get_declaration_under_name(inductive_name)
+        decl = self.environment.get_declaration_under_name(inductive_name, source=inductive_name_source)
         if not isinstance(decl, Inductive): 
             return None
         if decl.number_of_constructors == 0: 
             return None
-        return self.get_constructor(decl.constructor_names[0])
+        return self.get_constructor(decl.constructor_names[0], source=inductive_name_source)
     
     def mk_nullary_constructor(self, type_e : Expression, num_params : int) -> Optional[Expression]:
         """
@@ -613,7 +675,7 @@ class TypeChecker:
         d, args, arg_sources = unfold_app(type_e)
         if not isinstance(d, Const): 
             return None
-        constructor = self.get_first_constructor(d.cname)
+        constructor = self.get_first_constructor(d.cname, inductive_name_source=d.source)
         if constructor is None: 
             return None
         if len(args) < num_params:
@@ -653,7 +715,7 @@ class TypeChecker:
         new_type = self.infer_core(new_constructor_app, infer_only=(self.allow_unstrict_infer and True))
 
         # ensure that the type is preserved after the conversion
-        if not self.def_eq(app_type, new_type): 
+        if not self.def_eq(app_type, new_type, expect_true=False): 
             return e
         return new_constructor_app
     
@@ -720,7 +782,7 @@ class TypeChecker:
         fn, args, arg_sources = unfold_app(expr)
         if not isinstance(fn, Const): 
             return None
-        decl = self.environment.get_declaration_under_name(fn.cname)
+        decl = self.environment.get_declaration_under_name(fn.cname, source=fn.source)
         if not decl.has_value(): 
             return None
         if not (isinstance(decl, Definition) or isinstance(decl, Opaque) or isinstance(decl, Theorem)):
@@ -767,7 +829,7 @@ class TypeChecker:
         proj_struct_fn, proj_struct_args, _ = unfold_app(proj_struct)
         if not isinstance(proj_struct_fn, Const): 
             return None
-        constructor_decl = self.environment.get_declaration_under_name(proj_struct_fn.cname)
+        constructor_decl = self.environment.get_declaration_under_name(proj_struct_fn.cname, source=proj_struct_fn.source)
         if not isinstance(constructor_decl, Constructor): 
             return None
 
@@ -798,16 +860,20 @@ class TypeChecker:
             return None
         return e_new
     
-    def def_eq_args(self, t : Expression, s : Expression) -> bool:
+    def def_eq_args(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
         Compares the arguments of the applications t and s.
         """
         while isinstance(t, App) and isinstance(s, App):
-            if not self.def_eq(t.arg, s.arg): 
+            if not self.def_eq(t.arg, s.arg, expect_true): 
+                assert not expect_true, f"This should be unreachable"
                 return False
             t = t.fn
             s = s.fn
-        return (not isinstance(t, App)) and (not isinstance(s, App))
+        ret = (not isinstance(t, App)) and (not isinstance(s, App))
+        if expect_true and not ret:
+            raise DefinitionalEqualityError(t, s)
+        return ret
 
     def lazy_delta_reduction_step(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, ReductionStatus]:
         """
@@ -845,7 +911,7 @@ class TypeChecker:
             else: # reduce both
                 if isinstance(t_n, App) and isinstance(s_n, App) and (id_t[1] is id_s[1]) and isinstance(id_t[1], Definition) and isinstance(id_t[1].hint, Regular):
                     if not self.failure_cache.did_fail_before(t_n, s_n):
-                        if self.def_eq_const(id_t[0], id_s[0]) and self.def_eq_args(t_n, s_n):
+                        if self.def_eq_const(id_t[0], id_s[0], expect_true=False) and self.def_eq_args(t_n, s_n, expect_true=False):
                             return t_n, s_n, ReductionStatus.EQUAL
                         else:
                             self.failure_cache.put(t_n, s_n)
@@ -854,13 +920,13 @@ class TypeChecker:
         else:
             raise PanicError("Unreachable code reached in lazy_delta_reduction_step.")
 
-        is_easy = self.def_eq_easy(t_n, s_n)
+        is_easy = self.def_eq_easy(t_n, s_n, expect_true=False)
         if is_easy is not None:
             return t_n, s_n, (ReductionStatus.EQUAL if is_easy else ReductionStatus.NOT_EQUAL)
         else: 
             return t_n, s_n, ReductionStatus.CONTINUE
 
-    def lazy_delta_reduction(self, t_n : Expression, s_n : Expression) -> Tuple[Expression, Expression, Optional[bool]]:
+    def lazy_delta_reduction(self, t_n : Expression, s_n : Expression, expect_true : bool) -> Tuple[Expression, Expression, Optional[bool]]:
         """
         Tries to compare the expressions t_n and s_n by unfolding the definitions of the functions of the applications. It loops until the expressions are equal, not equal, or definition unfolding will not help. 
 
@@ -875,24 +941,26 @@ class TypeChecker:
                 The expressions after the reduction, and the result of the comparison 
         """
         while True:
-            try_offset = self.def_eq_offset(t_n, s_n)
+            try_offset = self.def_eq_offset(t_n, s_n, expect_true=False)
             if try_offset is not None:
+                if expect_true and not try_offset: 
+                    raise DefinitionalEqualityError(t_n, s_n)
                 return t_n, s_n, try_offset
 
             if not t_n.has_fvars and not s_n.has_fvars: 
                 nat_t = self.reduce_nat_lit(t_n) 
                 if nat_t is not None: 
-                    return t_n, s_n, self.def_eq_core(nat_t, s_n)
+                    return t_n, s_n, self.def_eq_core(nat_t, s_n, expect_true)
                 nat_s = self.reduce_nat_lit(s_n)
                 if nat_s is not None: 
-                    return t_n, s_n, self.def_eq_core(t_n, nat_s)
+                    return t_n, s_n, self.def_eq_core(t_n, nat_s, expect_true)
             
             native_t = self.reduce_native(t_n)
             if native_t is not None:
-                return t_n, s_n, self.def_eq_core(native_t, s_n)
+                return t_n, s_n, self.def_eq_core(native_t, s_n, expect_true)
             native_s = self.reduce_native(s_n)
             if native_s is not None:
-                return t_n, s_n, self.def_eq_core(t_n, native_s)
+                return t_n, s_n, self.def_eq_core(t_n, native_s, expect_true)
 
             t_n, s_n, status = self.lazy_delta_reduction_step(t_n, s_n)
 
@@ -905,7 +973,7 @@ class TypeChecker:
                 return t_n, s_n, None
             else: raise PanicError("Unknown reduction status.")
 
-    def lazy_delta_proj_reduction(self, t_n : Expression, s_n : Expression, idx : int) -> bool:
+    def lazy_delta_proj_reduction(self, t_n : Expression, s_n : Expression, idx : int, expect_true : bool) -> bool:
         """
         Tries to lazy delta reduce the projections of the expressions t_n and s_n as much as possible. If in the end they are applications of projections, then it tries to reduce the projections using reduce_proj_core and compares the results.
         """
@@ -919,8 +987,8 @@ class TypeChecker:
                 if t is not None:
                     s = self.reduce_proj_core(s_n, idx)
                     if s is not None:
-                        return self.def_eq_core(t, s)
-                return self.def_eq_core(t_n, s_n)
+                        return self.def_eq_core(t, s, expect_true)
+                return self.def_eq_core(t_n, s_n, expect_true)
     
     def reduce_nat_lit(self, e : Expression) -> Optional[Expression]:
         """
@@ -1032,7 +1100,7 @@ class TypeChecker:
         if not isinstance(rec_fn, Const): 
             return None
         
-        rec_decl = self.environment.get_declaration_under_name(rec_fn.cname)
+        rec_decl = self.environment.get_declaration_under_name(rec_fn.cname, source=rec_fn.source)
         if not isinstance(rec_decl, Recursor): 
             return None
 
@@ -1054,7 +1122,7 @@ class TypeChecker:
         elif isinstance(major, StrLit):
             major = str_lit_to_constructor(self.environment, major)
         else:
-            major = self.to_constructor_when_structure(rec_decl.get_major_induct(), major, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
+            major = self.to_constructor_when_structure(rec_decl.get_major_induct(), major, inductive_name_source=rec_fn.source, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         
         rule = rec_decl.get_recursion_rule(major)
         if rule is None: 
@@ -1263,7 +1331,7 @@ class TypeChecker:
             inferred_domain = self.infer_core(app.arg, infer_only=(self.allow_unstrict_infer and infer_only))
 
             # the domain of the function should be equal to the type of the argument
-            if not self.def_eq(inferred_domain, fn_type.domain):
+            if not self.def_eq(inferred_domain, fn_type.domain, expect_true=False):
                 raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain, app.source)
             
             infered_type = self.instantiate(body=fn_type.codomain, val=app.arg)
@@ -1326,9 +1394,10 @@ class TypeChecker:
         """
         The type of a constant is the type of the declaration of the constant.
         """
-        if len(c.lvl_params) != len(self.environment.get_declaration_under_name(c.cname).lvl_params):
+        decl = self.environment.get_declaration_under_name(c.cname, source=c.source)
+        if len(c.lvl_params) != len(decl.lvl_params):
             raise PanicError("The number of level parameters of the constant does not match the number of level parameters in the environment.")
-        return self.get_declaration_type_with_substituted_level_params(self.environment.get_declaration_under_name(c.cname), c.lvl_params)
+        return self.get_declaration_type_with_substituted_level_params(decl, c.lvl_params)
 
     def make_pi_binding(self, fvars : List[FVar], b : Expression, pi_sources : List[Expression]) -> Expression:
         """
@@ -1431,7 +1500,7 @@ class TypeChecker:
                 self.ensure_sort(self.infer_core(l_type, infer_only), sort_source=e.source)
                 inferred_val_type = self.infer_core(val, infer_only)
 
-                if not self.def_eq(inferred_val_type, l_type):
+                if not self.def_eq(inferred_val_type, l_type, expect_true=False):
                     raise ExpectedEqualExpressionsError(inferred_val_type, l_type, e.source)
             
             e = e.body
@@ -1476,7 +1545,7 @@ class TypeChecker:
             raise ProjectionError(f"Expected the struct name to be {proj.sname} but got {inductive_fn.cname}", source=proj.source)
         I_name = inductive_fn.cname
 
-        I_decl = self.environment.get_declaration_under_name(I_name)
+        I_decl = self.environment.get_declaration_under_name(I_name, source=inductive_fn.source)
         if not isinstance(I_decl, Inductive):
             raise ProjectionError(f"Expected an inductive type when unfolding the struct type for projection but got {I_decl.__class__.__name__}", source=proj.source)
         
@@ -1486,7 +1555,7 @@ class TypeChecker:
         if len(args) != I_decl.num_params + I_decl.num_indices:
             raise ProjectionError(f"Expected the {I_decl.num_params + I_decl.num_indices} arguments but got {len(args)}, when unfolding the struct type for projection.", source=proj.source)
 
-        constructor_decl = self.environment.get_declaration_under_name(I_decl.constructor_names[0])
+        constructor_decl = self.environment.get_declaration_under_name(I_decl.constructor_names[0], source=inductive_fn.source)
 
         if not isinstance(constructor_decl, Constructor):
             raise DeclarationError(f"Expected a constructor declaration for the first constructor of the inductive type {I_name} but got {constructor_decl.__class__.__name__}")
@@ -1639,7 +1708,7 @@ class TypeChecker:
             raise DeclarationError(f"Declaration {decl.name} is not a Definition, Theorem, or Opaque, when checking declaration value. It is a {decl.__class__.__name__}.")
 
         inferred_type = self.infer(decl.value)
-        if not self.def_eq(inferred_type, decl.info.type):
+        if not self.def_eq(inferred_type, decl.info.type, expect_true=True):
             raise DeclarationError(f"Declaration {decl.name} ({decl.__class__.__name__}) has type differnt from the expected type. ") 
 
     def check_definition(self, d : Definition):
@@ -1688,7 +1757,7 @@ class TypeChecker:
         count = 0
         for constructor_name in inductive_decl.constructor_names:
             if self.environment.exists_declaration_under_name(constructor_name):
-                constructor_decl = self.environment.get_declaration_under_name(constructor_name)
+                constructor_decl = self.environment.get_declaration_under_name_no_source(constructor_name)
                 if not isinstance(constructor_decl, Constructor): raise DeclarationError(f"Inductive type's constructor name {inductive_decl.name} refers to a non-constructor {constructor_name}.")
                 count += 1
         return count
@@ -1705,7 +1774,7 @@ class TypeChecker:
         """
         # First check that all the constructors have been added
         if not self.environment.exists_declaration_under_name(inductive): return
-        inductive_decl = self.environment.get_declaration_under_name(inductive)
+        inductive_decl = self.environment.get_declaration_under_name_no_source(inductive)
         if not isinstance(inductive_decl, Inductive):
             raise DeclarationError(f"Inductive type {inductive} not found.")
         
@@ -1720,7 +1789,7 @@ class TypeChecker:
 
         # Now check that the inductive type
         for i, constructor_name in enumerate(inductive_decl.constructor_names):
-            constructor_decl = self.environment.get_declaration_under_name(constructor_name)
+            constructor_decl = self.environment.get_declaration_under_name_no_source(constructor_name)
             self.check_declaration_info(constructor_decl)
             if not isinstance(constructor_decl, Constructor):
                 raise DeclarationError(f"Sanity check failed: constructor {constructor_name} is not a constructor.")
@@ -1733,7 +1802,7 @@ class TypeChecker:
 
         inductive_decl.is_checked = True
         for constructor_name in inductive_decl.constructor_names:
-            constructor_decl = self.environment.get_declaration_under_name(constructor_name)
+            constructor_decl = self.environment.get_declaration_under_name_no_source(constructor_name)
             self.check_declaration_info(constructor_decl)
             if not isinstance(constructor_decl, Constructor):
                 raise PanicError(f"Unreachable code reached: constructor {constructor_name} is not a constructor.")
@@ -1747,7 +1816,7 @@ class TypeChecker:
         self.check_declaration_info(recursor)
 
         for rec_rule in recursor.recursor_rules:
-            constructor_decl = self.environment.get_declaration_under_name(rec_rule.constructor)
+            constructor_decl = self.environment.get_declaration_under_name_no_source(rec_rule.constructor)
             if not isinstance(constructor_decl, Constructor):
                 raise DeclarationError(f"Recursor rule for {rec_rule.constructor} is not associated with a constructor; found {constructor_decl.__class__.__name__} with name {constructor_decl.info.ciname} instead.")
 

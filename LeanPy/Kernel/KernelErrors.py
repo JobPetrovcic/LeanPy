@@ -16,6 +16,10 @@ class DeclarationError(Exception):
     def __init__(self, message : str):
         super().__init__(message)
 
+class TCEnvironmentError(Exception):
+    def __init__(self, message : str):
+        super().__init__(message)
+
 # Kernel errors
 class KernelError(Exception):
     def __init__(self, message : str, source : Expression):
@@ -39,7 +43,7 @@ class ProjectionError(KernelError):
     def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
 
-class TCEnvironmentError(KernelError):
+class InvalidDeclarationNameError(KernelError):
     def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
 
@@ -62,3 +66,12 @@ class UnfinishedExpressionError(KernelError):
 class LocalContextError(KernelError):
     def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
+
+class DefinitionalEqualityError(Exception):
+    def __init__(self, l : Expression, r : Expression):
+        self.l = l
+        self.r = r
+        if should_print_expressions:
+            super().__init__(f"Definitional equality failed\n\t{l}\nand\n\t{r}")
+        else:
+            super().__init__(f"Definitional equality failed")

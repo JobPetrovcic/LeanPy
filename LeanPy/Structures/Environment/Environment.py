@@ -1,5 +1,5 @@
 from typing import Dict
-from LeanPy.Kernel.KernelErrors import TCEnvironmentError
+from LeanPy.Kernel.KernelErrors import DeclarationError, InvalidDeclarationNameError, TCEnvironmentError
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *
@@ -24,8 +24,8 @@ class Environment:
         self.anonymous = Anonymous()
         self.level_zero = LevelZero()
         self.level_one = LevelSucc(self.level_zero)
-        self.Prop = Sort(self.level_zero)
-        self.Type = Sort(self.level_one)
+        self.Prop = Sort(self.level_zero, source=None)
+        self.Type = Sort(self.level_one, source=None)
 
         # Lean constants
         self.Lean_name = string_to_name("Lean")
@@ -78,9 +78,16 @@ class Environment:
         self.Bool_reduce_name = SubName(self.Lean_name, "reduceBool")
 
         self.filler_name = string_to_name("filler")
-        self.filler_const = Const(self.filler_name, [])
+        self.filler_const = Const(self.filler_name, [], source=None)
 
-    def get_declaration_under_name(self, name : Name) -> Declaration:
+    def get_declaration_under_name(self, name : Name, source : Expression) -> Declaration:
+        if name not in self.name_dict:
+            raise InvalidDeclarationNameError(f"Name {name} does not exist in environment.", source)
+        found = self.name_dict[name]
+        
+        return found
+    
+    def get_declaration_under_name_no_source(self, name : Name) -> Declaration:
         if name not in self.name_dict:
             raise TCEnvironmentError(f"Name {name} does not exist in environment.")
         found = self.name_dict[name]
