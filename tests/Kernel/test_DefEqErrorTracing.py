@@ -1,4 +1,4 @@
-from LeanPy.Kernel.KernelErrors import DefinitionalEqualityError, KernelError
+from LeanPy.Kernel.KernelErrors import DefinitionalEqualityError
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Kernel.TypeChecker import TypeChecker
