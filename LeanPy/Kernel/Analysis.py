@@ -29,9 +29,9 @@ def err_print_neg_reduction(fn :Callable[[Any, Expression, Expression], Tuple[Ex
     return wrapper
 
 verbose = False
-def err_print_neg(fn :Callable[[Any, Expression, Expression], bool]):
-    def wrapper(self_arg : Any, l : Expression, r : Expression):
-        result = fn(self_arg, l, r)
+def err_print_neg(fn : Callable[[Any, Expression, Expression, bool], bool]):
+    def wrapper(self_arg : Any, l : Expression, r : Expression, expect_true : bool):
+        result = fn(self_arg, l, r, expect_true)
         if not result:
             print(f"Negative test failed for {fn.__name__} with\n\t{l}\nand\n\t{r}", file=sys.stderr)
             if verbose:
