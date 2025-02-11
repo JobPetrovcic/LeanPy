@@ -412,7 +412,7 @@ class TypeChecker:
             return False
         return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)), expect_true)
     
-    def def_eq_core(self, l: Expression, r: Expression, expect_true : bool) -> bool:
+    def def_eq_core(self, l : Expression, r : Expression, expect_true : bool) -> bool:
         """
         The main function for checking definitional equality. It tries to compare the expressions in multiple stages:
         1. It tries to compare in the easy cases (see def_eq_easy)
