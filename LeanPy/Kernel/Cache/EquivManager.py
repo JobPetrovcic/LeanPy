@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from LeanPy.Structures.Expression.Expression import Expression
 
@@ -19,14 +19,17 @@ class DSUObject:
 class EquivManager:
     def __init__(self):
         self.expr_to_dsu : Dict[int, DSUObject] = {}
+        self.cached_exprs : List[Expression] = []
 
     def create_fresh_dsu_object(self, expr : Expression):
         key = id(expr)
+        self.cached_exprs.append(expr)
         self.expr_to_dsu[key] = DSUObject()
         return self.expr_to_dsu[key]
 
     def expr_to_dsu_root(self, expr : Expression) -> DSUObject:
         key = id(expr)
+        self.cached_exprs.append(expr)
         if key not in self.expr_to_dsu: return self.create_fresh_dsu_object(expr) # if the expression is not in the DSU, create a new DSU object, already in the root
         return self.expr_to_dsu[key].get_root() # get the root of the DSU object
     
@@ -44,14 +47,18 @@ class EquivManager:
         
     def clear(self):
         self.expr_to_dsu.clear()
+        self.cached_exprs.clear()
         
 class FailureCache:
     def __init__(self):
         self.did_fail : Set[Tuple[int, int]] = set()
+        self.cached_exprs : List[Expression] = []
 
     def put(self, expr1 : Expression, expr2 : Expression):
         key = (id(expr1), id(expr2))
         self.did_fail.add(key)
+        self.cached_exprs.append(expr1)
+        self.cached_exprs.append(expr2)
     
     def did_fail_before(self, expr1 : Expression, expr2 : Expression) -> bool:
         key = (id(expr1), id(expr2))
@@ -59,4 +66,5 @@ class FailureCache:
     
     def clear(self):
         self.did_fail.clear()
+        self.cached_exprs.clear()
     

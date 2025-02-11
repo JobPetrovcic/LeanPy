@@ -152,10 +152,12 @@ class BVar(Expression):
         return isinstance(other, BVar) and self.db_index == other.db_index
 
 class FVar(Expression):
-    def __init__(self, name : Name, type : Expression, val : Optional[Expression], is_let : bool, source : Optional['Expression'] = None):
+    def __init__(self, name : Name, type : Expression, original_type : Expression, val : Optional[Expression], original_val : Optional[Expression], is_let : bool, source : Optional['Expression'] = None):
         self.name = name
         self.type = type
+        self.original_type = original_type
         self.val = val
+        self.original_val = original_val
         self.is_let = is_let
         Expression.__init__(self, source)
 

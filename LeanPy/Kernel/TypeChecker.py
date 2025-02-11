@@ -49,7 +49,9 @@ class TypeChecker:
         """
         Creates an FVar and adds it to the local context. It should have a value iff is_let is True.
         """
-        fvar = FVar(name, type, val, is_let=is_let, source = source.source)
+        copied_type = copy_expression(type, source)
+        copied_val = None if val is None else copy_expression(val, source)
+        fvar = FVar(name, type=copied_type, original_type=type, val=copied_val, original_val=val, is_let=is_let, source = source.source)
         self.local_context.add_fvar(fvar)
         return fvar
     
@@ -255,9 +257,9 @@ class TypeChecker:
             if t.codomain.has_loose_bvars or s.codomain.has_loose_bvars:
                 if var_s_type is None:
                     var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=var_s_type.source))
+                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=s.source))
             else:
-                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=self.environment.filler_const.source))
+                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=s.source))
             t = t.codomain
             s = s.codomain
         ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]), expect_true)
@@ -286,9 +288,9 @@ class TypeChecker:
             if t.body.has_loose_bvars or s.body.has_loose_bvars:
                 if var_s_type is None:
                     var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=var_s_type.source))
+                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=s.source))
             else:
-                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=self.environment.filler_const.source))
+                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=s.source))
             t = t.body
             s = s.body
             
@@ -1382,7 +1384,7 @@ class TypeChecker:
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
             t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
             us.append(t1.level)
-            fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=inst_domain.source))
+            fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=e.source))
             e = e.codomain
 
         e = self.instantiate_multiple(e, fvars[::-1])
@@ -1420,7 +1422,7 @@ class TypeChecker:
             c_fvar = fvars[i]
             if c_fvar.is_let:
                 raise PanicError("Cannot have a let binding in a pi binding.")
-            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
+            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.original_type)
             r = Pi(c_fvar.name, abs_type, r, source=pi_sources[i])
         
         return r
@@ -1436,7 +1438,7 @@ class TypeChecker:
         while isinstance(e, Lambda):
             pi_sources.append(e.source)
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
-            fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=inst_domain.source))
+            fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=e.source))
             if not infer_only:
                 self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
             e = e.body
@@ -1475,9 +1477,11 @@ class TypeChecker:
                 raise PanicError("Cannot have a non-let binding in a let binding.")
             if c_fvar.val is None:
                 raise PanicError("Cannot have a let binding without a value.")
+            ov = c_fvar.original_type
+            assert ov is not None
 
-            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.type)
-            abs_val = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.val)
+            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.original_type) # TODO: think about this deeply
+            abs_val = abstract_multiple_bvars(fvars[:i][::-1], ov)
 
             r = Let(bname=c_fvar.name, domain=abs_type, val=abs_val, body=r, source=let_sources[i])
         
@@ -1497,7 +1501,7 @@ class TypeChecker:
         while isinstance(e, Let):
             l_type = self.instantiate_multiple(e.domain, fvars[::-1])
             val = self.instantiate_multiple(e.val, fvars[::-1])
-            fvars.append(self.create_fvar(e.bname, l_type, val=val, is_let=True, source=l_type.source))
+            fvars.append(self.create_fvar(e.bname, l_type, val=val, is_let=True, source=e.source))
             vals.append(val)
             let_sources.append(e.source)
 

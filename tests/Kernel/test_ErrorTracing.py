@@ -41,4 +41,4 @@ def test_tracing3():
     assert inferred_type.source is fn
     assert isinstance(inferred_type, Pi)
     assert inferred_type.domain.source is fn.domain
-    #assert inferred_type.codomain.source is fn.body
+    assert inferred_type.codomain.source is fn

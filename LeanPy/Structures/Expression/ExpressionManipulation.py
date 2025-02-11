@@ -340,20 +340,20 @@ def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expressi
         return App(fn=replace_bvars_by_fvar(expr.fn, fvar_list), arg=replace_bvars_by_fvar(expr.arg, fvar_list), source=expr.source)
     elif isinstance(expr, Lambda):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, None, False, source=expr.source))
+        fvar_list.append(FVar(expr.bname, domain, domain, None, None, False, source=expr.source))
         body = replace_bvars_by_fvar(expr.body, fvar_list)
         fvar_list.pop()
         return Lambda(bname=expr.bname, domain=domain, body=body, source=expr.source)
     elif isinstance(expr, Pi):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, None, False, source=expr.source))
+        fvar_list.append(FVar(expr.bname, domain, domain, None, None, False, source=expr.source))
         codomain = replace_bvars_by_fvar(expr.codomain, fvar_list)
         fvar_list.pop()
         return Pi(bname=expr.bname, domain=domain, codomain=codomain, source=expr.source)
     elif isinstance(expr, Let):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
         val = replace_bvars_by_fvar(expr.val, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, val, False, source=expr.source))
+        fvar_list.append(FVar(expr.bname, domain, domain, val, val, False, source=expr.source))
         body = replace_bvars_by_fvar(expr.body, fvar_list)
         fvar_list.pop()
         return Let(bname=expr.bname, domain=domain, val=val, body=body, source=expr.source)
@@ -371,5 +371,65 @@ def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expressi
         return expr
     else:
         raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
-    
 
+def copy_expression_aux(
+        expr : Expression, 
+        copy_cache : Dict[int, Expression],
+        replace_source : Optional[Expression],
+    ) -> Expression:
+    
+    # first check if we have already replaced this expression
+    key = id(expr)
+    if key in copy_cache: return copy_cache[key]
+
+    new_source = expr.source if replace_source is None else replace_source.source
+
+    if isinstance(expr, BVar): new_expr = BVar(db_index=expr.db_index, source=new_source)
+    elif isinstance(expr, FVar): new_expr = expr # TODO: should we copy the fvar?
+    elif isinstance(expr, Sort): new_expr = Sort(level=expr.level, source=new_source)
+    elif isinstance(expr, Const): new_expr = Const(cname=expr.cname, lvl_params=expr.lvl_params, source=new_source)
+    elif isinstance(expr, App):
+        r_fn = copy_expression_aux(expr.fn, copy_cache, replace_source)
+        r_arg = copy_expression_aux(expr.arg, copy_cache, replace_source) 
+        if expr.fn is r_fn and expr.arg is r_arg: new_expr = expr
+        else: new_expr = App(fn=r_fn, arg=r_arg, source=new_source)
+    elif isinstance(expr, Lambda): 
+        r_domain = copy_expression_aux(expr.domain, copy_cache, replace_source)
+        r_body = copy_expression_aux(expr.body, copy_cache, replace_source)
+        if expr.domain is r_domain and expr.body is r_body: new_expr = expr
+        else: new_expr = Lambda(bname=expr.bname, domain=r_domain, body=r_body, source=new_source)
+    elif isinstance(expr, Pi): 
+        r_domain = copy_expression_aux(expr.domain, copy_cache, replace_source)
+        r_codomain = copy_expression_aux(expr.codomain, copy_cache, replace_source)
+        if expr.domain is r_domain and expr.codomain is r_codomain: new_expr = expr
+        else: new_expr = Pi(bname=expr.bname, domain=r_domain, codomain=r_codomain, source=new_source)
+    elif isinstance(expr, Let): 
+        r_domain = copy_expression_aux(expr.domain, copy_cache, replace_source)
+        r_val = copy_expression_aux(expr.val, copy_cache, replace_source)
+        r_body = copy_expression_aux(expr.body, copy_cache, replace_source)
+        if expr.domain is r_domain and expr.val is r_val and expr.body is r_body: new_expr = expr
+        else: new_expr = Let(bname=expr.bname, domain=r_domain, val=r_val, body=r_body, source=new_source)
+    elif isinstance(expr, Proj): 
+        r_expr = copy_expression_aux(expr.expr, copy_cache, replace_source)
+        if expr.expr is r_expr: new_expr = expr
+        else: new_expr = Proj(sname=expr.sname, index=expr.index, expr=r_expr, source=new_source)
+    elif isinstance(expr, NatLit): new_expr = NatLit(val=expr.val, source=new_source)
+    elif isinstance(expr, StrLit): new_expr = StrLit(val=expr.val, source=new_source)
+    else: raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
+    
+    copy_cache[key] = new_expr
+
+    return new_expr
+    
+def copy_expression(expr : Expression, replace_source : Optional[Expression],) -> Expression:
+    """ 
+    Recursively creates a deep copy of the given expression, optionally replacing its source with the source from replace_source.
+
+    Args:
+        expr: The expression to be copied.
+        replace_source: An optional expression; if provided, its source will replace the original expression's source.
+
+    Returns:
+        The deep-copied expression.
+    """
+    return copy_expression_aux(expr, {}, replace_source)
