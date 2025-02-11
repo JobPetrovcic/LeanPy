@@ -18,15 +18,17 @@ class DSUObject:
 
 class EquivManager:
     def __init__(self):
-        self.expr_to_dsu : Dict[Expression, DSUObject] = {}
+        self.expr_to_dsu : Dict[int, DSUObject] = {}
 
     def create_fresh_dsu_object(self, expr : Expression):
-        self.expr_to_dsu[expr] = DSUObject()
-        return self.expr_to_dsu[expr]
+        key = id(expr)
+        self.expr_to_dsu[key] = DSUObject()
+        return self.expr_to_dsu[key]
 
     def expr_to_dsu_root(self, expr : Expression) -> DSUObject:
-        if expr not in self.expr_to_dsu: return self.create_fresh_dsu_object(expr) # if the expression is not in the DSU, create a new DSU object, already in the root
-        return self.expr_to_dsu[expr].get_root() # get the root of the DSU object
+        key = id(expr)
+        if key not in self.expr_to_dsu: return self.create_fresh_dsu_object(expr) # if the expression is not in the DSU, create a new DSU object, already in the root
+        return self.expr_to_dsu[key].get_root() # get the root of the DSU object
     
     def add_equiv(self, expr1_dsu_root : DSUObject, expr2_dsu_root : DSUObject):
         if expr1_dsu_root == expr2_dsu_root: return
@@ -45,13 +47,15 @@ class EquivManager:
         
 class FailureCache:
     def __init__(self):
-        self.did_fail : Set[Tuple[Expression, Expression]] = set()
+        self.did_fail : Set[Tuple[int, int]] = set()
 
     def put(self, expr1 : Expression, expr2 : Expression):
-        self.did_fail.add((expr1, expr2))
+        key = (id(expr1), id(expr2))
+        self.did_fail.add(key)
     
     def did_fail_before(self, expr1 : Expression, expr2 : Expression) -> bool:
-        return (expr1, expr2) in self.did_fail
+        key = (id(expr1), id(expr2))
+        return key in self.did_fail
     
     def clear(self):
         self.did_fail.clear()

@@ -111,7 +111,7 @@ class Expression:
         return self.num_fvars > 0
 
 class BVar(Expression):
-    def __init__(self, db_index : int, source : Optional['Expression']):
+    def __init__(self, db_index : int, source : Optional['Expression'] = None):
         self.db_index = db_index
         Expression.__init__(self, source)
     
@@ -152,7 +152,7 @@ class BVar(Expression):
         return isinstance(other, BVar) and self.db_index == other.db_index
 
 class FVar(Expression):
-    def __init__(self, name : Name, type : Expression, val : Optional[Expression], is_let : bool, source : Optional['Expression']):
+    def __init__(self, name : Name, type : Expression, val : Optional[Expression], is_let : bool, source : Optional['Expression'] = None):
         self.name = name
         self.type = type
         self.val = val
@@ -205,7 +205,7 @@ class FVar(Expression):
         return self is other
 
 class Sort(Expression):
-    def __init__(self, level : Level, source : Optional['Expression']):
+    def __init__(self, level : Level, source : Optional['Expression'] = None):
         self.level = level
         Expression.__init__(self, source)
     
@@ -246,7 +246,7 @@ class Sort(Expression):
         return isinstance(other, Sort) and self.level.structurally_equal(other.level)
 
 class Const(Expression):
-    def __init__(self, cname : Name, lvl_params : List[Level], source : Optional['Expression']):
+    def __init__(self, cname : Name, lvl_params : List[Level], source : Optional['Expression'] = None):
         self.cname = cname
         self.lvl_params = lvl_params
         Expression.__init__(self, source)
@@ -295,7 +295,7 @@ class Const(Expression):
                 all([l1.structurally_equal(l2) for l1, l2 in zip(self.lvl_params, other.lvl_params)]))
 
 class App(Expression):
-    def __init__(self, fn : Expression, arg : Expression, source : Optional['Expression']):
+    def __init__(self, fn : Expression, arg : Expression, source : Optional['Expression'] = None):
         self.fn = fn
         self.arg = arg
         Expression.__init__(self, source)
@@ -345,7 +345,7 @@ class App(Expression):
                 self.arg.check_cache_and_compare(other.arg, compare_cache, use_cache))
 
 class Pi(Expression):
-    def __init__(self, bname : Name, domain : Expression, codomain : Expression, source : Optional['Expression']):
+    def __init__(self, bname : Name, domain : Expression, codomain : Expression, source : Optional['Expression'] = None):
         self.bname = bname
         self.domain = domain
         self.codomain = codomain
@@ -393,7 +393,7 @@ class Pi(Expression):
                 self.codomain.check_cache_and_compare(other.codomain, compare_cache, use_cache)) # don't need to check bname
 
 class Lambda(Expression):
-    def __init__(self, bname : Name, domain : Expression, body : Expression, source : Optional['Expression']):
+    def __init__(self, bname : Name, domain : Expression, body : Expression, source : Optional['Expression'] = None):
         self.bname = bname
         self.domain = domain
         self.body = body
@@ -441,7 +441,7 @@ class Lambda(Expression):
                 self.body.check_cache_and_compare(other.body, compare_cache, use_cache)) # don't need to check bname
 
 class Let(Expression):
-    def __init__(self, bname : Name, domain : Expression, val : Expression, body : Expression, source : Optional['Expression']):
+    def __init__(self, bname : Name, domain : Expression, val : Expression, body : Expression, source : Optional['Expression'] = None):
         self.bname = bname
         self.domain = domain
         self.val = val
@@ -488,7 +488,7 @@ class Let(Expression):
                 self.body.check_cache_and_compare(other.body, compare_cache, use_cache)) # don't need to check bname
 
 class Proj(Expression):
-    def __init__(self, sname : Name, index : int, expr : Expression, source : Optional['Expression']):
+    def __init__(self, sname : Name, index : int, expr : Expression, source : Optional['Expression'] = None):
         self.sname = sname
         self.index = index
         self.expr = expr
@@ -534,7 +534,7 @@ class Proj(Expression):
                 self.expr.check_cache_and_compare(other.expr, compare_cache, use_cache)) # check the name since it refers to the structure we are projecting
 
 class NatLit(Expression):
-    def __init__(self, val : int, source : Optional['Expression']):
+    def __init__(self, val : int, source : Optional['Expression'] = None):
         assert val >= 0, "Natural number literals must be non-negative"
         self.val = val
         Expression.__init__(self, source)
@@ -576,7 +576,7 @@ class NatLit(Expression):
         return isinstance(other, NatLit) and self.val == other.val
 
 class StrLit(Expression):
-    def __init__(self, val : str, source : Optional['Expression']):
+    def __init__(self, val : str, source : Optional['Expression'] = None):
         self.val = val
         Expression.__init__(self, source)
     
@@ -617,7 +617,7 @@ class StrLit(Expression):
         return isinstance(other, StrLit) and self.val == other.val
     
 class MVar(Expression):
-    def __init__(self, source : Optional['Expression']):
+    def __init__(self, source : Optional['Expression'] = None):
         Expression.__init__(self, source)
     
     @override

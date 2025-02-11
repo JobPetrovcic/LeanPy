@@ -310,6 +310,7 @@ class TypeChecker:
             ret = a.db_index == b.db_index
             if expect_true and not ret:
                 raise DefinitionalEqualityError(a, b)
+            return ret
 
         # check the equivalence manager
         dsu_ra = self.equiv_manager.expr_to_dsu_root(a)
@@ -369,10 +370,12 @@ class TypeChecker:
             ret = l.val == r.val
             if expect_true and not ret:
                 raise DefinitionalEqualityError(l, r)
+            return ret
         elif isinstance(l, StrLit) and isinstance(r, StrLit): 
             ret = l.val == r.val
             if expect_true and not ret:
                 raise DefinitionalEqualityError(l, r)
+            return ret
 
     def def_eq_proof_irrel(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
         """ 
@@ -604,7 +607,7 @@ class TypeChecker:
         if ret is not None:
             if expect_true and not ret:
                 raise DefinitionalEqualityError(t, s)
-            return ret
+        return ret
 
     # CONSTRUCTORS
     def get_constructor(self, constructor_name : Name, source : Expression) -> Constructor:
@@ -760,11 +763,12 @@ class TypeChecker:
         
         # reverse the successful_args, because we pass the args to instantiate_multiple in the innermost to outermost order
         rest_args = args[n_successful_subs:]
+        rest_arg_sources = args_sources[n_successful_subs:]
         successful_args = args[:n_successful_subs][::-1]
         
         inst_f = self.instantiate_multiple(f, successful_args)
 
-        return fold_apps(inst_f, rest_args, sources=args_sources)
+        return fold_apps(inst_f, rest_args, sources=rest_arg_sources)
     
     def is_delta(self, expr : Expression) -> Optional[Tuple[Const, Definition | Opaque | Theorem, List[Expression], List[Expression]]]:
         """
@@ -1246,6 +1250,7 @@ class TypeChecker:
                 r = self.whnf_core(pos_red, cheap_rec=cheap_rec, cheap_proj=cheap_proj)     
         elif isinstance(expr, App):
             raw_fn, raw_args, raw_arg_sources = unfold_app(expr)
+            assert len(raw_args) == len(raw_arg_sources)
             
             fn = self.whnf_core(raw_fn, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
             if isinstance(fn, Lambda):
@@ -1347,7 +1352,7 @@ class TypeChecker:
                     fn_type = fn_type.codomain
                 else:
                     fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1])
-                    fn_type = self.ensure_pi(fn_type, arg_sources[i].source)
+                    fn_type = self.ensure_pi(fn_type, arg_sources[j].source)
                     fn_type = fn_type.codomain
                     j = i
             

@@ -1,23 +1,20 @@
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from LeanPy.Kernel.KernelErrors import DeclarationError, PanicError, UnboundVariableError
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import Level, LevelParam
 from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
 
-T = TypeVar('T')
-def save_result(expr : T, new_expr : Expression, replace_cache : Dict[T, Expression]):
-    replace_cache[expr] = new_expr
-
 def replace_expression_aux(
         expr : Expression, 
         fn : Callable[[Expression], Optional[Expression]],
-        replace_cache : Dict[Expression, Expression],
+        replace_cache : Dict[int, Expression],
     ) -> Expression:
     
     # first check if we have already replaced this expression
-    if expr in replace_cache: return replace_cache[expr]
+    key = id(expr)
+    if key in replace_cache: return replace_cache[key]
 
     new_expr = fn(expr)
     if new_expr is None:
@@ -54,7 +51,7 @@ def replace_expression_aux(
         elif isinstance(expr, StrLit): new_expr = expr
         else: raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
     
-    save_result(expr, new_expr, replace_cache)
+    replace_cache[key] = new_expr
 
     return new_expr
     
@@ -77,13 +74,13 @@ def replace_expression_w_depth_aux(
         expr : Expression, 
         fn : Callable[[Expression, int], Optional[Expression]],
         depth : int,
-        replace_cache : Dict[Tuple[Expression, int], Expression]
+        replace_cache : Dict[Tuple[int, int], Expression]
     ) -> Expression:
     """
     Recursively replaces subexpressions in the given expression using the given function. 
     """
     # first check if we have already replaced this expression
-    key = (expr, depth)
+    key = (id(expr), depth)
     if key in replace_cache: return replace_cache[key]
 
     new_expr = fn(expr, depth)
@@ -149,8 +146,8 @@ def replace_expression_w_depth_aux(
         elif isinstance(expr, StrLit): 
             new_expr = expr
         else: raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
-
-    save_result((expr, depth), new_expr, replace_cache)
+    
+    replace_cache[key] = new_expr
     return new_expr
 
 def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int], Optional[Expression]], depth :int) -> Expression:
@@ -168,13 +165,14 @@ def replace_expression_w_depth(expr : Expression, fn : Callable[[Expression, int
     """
     return replace_expression_w_depth_aux(expr, fn, depth, {})
 
-def do_fn_aux(e : Expression, visited : Set[Expression], fn : Callable[[Expression], None]):
+def do_fn_aux(e : Expression, visited : Set[int], fn : Callable[[Expression], None]):
     """
     Auxiliary function for do_fn. Recursively applies the given function to the expression and its subexpressions. Caches the visited expressions to avoid exponential blowup.
     """
-    if e in visited: return
+    key = id(e)
+    if key in visited: return
     fn(e)
-    visited.add(e)
+    visited.add(key)
     
     if isinstance(e, App):
         do_fn_aux(e.fn, visited, fn)
@@ -238,7 +236,7 @@ def instantiate_bvars(body : Expression, vals : Sequence[Expression]) -> Express
         if isinstance(expr, BVar): 
             if expr.db_index >= depth: 
                 if expr.db_index - depth < len(vals): return vals[expr.db_index - depth]
-                else: raise UnboundVariableError(f"Unbound de Bruijn index {expr.db_index}")
+                else: raise UnboundVariableError(f"Unbound de Bruijn index {expr.db_index}", expr.source)
         return None
     return replace_expression_w_depth(body, instantiation_fn, 0)
 
@@ -267,10 +265,10 @@ def abstract_multiple_bvars(fvars : List[FVar], body : Expression) -> Expression
     """
     for fvar in fvars:
         if fvar.type.has_loose_bvars:
-            raise UnboundVariableError(f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}")
+            raise UnboundVariableError(f"Cannot abstract a free variable with a loose bound variable in its type: {fvar}", fvar.source)
         if fvar.val is not None:
             if fvar.val.has_loose_bvars:
-                raise UnboundVariableError(f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}")
+                raise UnboundVariableError(f"Cannot abstract a free variable with a loose bound variable in its value: {fvar}", fvar.source)
     """ Abstracts multiple free variables in the given expression. """
     def replace_fn(expr : Expression, depth : int) -> Optional[Expression]:
         if not expr.has_fvars: return expr
@@ -285,7 +283,7 @@ def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression], List[Ex
     If expr is of form (... ((f a1) a2) ... an), returns f, [a1, a2, ..., an]. 
     """
     fn, args, sources = unfold_app_rev(expr)
-    return fn, list(reversed(args)), sources
+    return fn, list(reversed(args)), list(reversed(sources))
 
 def unfold_app_rev(expr : Expression) -> Tuple[Expression, List[Expression], List[Expression]]:
     """ If expr is of form (...((f a1) a2) ... an), returns f, [an, ..., a2, a1]. """
