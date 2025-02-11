@@ -36,3 +36,21 @@ def test_defeq_tracing3():
     except DefinitionalEqualityError as e:
         assert e.l.source is pi1.codomain
         assert e.r.source is pi2.codomain
+
+def test_defeq_tracing_and_infer():
+    lam = Lambda(string_to_name("x"), Sort(LevelZero(), source=None), Sort(LevelZero(), source=None), source=None)
+    pi = Pi(string_to_name("x"), Sort(LevelZero(), source=None), Sort(LevelZero(), source=None), source=None)
+
+    tc = TypeChecker()
+
+    inferred_lam_type = tc.infer(lam)
+    assert inferred_lam_type.source is lam
+    assert isinstance(inferred_lam_type, Pi)
+    assert inferred_lam_type.domain.source is lam.domain
+    assert inferred_lam_type.codomain.source is lam.body
+    try:
+        tc.def_eq(inferred_lam_type, pi, True)
+        assert False
+    except DefinitionalEqualityError as e:
+        assert e.l.source is lam.body
+        assert e.r.source is pi.codomain

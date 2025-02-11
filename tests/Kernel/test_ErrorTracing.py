@@ -30,3 +30,15 @@ def test_tracing2():
         assert False
     except KernelError as e:
         assert e.source is proj
+
+def test_tracing3():
+    tc = TypeChecker()
+
+    fn = Lambda(string_to_name("x"), Sort(LevelZero(), source=None), BVar(0, source=None), source=None)
+
+    inferred_type = tc.infer(fn)
+
+    assert inferred_type.source is fn
+    assert isinstance(inferred_type, Pi)
+    assert inferred_type.domain.source is fn.domain
+    #assert inferred_type.codomain.source is fn.body
