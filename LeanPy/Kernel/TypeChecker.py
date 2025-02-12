@@ -1779,6 +1779,10 @@ class TypeChecker:
 
         inferred_sort = self.infer(decl.type)
         self.ensure_sort(inferred_sort, sort_source=decl.type.source)
+
+    def check_value_has_expected_type(self, value : Expression, expected_type : Expression) -> bool:
+        inferred_type = self.infer(value)
+        return self.def_eq(inferred_type, expected_type, expect_true=True)
         
     def check_declaration_value(self, decl : Declaration):
         """
@@ -1787,8 +1791,7 @@ class TypeChecker:
         if not (isinstance(decl, Definition) or isinstance(decl, Theorem) or isinstance(decl, Opaque)):
             raise DeclarationError(f"Declaration {decl.name} is not a Definition, Theorem, or Opaque, when checking declaration value. It is a {decl.__class__.__name__}.")
 
-        inferred_type = self.infer(decl.value)
-        if not self.def_eq(inferred_type, decl.info.type, expect_true=True):
+        if not self.check_value_has_expected_type(decl.value, decl.info.type):
             raise DeclarationError(f"Declaration {decl.name} ({decl.__class__.__name__}) has type different from the expected type. ") 
 
     def check_definition(self, d : Definition):
