@@ -340,20 +340,20 @@ def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expressi
         return App(fn=replace_bvars_by_fvar(expr.fn, fvar_list), arg=replace_bvars_by_fvar(expr.arg, fvar_list), source=expr.source)
     elif isinstance(expr, Lambda):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, domain, None, None, False, source=expr.source))
+        fvar_list.append(FVar(expr.bname, type=domain, original_type=domain, val=None, original_val=None, is_let=False, source=expr.source))
         body = replace_bvars_by_fvar(expr.body, fvar_list)
         fvar_list.pop()
         return Lambda(bname=expr.bname, domain=domain, body=body, source=expr.source)
     elif isinstance(expr, Pi):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, domain, None, None, False, source=expr.source))
+        fvar_list.append(FVar(expr.bname, type=domain, original_type=domain, val=None, original_val=None, is_let=False, source=expr.source))
         codomain = replace_bvars_by_fvar(expr.codomain, fvar_list)
         fvar_list.pop()
         return Pi(bname=expr.bname, domain=domain, codomain=codomain, source=expr.source)
     elif isinstance(expr, Let):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
         val = replace_bvars_by_fvar(expr.val, fvar_list)
-        fvar_list.append(FVar(expr.bname, domain, domain, val, val, False, source=expr.source))
+        fvar_list.append(FVar(expr.bname, type=domain, original_type=domain, val=val, original_val=val, is_let=False, source=expr.source))
         body = replace_bvars_by_fvar(expr.body, fvar_list)
         fvar_list.pop()
         return Let(bname=expr.bname, domain=domain, val=val, body=body, source=expr.source)
