@@ -353,7 +353,7 @@ def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expressi
     elif isinstance(expr, Let):
         domain = replace_bvars_by_fvar(expr.domain, fvar_list)
         val = replace_bvars_by_fvar(expr.val, fvar_list)
-        fvar_list.append(FVar(expr.bname, type=domain, original_type=domain, val=val, original_val=val, is_let=False, source=expr.source))
+        fvar_list.append(FVar(expr.bname, type=domain, original_type=domain, val=val, original_val=val, is_let=True, source=expr.source))
         body = replace_bvars_by_fvar(expr.body, fvar_list)
         fvar_list.pop()
         return Let(bname=expr.bname, domain=domain, val=val, body=body, source=expr.source)
