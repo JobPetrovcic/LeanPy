@@ -49,9 +49,9 @@ class TypeChecker:
         """
         Creates an FVar and adds it to the local context. It should have a value iff is_let is True.
         """
-        copied_type = copy_expression(type, source)
-        copied_val = None if val is None else copy_expression(val, source)
-        fvar = FVar(name, type=copied_type, original_type=type, val=copied_val, original_val=val, is_let=is_let, source = source.source)
+        copied_type = copy_expression(type, replace_source=source)
+        copied_val = None if val is None else copy_expression(val, replace_source=source)
+        fvar = FVar(name, type=copied_type, original_type=type, val=copied_val, original_val=val, is_let=is_let, source=source.source)
         self.local_context.add_fvar(fvar)
         return fvar
     
@@ -154,7 +154,7 @@ class TypeChecker:
         if  isinstance(whnfed_expr, Pi): 
             return whnfed_expr
         else: 
-            raise ExpectedEqualExpressionsConstructorsError(Pi, whnfed_expr.__class__, pi_source.source) # we use pi_source as the source of the error, since there is nothing inherently wrong with expr, but the application using it
+            raise ExpectedEqualExpressionsConstructorsError(Pi, whnfed_expr.__class__, source=pi_source.source) # we use pi_source as the source of the error, since there is nothing inherently wrong with expr, but the application using it
     
     def ensure_sort(self, e : Expression, sort_source : Expression) -> Sort:
         """
@@ -167,7 +167,7 @@ class TypeChecker:
         if isinstance(whnfd_e, Sort): 
             return whnfd_e
         
-        raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__, sort_source.source) # we use sort_source as the source of the error, since there is nothing inherently wrong with e, but the context in which it is used
+        raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__, source=sort_source.source) # we use sort_source as the source of the error, since there is nothing inherently wrong with e, but the context in which it is used
     
     def is_structure_like(self, decl_name : Name, source : Expression) -> bool:
         """
@@ -523,7 +523,7 @@ class TypeChecker:
             if expect_true:
                 raise DefinitionalEqualityError(t, s)
             return False
-        new_s = Lambda(bname=s_type.bname, domain=s_type.domain, body=App(s, BVar(0, source=s.source), s.source), source=s_type.domain.source)
+        new_s = Lambda(bname=s_type.bname, domain=s_type.domain, body=App(s, BVar(0, source=s.source), source=s.source), source=s_type.domain.source)
         return self.def_eq(t, new_s, expect_true)
     
     def try_eta_expansion(self, t : Expression, s : Expression, expect_true : bool) -> bool:
@@ -745,7 +745,7 @@ class TypeChecker:
             return fold_apps(fn, args[i:], sources=arg_sources[i:])
         elif isinstance(fn, BVar): # the body is a single bound variable, so just replace it with the value of it args[i - fn.db_index - 1]
             if i <= fn.db_index:
-                raise UnboundVariableError(f"Unbound variable in the body of the lambda.", fn.source)
+                raise UnboundVariableError(f"Unbound variable in the body of the lambda.", source=fn.source)
             return fold_apps(args[i - fn.db_index - 1], args[i:], sources=arg_sources[i:]) # fold back the rest of the arguments
         else:
             return e
@@ -1027,33 +1027,33 @@ class TypeChecker:
             if len(fn.lvl_params) != 0:
                 raise DeclarationError(f"Expected no level parameters, but got {len(fn.lvl_params)} when reducing natural numbers.")
             if name == self.environment.Nat_add_name: 
-                return reduce_bin_nat_op(nat_add, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_add, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_sub_name: 
-                return reduce_bin_nat_op(nat_sub, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_sub, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_mul_name: 
-                return reduce_bin_nat_op(nat_mul, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_mul, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_pow_name: 
-                return reduce_bin_nat_op(nat_pow, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_pow, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_gcd_name: 
-                return reduce_bin_nat_op(nat_gcd, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_gcd, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_mod_name: 
-                return reduce_bin_nat_op(nat_mod, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_mod, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_div_name: 
-                return reduce_bin_nat_op(nat_div, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_div, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_eq_name: 
-                return reduce_bin_nat_pred(self.environment, nat_beq, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_pred(self.environment, nat_beq, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_le_name: 
-                return reduce_bin_nat_pred(self.environment, nat_ble, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_pred(self.environment, nat_ble, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_land_name: 
-                return reduce_bin_nat_op(nat_land, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_land, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_lor_name: 
-                return reduce_bin_nat_op(nat_lor, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_lor, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_lxor_name: 
-                return reduce_bin_nat_op(nat_xor, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_xor, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_shiftl_name: 
-                return reduce_bin_nat_op(nat_shiftl, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_shiftl, arg1.val, arg2.val, source=e.source)
             elif name == self.environment.Nat_shiftr_name: 
-                return reduce_bin_nat_op(nat_shiftr, arg1.val, arg2.val, e.source)
+                return reduce_bin_nat_op(nat_shiftr, arg1.val, arg2.val, source=e.source)
         return None
     
     def quot_reduce_rec(self, e : Expression) -> Optional[Expression]:
@@ -1339,7 +1339,7 @@ class TypeChecker:
 
             # the domain of the function should be equal to the type of the argument
             if not self.def_eq(inferred_domain, fn_type.domain, expect_true=False):
-                raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain, app.source)
+                raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain, source=app.source)
             
             infered_type = self.instantiate(body=fn_type.codomain, val=app.arg)
             return infered_type
@@ -1354,7 +1354,7 @@ class TypeChecker:
                     fn_type = fn_type.codomain
                 else:
                     fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1])
-                    fn_type = self.ensure_pi(fn_type, arg_sources[j].source)
+                    fn_type = self.ensure_pi(fn_type, pi_source=arg_sources[j].source)
                     fn_type = fn_type.codomain
                     j = i
             
@@ -1445,7 +1445,7 @@ class TypeChecker:
         
         r = self.instantiate_multiple(e, fvars[::-1])
         if r.has_loose_bvars:
-            raise UnboundVariableError("The body of the lambda has loose bound variables.", lam.source)
+            raise UnboundVariableError("The body of the lambda has loose bound variables.", source=lam.source)
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
 
@@ -1625,7 +1625,7 @@ class TypeChecker:
         Raises: See KernelExceptions.py
         """
         if expr.has_loose_bvars:
-            raise UnboundVariableError("Cannot infer the type of an expression with unbound variables.", expr.source)
+            raise UnboundVariableError("Cannot infer the type of an expression with unbound variables.", source=expr.source)
 
         # check if expression is already in infer_cache (separate cache for infer_only)
         cached_inferred_type = self.infer_cache[infer_only].get(expr)
@@ -1637,7 +1637,7 @@ class TypeChecker:
         elif isinstance(expr, FVar): 
             inferred_type = self.infer_fvar(expr)
         elif isinstance(expr, MVar): 
-            raise UnfinishedExpressionError("Cannot infer the type of an expression with metavariables.", expr.source)
+            raise UnfinishedExpressionError("Cannot infer the type of an expression with metavariables.", source=expr.source)
         elif isinstance(expr, App): 
             inferred_type = self.infer_app(expr, infer_only=(self.allow_unstrict_infer and infer_only))
         elif isinstance(expr, Sort): 
@@ -1715,10 +1715,11 @@ class TypeChecker:
         """
         if not (isinstance(decl, Definition) or isinstance(decl, Theorem) or isinstance(decl, Opaque)):
             raise DeclarationError(f"Declaration {decl.name} is not a Definition, Theorem, or Opaque, when checking declaration value. It is a {decl.__class__.__name__}.")
+        print(decl.value)
 
         inferred_type = self.infer(decl.value)
         if not self.def_eq(inferred_type, decl.info.type, expect_true=True):
-            raise DeclarationError(f"Declaration {decl.name} ({decl.__class__.__name__}) has type differnt from the expected type. ") 
+            raise DeclarationError(f"Declaration {decl.name} ({decl.__class__.__name__}) has type different from the expected type. ") 
 
     def check_definition(self, d : Definition):
         """
