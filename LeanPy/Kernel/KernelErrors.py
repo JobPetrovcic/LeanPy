@@ -1,7 +1,7 @@
 from typing import Type
 from LeanPy.Structures.Expression.Expression import Expression
 
-should_print_expressions = False
+should_print_expressions = True
 
 # Fatal errors
 class PanicError(Exception):
@@ -41,7 +41,10 @@ class ExpectedEqualExpressionsError(KernelError):
 
 class ProjectionError(KernelError):
     def __init__(self, message : str, source : Expression):
-        super().__init__(message, source)
+        if should_print_expressions:
+            super().__init__(message + f"\n\t{source}", source)
+        else:
+            super().__init__(message, source)
 
 class InvalidDeclarationNameError(KernelError):
     def __init__(self, message : str, source : Expression):
