@@ -12,6 +12,8 @@ EXPR_COMPARE_RAW_THRESHOLD = 100 # the threshold for when to compare expressions
 class Expression:
     def __init__(self, source : Optional['Expression']):
         self.source = source if source is not None else self
+        self.is_external = False
+        self.is_expected_type = False
         self.update_bookkeeping()
 
     def update_bookkeeping(self):

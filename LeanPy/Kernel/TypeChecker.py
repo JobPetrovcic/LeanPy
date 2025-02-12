@@ -22,7 +22,9 @@ class TypeChecker:
     def __init__(
             self, 
             allow_unstrict_infer : bool = True, # TODO: change this after testing
-            environment : Environment | None = None
+            environment : Environment | None = None,
+            fun_on_successful_inference : Optional[Callable[[Expression, Expression], None]] = None,
+            fun_on_successful_expected_type_inference : Optional[Callable[[Expression, Expression], None]] = None,
         ):
         self.allow_unstrict_infer = allow_unstrict_infer
 
@@ -41,6 +43,17 @@ class TypeChecker:
             self.environment = environment
         
         self.local_context = LocalContext()
+
+        if fun_on_successful_inference is None:
+            self.fun_on_successful_inference : Callable[[Expression, Expression], None] = lambda _s, _t : None
+        else:
+            self.fun_on_successful_inference = fun_on_successful_inference
+
+
+        if fun_on_successful_expected_type_inference is None:
+            self.fun_on_successful_expected_type_inference : Callable[[Expression, Expression], None] = lambda _s, _t : None
+        else:
+            self.fun_on_successful_expected_type_inference = fun_on_successful_expected_type_inference
 
     def remove_fvar(self, fvar: FVar):
         self.local_context.remove_fvar(fvar)
@@ -418,6 +431,14 @@ class TypeChecker:
         return self.def_eq_core(t_type, self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)), expect_true)
     
     def def_eq_core(self, l : Expression, r : Expression, expect_true : bool) -> bool:
+        ret = self.def_eq_core_logic(l, r, expect_true)
+        if ret: 
+            if r.is_external and r.is_expected_type:
+                self.fun_on_successful_expected_type_inference(l, r)
+        
+        return ret
+
+    def def_eq_core_logic(self, l : Expression, r : Expression, expect_true : bool) -> bool:
         """
         The main function for checking definitional equality. It tries to compare the expressions in multiple stages:
         1. It tries to compare in the easy cases (see def_eq_easy)
@@ -1729,6 +1750,9 @@ class TypeChecker:
             inferred_type = self.infer_string_lit(expr)
         else: 
             raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
+
+        if expr.is_external:
+            self.fun_on_successful_inference(expr, inferred_type)
         
         # cache the result
         self.infer_cache[infer_only].put(expr, inferred_type)
