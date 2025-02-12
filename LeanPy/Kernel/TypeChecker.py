@@ -257,9 +257,9 @@ class TypeChecker:
             if t.codomain.has_loose_bvars or s.codomain.has_loose_bvars:
                 if var_s_type is None:
                     var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=s.source))
+                subs.append(self.create_fvar(s.bname, var_s_type, val=None, is_let=False, source=s.source))
             else:
-                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=s.source))
+                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, val=None, is_let=False, source=s.source))
             t = t.codomain
             s = s.codomain
         ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]), expect_true)
@@ -288,9 +288,9 @@ class TypeChecker:
             if t.body.has_loose_bvars or s.body.has_loose_bvars:
                 if var_s_type is None:
                     var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                subs.append(self.create_fvar(s.bname, var_s_type, None, is_let=False, source=s.source))
+                subs.append(self.create_fvar(s.bname, var_s_type, val=None, is_let=False, source=s.source))
             else:
-                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, None, is_let=False, source=s.source))
+                subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, val=None, is_let=False, source=s.source))
             t = t.body
             s = s.body
             
@@ -1094,7 +1094,7 @@ class TypeChecker:
 
         elim_arity = mk_pos+1
         if len(args) > elim_arity:
-            r = fold_apps(r, args[elim_arity:], arg_sources[elim_arity:]) # reapply the arguments that were not relevant for the recursor
+            r = fold_apps(r, args[elim_arity:], sources=arg_sources[elim_arity:]) # reapply the arguments that were not relevant for the recursor
         return r
     
     def inductive_reduce_rec(self, e : Expression, cheap_rec : bool, cheap_proj : bool) -> Optional[Expression]:
@@ -1384,7 +1384,7 @@ class TypeChecker:
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
             t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
             us.append(t1.level)
-            fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=e.source))
+            fvars.append(self.create_fvar(e.bname, inst_domain, val=None, is_let=False, source=e.source))
             e = e.codomain
 
         e = self.instantiate_multiple(e, fvars[::-1])
@@ -1477,10 +1477,11 @@ class TypeChecker:
                 raise PanicError("Cannot have a non-let binding in a let binding.")
             if c_fvar.val is None:
                 raise PanicError("Cannot have a let binding without a value.")
-            ov = c_fvar.original_type
-            assert ov is not None
 
             abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.original_type) # TODO: think about this deeply
+
+            ov = c_fvar.original_val
+            assert ov is not None
             abs_val = abstract_multiple_bvars(fvars[:i][::-1], ov)
 
             r = Let(bname=c_fvar.name, domain=abs_type, val=abs_val, body=r, source=let_sources[i])
@@ -1715,7 +1716,6 @@ class TypeChecker:
         """
         if not (isinstance(decl, Definition) or isinstance(decl, Theorem) or isinstance(decl, Opaque)):
             raise DeclarationError(f"Declaration {decl.name} is not a Definition, Theorem, or Opaque, when checking declaration value. It is a {decl.__class__.__name__}.")
-        print(decl.value)
 
         inferred_type = self.infer(decl.value)
         if not self.def_eq(inferred_type, decl.info.type, expect_true=True):
