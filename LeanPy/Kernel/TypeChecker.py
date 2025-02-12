@@ -526,11 +526,26 @@ class TypeChecker:
         new_s = Lambda(bname=s_type.bname, domain=s_type.domain, body=App(s, BVar(0, source=s.source), source=s.source), source=s_type.domain.source)
         return self.def_eq(t, new_s, expect_true)
     
+    def try_eta_expansion_core_antisymm(self, t : Expression, s : Expression, expect_true : bool) -> bool:
+        """ Same as try_eta_expansion_core, but roles of t and s are reversed. """
+        if not (isinstance(s, Lambda) and (not isinstance(t, Lambda))):
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
+            return False
+        
+        t_type = self.whnf(self.infer_core(t, infer_only=(self.allow_unstrict_infer and False)))
+        if not isinstance(t_type, Pi): 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
+            return False
+        new_t = Lambda(bname=t_type.bname, domain=t_type.domain, body=App(t, BVar(0, source=t.source), source=t.source), source=t_type.domain.source)
+        return self.def_eq(new_t, s, expect_true)
+    
     def try_eta_expansion(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
-        Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y. This is symmetric.
+        Tries to eta expand y and compares it to x, then tries to eta expand x and compares it to y. 
         """
-        ret = self.try_eta_expansion_core(t, s, expect_true=False) or self.try_eta_expansion_core(s, t, expect_true=False)
+        ret = self.try_eta_expansion_core(t, s, expect_true=False) or self.try_eta_expansion_core_antisymm(t, s, expect_true=False)
         if expect_true and not ret:
             raise DefinitionalEqualityError(t, s)
         return ret
@@ -585,11 +600,61 @@ class TypeChecker:
                 return False
         return True
     
+    def try_structural_eta_expansion_core_antisymm(self, t : Expression, s : Expression, expect_true : bool) -> bool:
+        """
+        If the t and s are applications of a constructor of a structure, then they are equal if the types are equal and the arguments are equal. This is done non-symmetrically: arguments of s are compared to projections of t (the projections then correspond to the arguments of t).
+        """
+
+        # First part: deconstruct s, ensure it is an application of a constructor
+        t_fn, t_args, _ = unfold_app(t)
+
+        if not isinstance(t_fn, Const):
+            if expect_true:
+                raise DefinitionalEqualityError(t, s) 
+            return False
+        
+        decl = self.environment.get_declaration_under_name(t_fn.cname, source=t_fn.source)
+        if not isinstance(decl, Constructor): 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
+            return False
+
+        # Second part: ensure that the application has the correct number of arguments and that the inductive type is a structure
+        if len(t_args) != decl.num_params + decl.num_fields: 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
+            return False
+        if not self.is_structure_like(decl.inductive_name, source=t_fn.source): 
+            if expect_true:
+                raise DefinitionalEqualityError(t, s)
+            return False
+
+        # Third part: ensure that the types are equal
+        if not self.def_eq(
+            self.infer_core(t, infer_only=(self.allow_unstrict_infer and True)),
+            self.infer_core(s, infer_only=(self.allow_unstrict_infer and True)),
+            expect_true
+        ): 
+            assert not expect_true, f"This should be unreachable"
+            return False
+
+        # Fourth part: ensure that the arguments are equal:
+        # s was decomposed, so we know the arguments
+        # for t we don't know the arguments, so we use proj to get them
+        for i in range(decl.num_params, len(t_args)):
+            s_i_proj = Proj(sname=decl.inductive_name, index=i-decl.num_params, expr=s, source=s.source)
+
+            # compare the arguments
+            if not self.def_eq(t_args[i], s_i_proj, expect_true):
+                assert not expect_true, f"This should be unreachable"
+                return False
+        return True
+    
     def try_structural_eta_expansion(self, t : Expression, s : Expression, expect_true : bool) -> bool:
         """
-        Tries to eta expand s and compares it to t, then tries to eta expand t and compares it to s. This is symmetric.
+        Tries to eta expand s and compares it to t, then tries to eta expand t and compares it to s. 
         """
-        ret = self.try_structural_eta_expansion_core(t, s, expect_true=False) or self.try_structural_eta_expansion_core(s, t, expect_true=False)
+        ret = self.try_structural_eta_expansion_core(t, s, expect_true=False) or self.try_structural_eta_expansion_core_antisymm(t, s, expect_true=False)
         if expect_true and not ret:
             raise DefinitionalEqualityError(t, s)
         return ret
@@ -598,6 +663,11 @@ class TypeChecker:
         if isinstance(t, StrLit) and isinstance(s, App) and get_app_function(s) == Const(self.environment.String_mk_name, [], source=None):
             return self.def_eq_core(str_lit_to_constructor(self.environment, t), s, expect_true)
         return None
+    
+    def try_string_lit_expansion_core_antisymm(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
+        if isinstance(s, StrLit) and isinstance(t, App) and get_app_function(t) == Const(self.environment.String_mk_name, [], source=None):
+            return self.def_eq_core(t, str_lit_to_constructor(self.environment, s), expect_true)
+        return None
 
     def try_string_lit_expansion(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
         r = self.try_string_lit_expansion_core(t, s, expect_true=False)
@@ -605,7 +675,7 @@ class TypeChecker:
             if expect_true and not r:
                 raise DefinitionalEqualityError(t, s)
             return r
-        ret = self.try_string_lit_expansion_core(s, t, expect_true=False)
+        ret = self.try_string_lit_expansion_core_antisymm(t, s, expect_true=False)
         if ret is not None:
             if expect_true and not ret:
                 raise DefinitionalEqualityError(t, s)
