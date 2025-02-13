@@ -10,7 +10,7 @@ from LeanPy.Parsing import LeanJSONParser
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 
 class DependencyManager:
-    def __init__(self, folder : str, checked_file_path : str | None = None):
+    def __init__(self, folder : str, checked_file_path : str | None = None, preloaded_declarations : List[str] = []):
         """
         The DependencyManager class is responsible for managing the dependencies of declarations. The declaration can be in the following states:
         - Not loaded
@@ -38,6 +38,9 @@ class DependencyManager:
                     self.checked = pickle.load(f)
                 for decl_file_name in self.checked:
                     self.load_and_load_dependencies(decl_file_name)
+
+        for decl_file_name in preloaded_declarations:
+            self.load_and_load_dependencies(decl_file_name)
 
     def is_checked(self, decl_file_name : str) -> bool:
         """
@@ -153,4 +156,8 @@ class DependencyManager:
         tqdm_instance.total = self.__total__()
         tqdm_instance.n = self.n_checked()
         tqdm_instance.refresh()
+    
+    @property
+    def environment(self):
+        return self.type_checker.environment
         
