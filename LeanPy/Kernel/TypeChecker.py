@@ -24,7 +24,7 @@ class TypeChecker:
             allow_unstrict_infer : bool = True, # TODO: change this after testing
             environment : Environment | None = None,
             fun_on_successful_inference : Optional[Callable[[Expression, Expression], None]] = None,
-            fun_on_successful_expected_type_inference : Optional[Callable[[Expression, Expression], None]] = None,
+            fun_on_successful_equality : Optional[Callable[[Expression, Expression], None]] = None,
         ):
         self.allow_unstrict_infer = allow_unstrict_infer
 
@@ -50,10 +50,10 @@ class TypeChecker:
             self.fun_on_successful_inference = fun_on_successful_inference
 
 
-        if fun_on_successful_expected_type_inference is None:
-            self.fun_on_successful_expected_type_inference : Callable[[Expression, Expression], None] = lambda _s, _t : None
+        if fun_on_successful_equality is None:
+            self.fun_on_successful_equality : Callable[[Expression, Expression], None] = lambda _s, _t : None
         else:
-            self.fun_on_successful_expected_type_inference = fun_on_successful_expected_type_inference
+            self.fun_on_successful_equality = fun_on_successful_equality
 
     def remove_fvar(self, fvar: FVar):
         self.local_context.remove_fvar(fvar)
@@ -433,8 +433,7 @@ class TypeChecker:
     def def_eq_core(self, l : Expression, r : Expression, expect_true : bool) -> bool:
         ret = self.def_eq_core_logic(l, r, expect_true)
         if ret: 
-            if r.is_external and r.is_expected_type:
-                self.fun_on_successful_expected_type_inference(l, r)
+            self.fun_on_successful_equality(l, r)
         
         return ret
 
