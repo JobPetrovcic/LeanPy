@@ -98,7 +98,9 @@ class TypeChecker:
             return cached_inst_body
 
         inst_body = instantiate_bvar(body, val)
-        self.instantiation_cache.put(body, val, inst_body)
+        if not body.has_expr_mvars: # cache only if there are no metavariables in the body
+            assert not inst_body.has_expr_mvars
+            self.instantiation_cache.put(body, val, inst_body)
         return inst_body
     
     def instantiate_multiple(self, body : Expression, vals : Sequence[Expression]) -> Expression:
@@ -114,7 +116,9 @@ class TypeChecker:
             return cached_inst_body
 
         inst_body = instantiate_bvars(body, vals_tuple)
-        self.instantiation_multiple_cache.put(body, vals_tuple, inst_body)
+        if not body.has_expr_mvars: # cache only if there are no metavariables in the body
+            assert not inst_body.has_expr_mvars
+            self.instantiation_multiple_cache.put(body, vals_tuple, inst_body)
         return inst_body
     
     def subst_level_params(self, expr : Expression, lvl_params : List[LevelParam], levels : List[Level]) -> Expression:
@@ -129,7 +133,9 @@ class TypeChecker:
             return cached_subst_expr
 
         subst_expr = substitute_level_params_in_expression(expr, lvl_subst)
-        self.lvl_param_subst_cache.put(expr, lvl_subst_tuple, subst_expr)
+        if not expr.has_expr_mvars: # cache only if there are no metavariables in the expression
+            assert not subst_expr.has_expr_mvars
+            self.lvl_param_subst_cache.put(expr, lvl_subst_tuple, subst_expr)
 
         return subst_expr
 
@@ -328,10 +334,11 @@ class TypeChecker:
             return ret
 
         # check the equivalence manager
-        dsu_ra = self.equiv_manager.expr_to_dsu_root(a)
-        dsu_rb = self.equiv_manager.expr_to_dsu_root(b)
-        if dsu_ra is dsu_rb: 
-            return True
+        if not a.has_expr_mvars and not b.has_expr_mvars:
+            dsu_ra = self.equiv_manager.expr_to_dsu_root(a)
+            dsu_rb = self.equiv_manager.expr_to_dsu_root(b)
+            if dsu_ra is dsu_rb: 
+                return True
         
         # fall back to structural equality
         if a.__class__ != b.__class__: 
@@ -356,7 +363,8 @@ class TypeChecker:
         else: raise PanicError(f"Unreachable code reached: Cannot compare expressions of class {a.__class__.__name__} and {b.__class__.__name__}.")
         
         if result:
-            self.equiv_manager.add_equiv(dsu_ra, dsu_rb)
+            if not a.has_expr_mvars and not b.has_expr_mvars: # only add to the equivalence manager if there are no metavariables
+                self.equiv_manager.add_equiv(dsu_ra, dsu_rb)
 
         if expect_true and not result:
             raise DefinitionalEqualityError(a, b)
@@ -525,7 +533,9 @@ class TypeChecker:
         Same as def_eq_core, but also adds the expressions to the equivalence manager if they are equal.
         """
         ret = self.def_eq_core(l, r, expect_true)
-        if ret: self.equiv_manager.add_equiv_expressions(l, r)
+        if ret: 
+            if not l.has_expr_mvars and not r.has_expr_mvars: # only add to the equivalence manager if there are no metavariables
+                self.equiv_manager.add_equiv_expressions(l, r)
         return ret
 
     # EXPANSIONS
@@ -1010,7 +1020,8 @@ class TypeChecker:
                         if self.def_eq_const(id_t[0], id_s[0], expect_true=False) and self.def_eq_args(t_n, s_n, expect_true=False):
                             return t_n, s_n, ReductionStatus.EQUAL
                         else:
-                            self.failure_cache.put(t_n, s_n)
+                            if not t_n.has_expr_mvars and not s_n.has_expr_mvars: # if there are no mvars, then we can cache the failure
+                                self.failure_cache.put(t_n, s_n)
                 t_n = self.whnf_core(self.delta_reduction_core(*id_t), cheap_rec=False, cheap_proj=True)
                 s_n = self.whnf_core(self.delta_reduction_core(*id_s), cheap_rec=False, cheap_proj=True)
         else:
@@ -1362,7 +1373,9 @@ class TypeChecker:
         if r is None:
             raise PanicError(f"Expr of type {expr.__class__.__name__} could not be matched, this should not happen.")
 
-        if (not cheap_rec) and (not cheap_proj): self.whnf_core_cache.put(expr, r)
+        if (not cheap_rec) and (not cheap_proj): 
+            if not expr.has_expr_mvars: # cache the result if it was NOT delta reduced
+                self.whnf_core_cache.put(expr, r)
 
         return r
     
@@ -1389,14 +1402,18 @@ class TypeChecker:
             v = self.reduce_native(t1)
             if v is not None:
                 # cache the result of native reduction
-                self.whnf_cache.put(e, v)
+                if not e.has_expr_mvars: # cache the result if it does not have mvars
+                    assert not v.has_expr_mvars
+                    self.whnf_cache.put(e, v)
                 return v
 
             # if the expressions is nat it tries to reduce it using Python's built-in functions
             v = self.reduce_nat_lit(t1)
             if v is not None: 
                 # cache the result of nat_lit reduction
-                self.whnf_cache.put(e, v)
+                if not e.has_expr_mvars: # cache the result if it does not have mvars
+                    assert not v.has_expr_mvars
+                    self.whnf_cache.put(e, v)
                 return v
 
             # Finally try to unfold definitions
@@ -1406,7 +1423,9 @@ class TypeChecker:
             else:
                 r = t1
                 # cache the result if it was NOT delta reduced
-                self.whnf_cache.put(e, r)
+                if not e.has_expr_mvars: # cache the result if it does not have mvars
+                    assert not r.has_expr_mvars
+                    self.whnf_cache.put(e, r)
                 return r
 
     # INFERENCE
@@ -1754,7 +1773,9 @@ class TypeChecker:
             self.fun_on_successful_inference(expr, inferred_type)
         
         # cache the result
-        self.infer_cache[infer_only].put(expr, inferred_type)
+        if not expr.has_expr_mvars: # cache the result if it does not have mvars
+            assert not inferred_type.has_expr_mvars
+            self.infer_cache[infer_only].put(expr, inferred_type)
 
         return inferred_type
     

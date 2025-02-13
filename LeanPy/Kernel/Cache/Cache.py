@@ -12,6 +12,8 @@ class MapCache:
         return self.cache.get(id(expr), None)
     
     def put(self, expr : Expression, value : Expression):
+        assert not expr.has_expr_mvars, f"Cannot cache expression with metavariables"
+        assert not value.has_expr_mvars, f"Cannot cache expression with metavariables"
         key_id = id(expr)
         if key_id in self.cache:
             if self.cache[key_id] != value: 
