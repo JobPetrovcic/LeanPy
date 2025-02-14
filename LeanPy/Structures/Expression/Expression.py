@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 from typing_extensions import override
 
 #from typeguard import typechecked
@@ -297,6 +297,16 @@ class Const(Expression):
                 self.cname == other.cname and 
                 len(self.lvl_params) == len(other.lvl_params) and 
                 all([l1.structurally_equal(l2) for l1, l2 in zip(self.lvl_params, other.lvl_params)]))
+    
+    # override __getattr__ so that levels parameters can be accessed as attributes
+    def __getattr__(self, attr_name : str) -> Any:
+        if attr_name.startswith("lvl_"):
+            lvl_index = int(attr_name[4:])
+            if lvl_index < len(self.lvl_params):
+                return self.lvl_params[lvl_index]
+        elif attr_name == "cname":
+            return self.cname
+        return super().__getattr__(attr_name)
 
 class App(Expression):
     def __init__(self, fn : Expression, arg : Expression, source : Optional['Expression'] = None):
