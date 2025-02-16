@@ -1,8 +1,11 @@
 from abc import abstractmethod
 from typing import override
+
+from typeguard import typechecked
 from LeanPy.Structures.Name import Name
 
 class Level:
+    @typechecked
     def __init__(self):
         self.is_external = False
         self.update_bookkeeping()
@@ -32,6 +35,7 @@ class Level:
 
 class LevelZero(Level):
     @override
+    @typechecked
     def __init__(self):
         Level.__init__(self)
         
@@ -53,6 +57,7 @@ class LevelZero(Level):
 
 class LevelSucc(Level):
     @override
+    @typechecked
     def __init__(self, anc: Level):
         self.anc = anc
         Level.__init__(self)
@@ -83,6 +88,7 @@ class LevelSucc(Level):
 
 class LevelMax(Level):
     @override
+    @typechecked
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
@@ -110,6 +116,7 @@ class LevelMax(Level):
 
 class LevelIMax(Level):
     @override
+    @typechecked
     def __init__(self, lhs: Level, rhs: Level):
         self.lhs = lhs
         self.rhs = rhs
@@ -137,6 +144,7 @@ class LevelIMax(Level):
 
 class LevelParam(Level):
     @override
+    @typechecked
     def __init__(self, pname: Name):
         self.pname = pname
         Level.__init__(self)
@@ -159,6 +167,7 @@ class LevelParam(Level):
 
 class LevelMVar(Level):
     @override
+    @typechecked
     def __init__(self):
         Level.__init__(self)
     
@@ -176,4 +185,4 @@ class LevelMVar(Level):
 
 level_constructors = [LevelZero, LevelSucc, LevelMax, LevelIMax, LevelParam]
 
-__all__ = ['Level', 'LevelZero', 'LevelSucc', 'LevelMax', 'LevelIMax', 'LevelParam', 'level_constructors']
+__all__ = ['Level', 'LevelZero', 'LevelSucc', 'LevelMax', 'LevelIMax', 'LevelParam', 'LevelMVar', 'level_constructors']

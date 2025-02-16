@@ -386,6 +386,7 @@ def copy_expression_aux(
 
     if isinstance(expr, BVar): new_expr = BVar(db_index=expr.db_index, source=new_source)
     elif isinstance(expr, FVar): new_expr = expr # TODO: should we copy the fvar?
+    elif isinstance(expr, MVar): new_expr = expr # TODO: should we copy the mvar?
     elif isinstance(expr, Sort): new_expr = Sort(level=expr.level, source=new_source)
     elif isinstance(expr, Const): new_expr = Const(cname=expr.cname, lvl_params=expr.lvl_params, source=new_source)
     elif isinstance(expr, App):
@@ -433,3 +434,11 @@ def copy_expression(expr : Expression, replace_source : Optional[Expression],) -
         The deep-copied expression.
     """
     return copy_expression_aux(expr, {}, replace_source)
+
+def mark_as_expected_type(expr : Expression) -> None:
+    """
+    Marks the given expression as an expected type. Used for constructing a value which is expected to have a certain type.
+    """
+    def mark_fn(e : Expression):
+        e.is_expected_type = True
+    do_fn(expr, mark_fn)

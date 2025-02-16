@@ -62,10 +62,6 @@ class UnboundVariableError(KernelError):
     def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
 
-class UnfinishedExpressionError(KernelError):
-    def __init__(self, message : str, source : Expression):
-        super().__init__(message, source)
-
 class LocalContextError(KernelError):
     def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
@@ -78,3 +74,9 @@ class DefinitionalEqualityError(Exception):
             super().__init__(f"Definitional equality failed\n\t{l}\nand\n\t{r}")
         else:
             super().__init__(f"Definitional equality failed")
+
+
+# Special error for unfinished expressions
+class UnfinishedExpressionError(Exception):
+    def __init__(self, message : str, source : Expression):
+        super().__init__(message, source)

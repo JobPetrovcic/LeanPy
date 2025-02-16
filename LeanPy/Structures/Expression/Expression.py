@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from typing import Any, List, Optional, Set, Tuple
+from typeguard import typechecked
 from typing_extensions import override
 
 #from typeguard import typechecked
@@ -10,6 +11,7 @@ from LeanPy.Structures.Name import *
 EXPR_COMPARE_RAW_THRESHOLD = 100 # the threshold for when to compare expressions without using the cache
 
 class Expression:
+    @typechecked
     def __init__(self, source : Optional['Expression']):
         self.source = source if source is not None else self
         self.is_external = False
@@ -106,6 +108,20 @@ class Expression:
         return self.num_mvars > 0
     
     @property
+    def has_lvl_mvars(self) -> bool:
+        """ 
+        Returns True if the given expression has any level metavariables. 
+        """
+        return self.num_lvl_mvars > 0
+    
+    @property
+    def has_mvars(self) -> bool:
+        """ 
+        Returns True if the given expression has any metavariables. 
+        """
+        return self.has_expr_mvars or self.has_lvl_mvars
+    
+    @property
     def has_fvars(self) -> bool:
         """ 
         Returns True if the given expression has any free variables. 
@@ -113,6 +129,7 @@ class Expression:
         return self.num_fvars > 0
 
 class BVar(Expression):
+    @typechecked
     def __init__(self, db_index : int, source : Optional['Expression'] = None):
         self.db_index = db_index
         Expression.__init__(self, source)
@@ -154,6 +171,7 @@ class BVar(Expression):
         return isinstance(other, BVar) and self.db_index == other.db_index
 
 class FVar(Expression):
+    @typechecked
     def __init__(self, name : Name, type : Expression, original_type : Expression, val : Optional[Expression], original_val : Optional[Expression], is_let : bool, source : Optional['Expression'] = None):
         self.name = name
         self.type = type
@@ -209,6 +227,7 @@ class FVar(Expression):
         return self is other
 
 class Sort(Expression):
+    @typechecked
     def __init__(self, level : Level, source : Optional['Expression'] = None):
         self.level = level
         Expression.__init__(self, source)
@@ -250,6 +269,7 @@ class Sort(Expression):
         return isinstance(other, Sort) and self.level.structurally_equal(other.level)
 
 class Const(Expression):
+    @typechecked
     def __init__(self, cname : Name, lvl_params : List[Level], source : Optional['Expression'] = None):
         self.cname = cname
         self.lvl_params = lvl_params
@@ -306,9 +326,10 @@ class Const(Expression):
                 return self.lvl_params[lvl_index]
         elif attr_name == "cname":
             return self.cname
-        return super().__getattr__(attr_name)
+        return super().__getattr__(attr_name) # type: ignore
 
 class App(Expression):
+    @typechecked
     def __init__(self, fn : Expression, arg : Expression, source : Optional['Expression'] = None):
         self.fn = fn
         self.arg = arg
@@ -359,6 +380,7 @@ class App(Expression):
                 self.arg.check_cache_and_compare(other.arg, compare_cache, use_cache))
 
 class Pi(Expression):
+    @typechecked
     def __init__(self, bname : Name, domain : Expression, codomain : Expression, source : Optional['Expression'] = None):
         self.bname = bname
         self.domain = domain
@@ -407,6 +429,7 @@ class Pi(Expression):
                 self.codomain.check_cache_and_compare(other.codomain, compare_cache, use_cache)) # don't need to check bname
 
 class Lambda(Expression):
+    @typechecked
     def __init__(self, bname : Name, domain : Expression, body : Expression, source : Optional['Expression'] = None):
         self.bname = bname
         self.domain = domain
@@ -455,6 +478,7 @@ class Lambda(Expression):
                 self.body.check_cache_and_compare(other.body, compare_cache, use_cache)) # don't need to check bname
 
 class Let(Expression):
+    @typechecked
     def __init__(self, bname : Name, domain : Expression, val : Expression, body : Expression, source : Optional['Expression'] = None):
         self.bname = bname
         self.domain = domain
@@ -502,6 +526,7 @@ class Let(Expression):
                 self.body.check_cache_and_compare(other.body, compare_cache, use_cache)) # don't need to check bname
 
 class Proj(Expression):
+    @typechecked
     def __init__(self, sname : Name, index : int, expr : Expression, source : Optional['Expression'] = None):
         self.sname = sname
         self.index = index
@@ -548,6 +573,7 @@ class Proj(Expression):
                 self.expr.check_cache_and_compare(other.expr, compare_cache, use_cache)) # check the name since it refers to the structure we are projecting
 
 class NatLit(Expression):
+    @typechecked
     def __init__(self, val : int, source : Optional['Expression'] = None):
         assert val >= 0, "Natural number literals must be non-negative"
         self.val = val
@@ -590,6 +616,7 @@ class NatLit(Expression):
         return isinstance(other, NatLit) and self.val == other.val
 
 class StrLit(Expression):
+    @typechecked
     def __init__(self, val : str, source : Optional['Expression'] = None):
         self.val = val
         Expression.__init__(self, source)
@@ -631,6 +658,7 @@ class StrLit(Expression):
         return isinstance(other, StrLit) and self.val == other.val
     
 class MVar(Expression):
+    @typechecked
     def __init__(self, source : Optional['Expression'] = None):
         Expression.__init__(self, source)
     
