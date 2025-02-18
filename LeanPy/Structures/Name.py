@@ -37,4 +37,4 @@ def string_to_name(s : str) -> Name:
     return cur
         
 
-__all__ = ['Name', 'Anonymous', 'SubName']
+__all__ = ['Name', 'Anonymous', 'SubName', 'string_to_name']

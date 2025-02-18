@@ -1,5 +1,5 @@
 from typing import Type
-from LeanPy.Structures.Expression.Expression import Expression
+from LeanPy.Structures.Expression.Expression import Expression, MVar
 
 should_print_expressions = True
 
@@ -68,6 +68,10 @@ class LocalContextError(KernelError):
 
 class DefinitionalEqualityError(Exception):
     def __init__(self, l : Expression, r : Expression):
+        if isinstance(l, MVar) or isinstance(r, MVar):
+            raise PanicError("Don't use DefinitionalEqualityError with metavariables")
+        
+
         self.l = l
         self.r = r
         if should_print_expressions:
@@ -78,5 +82,5 @@ class DefinitionalEqualityError(Exception):
 
 # Special error for unfinished expressions
 class UnfinishedExpressionError(Exception):
-    def __init__(self, message : str, source : Expression):
-        super().__init__(message, source)
+    def __init__(self, source : Expression):
+        super().__init__("Expression is unfinished, cannot continue", source)

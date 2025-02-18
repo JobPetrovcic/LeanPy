@@ -32,6 +32,10 @@ class Level:
 
     def get_hash(self) -> int: 
         raise NotImplementedError("Method get_hash not implemented for abstract class Level")
+    
+    @property
+    def has_mvars(self) -> bool:
+        return self.num_mvars > 0
 
 class LevelZero(Level):
     @override

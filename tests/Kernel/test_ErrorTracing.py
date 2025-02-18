@@ -42,3 +42,14 @@ def test_tracing3():
     assert isinstance(inferred_type, Pi)
     assert inferred_type.domain.source is fn.domain
     assert inferred_type.codomain.source is fn
+
+def test_mvar_infer():
+    tc = TypeChecker()
+
+    unfinished_pi = Pi(string_to_name("x"), Sort(LevelZero()), MVar())
+
+    inferred_type = tc.infer(unfinished_pi)
+
+    assert isinstance(inferred_type, Pi)
+    assert inferred_type.domain == Sort(LevelZero())
+    assert inferred_type.codomain == MVar()

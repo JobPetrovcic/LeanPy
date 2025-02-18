@@ -166,25 +166,36 @@ class TypeChecker:
         """
         Ensures that the expression is a Pi type. If this is not immediate it tries reducing it using whnf. Throws an error if the expression is not a Pi type.
         """
+
+        if isinstance(expr, MVar):
+            raise UnfinishedExpressionError(expr.source)
+
         if isinstance(expr, Pi): 
             return expr
         
         whnfed_expr = self.whnf(expr)
         if  isinstance(whnfed_expr, Pi): 
             return whnfed_expr
-        else: 
-            raise ExpectedEqualExpressionsConstructorsError(Pi, whnfed_expr.__class__, source=pi_source.source) # we use pi_source as the source of the error, since there is nothing inherently wrong with expr, but the application using it
+        
+        if isinstance(whnfed_expr, MVar):
+            raise UnfinishedExpressionError(whnfed_expr.source)
+        
+        raise ExpectedEqualExpressionsConstructorsError(Pi, whnfed_expr.__class__, source=pi_source.source) # we use pi_source as the source of the error, since there is nothing inherently wrong with expr, but the application using it
     
     def ensure_sort(self, e : Expression, sort_source : Expression) -> Sort:
         """
         Ensures that the expression is a Sort. If this is not immediate it tries reducing it using whnf. Throws an error if the expression is not a Sort.
         """
-
+        if isinstance(e, MVar):
+            raise UnfinishedExpressionError(e.source)
         if isinstance(e, Sort): 
             return e
         whnfd_e = self.whnf(e)
         if isinstance(whnfd_e, Sort): 
             return whnfd_e
+
+        if isinstance(whnfd_e, MVar):
+            raise UnfinishedExpressionError(whnfd_e.source)
         
         raise ExpectedEqualExpressionsConstructorsError(Sort, whnfd_e.__class__, source=sort_source.source) # we use sort_source as the source of the error, since there is nothing inherently wrong with e, but the context in which it is used
     
@@ -205,7 +216,18 @@ class TypeChecker:
             inferred_type = self.whnf_core(self.infer_core(e, infer_only=(self.allow_unstrict_infer and True)), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         else:
             inferred_type = self.whnf(self.infer_core(e, infer_only=(self.allow_unstrict_infer and True)))
-        return isinstance(inferred_type, Sort) and is_equivalent(inferred_type.level, self.environment.level_zero)
+
+        if isinstance(inferred_type, MVar):
+            raise UnfinishedExpressionError(inferred_type.source)
+        
+        if not isinstance(inferred_type, Sort):
+            return False
+        
+        if inferred_type.level.has_mvars:
+            raise UnfinishedExpressionError(inferred_type.source)
+        if self.environment.level_zero.has_mvars:
+            raise PanicError("Unfinished expression in right side of definitional equality.")
+        return is_equivalent(inferred_type.level, self.environment.level_zero)
     
     # DEFINITIONAL EQUALITY
     def def_eq_offset(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
@@ -224,6 +246,11 @@ class TypeChecker:
         """
         The sorts are definitonally equal if their levels are considered equivalent.
         """
+        if l.level.has_mvars:
+            raise UnfinishedExpressionError(l.source)
+        if r.level.has_mvars:
+            raise PanicError("Unfinished expression in right hand side of definitional equality.")
+        
         ret = is_equivalent(l.level, r.level)
         if expect_true and not ret:
             raise DefinitionalEqualityError(l, r)
@@ -234,6 +261,13 @@ class TypeChecker:
         If the names are the same, and the level parameters are equal, then the constants are equal.
         """
         if l.cname == r.cname:
+            for lvl in l.lvl_params:
+                if lvl.has_mvars:
+                    raise UnfinishedExpressionError(l.source)
+            for lvl in r.lvl_params:
+                if lvl.has_mvars:
+                    raise PanicError("Unfinished expression in right hand side of definitional equality.")
+
             if is_equivalent_list(l.lvl_params, r.lvl_params): 
                 return True
             #else: print(f"Constants {l} and {r} have the same name but different level parameters : {[str(lvl) for lvl in l.lvl_params]} and {[str(lvl) for lvl in r.lvl_params]}", file=sys.stderr)
@@ -321,6 +355,11 @@ class TypeChecker:
         """
         This function checks if two expressions are structurally equal OR if they have been found to be equal by the equivalence manager.
         """
+        if isinstance(a, MVar):
+            raise UnfinishedExpressionError(a.source)
+        elif isinstance(b, MVar):
+            raise PanicError("Unfinished expression in right side of definitional equality.")
+
         if a is b: 
             return True
         if use_hash and a.hash != b.hash:
@@ -462,6 +501,11 @@ class TypeChecker:
         10. unit-like structures are compared
         Finally, if none of the above steps return a definitive answer, then they are not considered equal (although in easy cases, the negative answer might be returned earlier).
         """
+        if isinstance(l, MVar):
+            raise UnfinishedExpressionError(l.source)
+        elif isinstance(r, MVar):
+            raise PanicError("Unfinished expression in right side of definitional equality.")
+
         is_easy = self.def_eq_easy(l, r, expect_true=expect_true, use_hash=True)
         if is_easy is not None:
             assert not (expect_true and not is_easy), f"This should be unreachable"
@@ -474,6 +518,11 @@ class TypeChecker:
 
         l_n = self.whnf_core(l, cheap_rec=False, cheap_proj=True)
         r_n = self.whnf_core(r, cheap_rec=False, cheap_proj=True)
+
+        if isinstance(l_n, MVar):
+            raise UnfinishedExpressionError(l_n.source)
+        elif isinstance(r_n, MVar):
+            raise PanicError("Unfinished expression in right side of definitional equality.")
      
         if (l_n is not l) or (r_n is not r):
             is_easy = self.def_eq_easy(l_n, r_n, expect_true)
@@ -487,6 +536,11 @@ class TypeChecker:
             return is_proof_irr
 
         l_n_n, r_n_n, try_lazy = self.lazy_delta_reduction(l_n, r_n, expect_true=False)
+        if isinstance(l_n_n, MVar):
+            raise UnfinishedExpressionError(l.source)
+        elif isinstance(r_n_n, MVar):
+            raise PanicError("Unfinished expression in right side of definitional equality.")
+        
         if try_lazy is not None:
             if expect_true and not try_lazy:
                 raise DefinitionalEqualityError(l, r)
@@ -498,11 +552,16 @@ class TypeChecker:
         if isinstance(l_n_n, FVar) and isinstance(r_n_n, FVar) and (l_n_n is r_n_n): 
             return True
         if isinstance(l_n_n, Proj) and isinstance(r_n_n, Proj) and l_n_n.index == r_n_n.index:
-            if self.lazy_delta_proj_reduction(l_n_n.expr, r_n_n.expr, l_n_n.index, expect_true=False): 
+            if self.lazy_delta_proj_reduction(l_n_n.expr, r_n_n.expr, l_n_n.index, expect_true=False):
                 return True
 
         l_n_n_n = self.whnf_core(l_n_n, cheap_rec=False, cheap_proj=False) # don't use cheap_proj now
         r_n_n_n = self.whnf_core(r_n_n, cheap_rec=False, cheap_proj=False) # don't use cheap_proj now
+
+        if isinstance(l_n_n_n, MVar):
+            raise UnfinishedExpressionError(l_n_n_n.source)
+        elif isinstance(r_n_n_n, MVar):
+            raise PanicError("Unfinished expression in right side of definitional equality.")
 
         if (l_n_n_n is not l_n_n) or (r_n_n_n is not r_n_n): 
             return self.def_eq_core(l_n_n_n, r_n_n_n, expect_true)
@@ -1749,7 +1808,8 @@ class TypeChecker:
         elif isinstance(expr, FVar): 
             inferred_type = self.infer_fvar(expr)
         elif isinstance(expr, MVar): 
-            raise UnfinishedExpressionError("Cannot infer the type of an expression with metavariables.", source=expr.source)
+            return MVar()
+            #raise UnfinishedExpressionError("Cannot infer the type of an expression with metavariables.", source=expr.source)
         elif isinstance(expr, App): 
             inferred_type = self.infer_app(expr, infer_only=(self.allow_unstrict_infer and infer_only))
         elif isinstance(expr, Sort): 
