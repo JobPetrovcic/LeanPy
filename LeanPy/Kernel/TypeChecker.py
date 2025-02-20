@@ -2,6 +2,7 @@ from typing import List, Optional, Sequence, Tuple
 from LeanPy.Kernel.Cache.Cache import InferCache, PairCache, WHNFCache # TODO: Pair cache is redundant, can be replace by map from tuple to value
 from LeanPy.Kernel.Cache.EquivManager import EquivManager, FailureCache
 from LeanPy.Kernel.KernelErrors import *
+from LeanPy.Kernel.LevelEqualityChecking import make_imax
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration, compare_reducibility_hints
 from LeanPy.Structures.Environment.Environment import Environment
 from LeanPy.Structures.Environment.LocalContext import LocalContext
@@ -1555,7 +1556,9 @@ class TypeChecker:
         fvars : List[FVar] = []
         us : List[Level] = []
         e = pi
+        pi_sources : List[Expression] = []
         while isinstance(e, Pi):
+            pi_sources.append(e)
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
             t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
             us.append(t1.level)
@@ -1565,8 +1568,8 @@ class TypeChecker:
         e = self.instantiate_multiple(e, fvars[::-1])
         t1 = self.ensure_sort(self.infer_core(e, infer_only), sort_source=e.source)
         lvl = t1.level
-        for u in us[::-1]:
-            lvl = make_imax(u, lvl)
+        for i in range(len(us)-1, -1, -1):
+            lvl = make_imax(us[i], lvl, source=pi_sources[i].source)
 
         self.cleanup_fvars(fvars)
 
@@ -1900,6 +1903,7 @@ class TypeChecker:
 
     def check_value_has_expected_type(self, value : Expression, expected_type : Expression, clear_caches : bool = True, clear_local_context : bool = False) -> bool:
         inferred_type = self.infer(value, clear_caches, clear_local_context)
+        print(f"Value {value} of type {inferred_type}")
         return self.def_eq(inferred_type, expected_type, expect_true=True)
         
     def check_declaration_value(self, decl : Declaration):
