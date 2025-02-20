@@ -1,14 +1,15 @@
-from abc import abstractmethod
-from typing import override
+from typing import Optional, override
 
 from typeguard import typechecked
 from LeanPy.Structures.Name import Name
 
 class Level:
     @typechecked
-    def __init__(self):
+    def __init__(self, source : Optional['Level']):
         self.is_external = False
         self.is_expected_type = False
+        self.source = source if source is not None else self
+
         self.update_bookkeeping()
     
     def update_bookkeeping(self):
@@ -20,10 +21,6 @@ class Level:
 
     def __str__(self) -> str:
         raise NotImplementedError("Method __str__ not implemented for abstract class Level")
-
-    @abstractmethod
-    def structurally_equal(self, other: 'Level') -> bool:
-        raise NotImplementedError("Method structurally_equal not implemented for abstract class Level")
     
     def __hash__(self) -> int: 
         return self.hash
@@ -41,16 +38,12 @@ class Level:
 class LevelZero(Level):
     @override
     @typechecked
-    def __init__(self):
-        Level.__init__(self)
+    def __init__(self, source : Optional['Level']):
+        Level.__init__(self, source)
         
     @override
     def __str__(self) -> str:
         return "0"
-
-    @override
-    def structurally_equal(self, other: 'Level') -> bool:
-        return isinstance(other, LevelZero)
 
     @override
     def get_hash(self) -> int: 
@@ -63,9 +56,9 @@ class LevelZero(Level):
 class LevelSucc(Level):
     @override
     @typechecked
-    def __init__(self, anc: Level):
+    def __init__(self, anc: Level, source : Optional['Level']):
         self.anc = anc
-        Level.__init__(self)
+        Level.__init__(self, source)
     
     @override
     def __str__(self) -> str:
@@ -78,10 +71,6 @@ class LevelSucc(Level):
             return f"{o}"
         else:
             return f"{r} + {o}"
-
-    @override
-    def structurally_equal(self, other: 'Level') -> bool:
-        return isinstance(other, LevelSucc) and self.anc.structurally_equal(other.anc)
     
     @override
     def get_hash(self) -> int: 
@@ -94,23 +83,15 @@ class LevelSucc(Level):
 class LevelMax(Level):
     @override
     @typechecked
-    def __init__(self, lhs: Level, rhs: Level):
+    def __init__(self, lhs: Level, rhs: Level, source : Optional['Level']):
         self.lhs = lhs
         self.rhs = rhs
-        Level.__init__(self)
+        Level.__init__(self, source)
     
     @override
     def __str__(self) -> str:
         return f"max ({self.lhs}) ({self.rhs})"
 
-    @override
-    def structurally_equal(self, other: 'Level') -> bool:
-        return (
-            isinstance(other, LevelMax) and 
-            self.lhs.structurally_equal(other.lhs) and 
-            self.rhs.structurally_equal(other.rhs)
-        )
-    
     @override
     def get_hash(self) -> int: 
         return hash((self.lhs, self.rhs, "Max"))
@@ -122,23 +103,15 @@ class LevelMax(Level):
 class LevelIMax(Level):
     @override
     @typechecked
-    def __init__(self, lhs: Level, rhs: Level):
+    def __init__(self, lhs: Level, rhs: Level, source : Optional['Level']):
         self.lhs = lhs
         self.rhs = rhs
-        Level.__init__(self)
+        Level.__init__(self, source)
     
     @override
     def __str__(self) -> str:
         return f"imax ({self.lhs}) ({self.rhs})"
 
-    @override
-    def structurally_equal(self, other: 'Level') -> bool:
-        return (
-            isinstance(other, LevelIMax) and 
-            self.lhs.structurally_equal(other.lhs) and 
-            self.rhs.structurally_equal(other.rhs)
-        )
-    
     @override
     def get_hash(self) -> int: 
         return hash((self.lhs, self.rhs, "IMax"))
@@ -150,18 +123,14 @@ class LevelIMax(Level):
 class LevelParam(Level):
     @override
     @typechecked
-    def __init__(self, pname: Name):
+    def __init__(self, pname: Name, source : Optional['Level']):
         self.pname = pname
-        Level.__init__(self)
+        Level.__init__(self, source)
     
     @override
     def __str__(self) -> str:
         return f"{self.pname}"
-    
-    @override
-    def structurally_equal(self, other: 'Level') -> bool:
-        return isinstance(other, LevelParam) and self.pname == other.pname
-    
+
     @override
     def get_hash(self) -> int: 
         return hash(("Param", self.pname))
@@ -173,8 +142,8 @@ class LevelParam(Level):
 class LevelMVar(Level):
     @override
     @typechecked
-    def __init__(self):
-        Level.__init__(self)
+    def __init__(self, source : Optional['Level']):
+        Level.__init__(self, source)
     
     @override
     def __str__(self) -> str: 
