@@ -1710,7 +1710,6 @@ class TypeChecker:
         self.cleanup_fvars(fvars)
         return r
 
-
     def infer_proj(self, proj : Proj, infer_only : bool) -> Expression:
         """
         The type of the projections is the type of the i-th field of the constructor of the structure. First it get the structure name and the corresponding constructor. Then it instantiates the arguments into the constructor until the i-th field is reached. Finally it returns the type of the i-th field. If the projection is a proposition, then it checks that it remains a proposition during the instantiation process. 
@@ -1719,6 +1718,9 @@ class TypeChecker:
         struct_type = self.whnf(struct_type)
 
         inductive_fn, args, _ = unfold_app(struct_type)
+        if isinstance(inductive_fn, MVar):
+            raise UnfinishedExpressionError(proj.source)
+        
         if not isinstance(inductive_fn, Const):
             raise ProjectionError(f"Expected a constant when unfolding the struct type for projection but got {inductive_fn.__class__.__name__}", source=proj.source)
         if inductive_fn.cname != proj.sname:
@@ -1749,6 +1751,8 @@ class TypeChecker:
             if i >= len(args):
                 raise ProjectionError(f"Ran out of arguments when instantiating projection args.", source=proj.source)
             r = self.whnf(r)
+            if isinstance(r, MVar):
+                raise UnfinishedExpressionError(proj.source)
             if not isinstance(r, Pi):
                 raise ProjectionError(f"Expected a Pi type when instantiating projection args but got {r.__class__.__name__}", source=proj.source)
             r = self.instantiate(body=r.codomain, val=args[i])
@@ -1889,8 +1893,8 @@ class TypeChecker:
         inferred_sort = self.infer(decl.type)
         self.ensure_sort(inferred_sort, sort_source=decl.type.source)
 
-    def check_value_has_expected_type(self, value : Expression, expected_type : Expression) -> bool:
-        inferred_type = self.infer(value)
+    def check_value_has_expected_type(self, value : Expression, expected_type : Expression, clear_caches : bool = True, clear_local_context : bool = False) -> bool:
+        inferred_type = self.infer(value, clear_caches, clear_local_context)
         return self.def_eq(inferred_type, expected_type, expect_true=True)
         
     def check_declaration_value(self, decl : Declaration):
