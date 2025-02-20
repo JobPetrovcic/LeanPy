@@ -4,7 +4,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 from LeanPy.Kernel.KernelErrors import DeclarationError, PanicError, UnboundVariableError
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import Level, LevelParam
-from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList
+from LeanPy.Structures.Expression.LevelManipulation import substitute_level_params_level, LevelSubList, mark_as_expected_type_level
 
 def replace_expression_aux(
         expr : Expression, 
@@ -441,4 +441,9 @@ def mark_as_expected_type(expr : Expression) -> None:
     """
     def mark_fn(e : Expression):
         e.is_expected_type = True
+        if isinstance(e, Sort):
+            mark_as_expected_type_level(e.level)
+        elif isinstance(e, Const):
+            for lvl in e.lvl_params:
+                mark_as_expected_type_level(lvl)
     do_fn(expr, mark_fn)

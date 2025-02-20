@@ -8,6 +8,7 @@ class Level:
     @typechecked
     def __init__(self):
         self.is_external = False
+        self.is_expected_type = False
         self.update_bookkeeping()
     
     def update_bookkeeping(self):
@@ -186,6 +187,9 @@ class LevelMVar(Level):
     @override
     def get_num_mvars(self) -> int: 
         return 1
+    
+    def structurally_equal(self, other: 'Level') -> bool:
+        return self is other
 
 level_constructors = [LevelZero, LevelSucc, LevelMax, LevelIMax, LevelParam]
 

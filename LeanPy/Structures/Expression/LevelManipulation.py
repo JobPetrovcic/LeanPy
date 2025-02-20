@@ -1,12 +1,11 @@
 import functools
-from typing import Callable, Dict, Optional, List, Sequence, Tuple
+from typing import Callable, Dict, Optional, List, Sequence, Set, Tuple
 
 from LeanPy.Structures.Expression.Level import *
-
-
-from typeguard import typechecked
 from LeanPy.Kernel.KernelErrors import PanicError
 from LeanPy.Structures.Expression.Level import *
+
+from typeguard import typechecked
     
 def to_offset(level : Level) -> Tuple[Level, int]:
     cur = level
@@ -213,3 +212,28 @@ def substitute_level_params_level(level : Level, params : LevelSubList) -> Level
     return replace_level(level, replace_fn)
 
 __all__ = ["are_unique_level_params", "is_equivalent", "is_equivalent_list", "make_imax"]
+
+
+def do_fn_level_aux(level : Level, visited : Set[int], fn : Callable[[Level], Optional[Level]]) -> Level:
+
+    key = id(level)
+    if key in visited: return level
+    visited.add(key)
+    
+    new_level = fn(level)
+    if new_level is not None: return new_level
+
+    if isinstance(level, LevelZero): return level # does not refer to any other level
+    elif isinstance(level, LevelParam): return level # does not refer to any other level
+    elif isinstance(level, LevelSucc): return LevelSucc(do_fn_level_aux(level.anc, visited, fn))
+    elif isinstance(level, LevelMax): return LevelMax(do_fn_level_aux(level.lhs, visited, fn), do_fn_level_aux(level.rhs, visited, fn))
+    elif isinstance(level, LevelIMax): return LevelIMax(do_fn_level_aux(level.lhs, visited, fn), do_fn_level_aux(level.rhs, visited, fn))
+    else: raise PanicError(f"Unknown level type {level.__class__.__name__}")
+
+def do_fn_level(level : Level, fn : Callable[[Level], Optional[Level]]) -> Level:
+    return do_fn_level_aux(level, set(), fn)
+    
+def mark_as_expected_type_level(level : Level):
+    def mark_fn_level(e : Level):
+        e.is_expected_type = True
+    do_fn_level(level, mark_fn_level)
