@@ -419,7 +419,12 @@ class TypeChecker:
         if self.are_struct_eq_exprs(l, r, expect_true=False, use_hash=use_hash): 
             return True
 
-        if not (l.__class__ == r.__class__): 
+        if l.__class__ != r.__class__:
+            if (isinstance(l, Pi) and isinstance(r, Sort)) or (isinstance(l, Sort) and isinstance(r, Pi)): # easy non-equality case
+                if expect_true:
+                    raise DefinitionalEqualityError(l, r)
+                return False
+
             return None # not an easy case
 
         if isinstance(l, Sort) and isinstance(r, Sort): 
