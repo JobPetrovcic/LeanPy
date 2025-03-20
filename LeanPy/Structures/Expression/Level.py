@@ -69,7 +69,7 @@ class LevelSucc(Level):
     
     @override
     def get_hash(self) -> int: 
-        return hash((self.anc, "Succ"))
+        return hash(("Succ", hash(self.anc)))
 
     @override
     def get_num_mvars(self) -> int: 
@@ -88,7 +88,7 @@ class LevelMax(Level):
 
     @override
     def get_hash(self) -> int: 
-        return hash((self.lhs, self.rhs, "Max"))
+        return hash(("Max", hash(self.lhs), hash(self.rhs)))
 
     @override
     def get_num_mvars(self) -> int: 
@@ -107,7 +107,7 @@ class LevelIMax(Level):
 
     @override
     def get_hash(self) -> int: 
-        return hash((self.lhs, self.rhs, "IMax"))
+        return hash(("IMax", hash(self.lhs), hash(self.rhs)))
 
     @override
     def get_num_mvars(self) -> int: 
@@ -125,7 +125,7 @@ class LevelParam(Level):
 
     @override
     def get_hash(self) -> int: 
-        return hash(("Param", self.pname))
+        return hash(("Param", hash(self.pname)))
 
     @override
     def get_num_mvars(self) -> int: 
