@@ -12,6 +12,7 @@ class DefinitionalEqualityLevelError(Exception):
         
         self.l = l
         self.r = r
+        super().__init__(f"Levels {l} and {r} are not definitionally equal")
 
 class UnfinishedLevelError(Exception):
     def __init__(self, source : Level):

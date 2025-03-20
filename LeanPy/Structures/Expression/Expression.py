@@ -6,6 +6,7 @@ from typing_extensions import override
 #from typeguard import typechecked
 
 from LeanPy.Structures.Expression.Level import *
+from LeanPy.Structures.Expression.LevelManipulation import structurally_equal
 from LeanPy.Structures.Name import *
 
 EXPR_COMPARE_RAW_THRESHOLD = 100 # the threshold for when to compare expressions without using the cache
@@ -27,7 +28,7 @@ class Expression:
         self.num_fvars = self.get_num_fvars()
         self.num_bvars = self.get_num_bvars()
         self.bvar_range = self.get_bvar_range() # the maximum bvar index in the expression, adjusted for the number of binders
-        self.num_mvars = self.get_num_mvars()
+        self.num_expr_mvars = self.get_num_expr_mvars()
 
         self.num_lvl_mvars = self.get_lvl_mvars()
 
@@ -39,8 +40,8 @@ class Expression:
         raise NotImplementedError(f"Method get_num_bvars not implemented for class {self.__class__.__name__}")
     def get_bvar_range(self) -> int: 
         raise NotImplementedError(f"Method get_bvar_range not implemented for class {self.__class__.__name__}")
-    def get_num_mvars(self) -> int: 
-        raise NotImplementedError(f"Method get_num_mvars not implemented for class {self.__class__.__name__}")
+    def get_num_expr_mvars(self) -> int: 
+        raise NotImplementedError(f"Method get_num_expr_mvars not implemented for class {self.__class__.__name__}")
     def get_lvl_mvars(self) -> int: 
         raise NotImplementedError(f"Method get_lvl_mvars not implemented for class {self.__class__.__name__}")
     def get_expr_size(self) -> int: 
@@ -105,7 +106,7 @@ class Expression:
         """ 
         Returns True if the given expression has any metavariables. 
         """
-        return self.num_mvars > 0
+        return self.num_expr_mvars > 0
     
     @property
     def has_lvl_mvars(self) -> bool:
@@ -151,7 +152,7 @@ class BVar(Expression):
         return self.db_index
     
     @override
-    def get_num_mvars(self): 
+    def get_num_expr_mvars(self): 
         return 0
     
     @override
@@ -204,12 +205,12 @@ class FVar(Expression):
         return -1
     
     @override
-    def get_num_mvars(self): 
-        return 0
+    def get_num_expr_mvars(self): 
+        return self.type.num_expr_mvars + (0 if self.val is None else self.val.num_expr_mvars)
     
     @override
     def get_lvl_mvars(self): 
-        return 0
+        return self.type.num_lvl_mvars + (0 if self.val is None else self.val.num_lvl_mvars)
     
     @override
     def get_expr_size(self) -> int: 
@@ -234,7 +235,7 @@ class Sort(Expression):
     
     @override
     def get_hash(self) -> int: 
-        return hash(("Sort", self.level))
+        return hash(("Sort", hash(self.level)))
     
     @override
     def get_num_fvars(self): 
@@ -249,7 +250,7 @@ class Sort(Expression):
         return -1
     
     @override
-    def get_num_mvars(self): 
+    def get_num_expr_mvars(self): 
         return 0
     
     @override
@@ -266,7 +267,7 @@ class Sort(Expression):
     
     @override
     def structurally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
-        return isinstance(other, Sort) and self.level.structurally_equal(other.level)
+        return isinstance(other, Sort) and structurally_equal(self.level, other.level, False)
 
 class Const(Expression):
     @typechecked
@@ -276,8 +277,10 @@ class Const(Expression):
         Expression.__init__(self, source)
     
     @override
-    def get_hash(self) -> int: 
-        return hash(("Const", hash(self.cname)))
+    def get_hash(self) -> int:
+        lvl_params_hash = tuple([hash(lvl) for lvl in self.lvl_params])
+
+        return hash(("Const", hash(self.cname), lvl_params_hash))
     
     @override
     def get_num_fvars(self): 
@@ -292,7 +295,7 @@ class Const(Expression):
         return -1
     
     @override
-    def get_num_mvars(self): 
+    def get_num_expr_mvars(self): 
         return 0
     
     @override
@@ -316,17 +319,38 @@ class Const(Expression):
         return (isinstance(other, Const) and 
                 self.cname == other.cname and 
                 len(self.lvl_params) == len(other.lvl_params) and 
-                all([l1.structurally_equal(l2) for l1, l2 in zip(self.lvl_params, other.lvl_params)]))
+                all([structurally_equal(l1, l2, False) for l1, l2 in zip(self.lvl_params, other.lvl_params)]))
     
     # override __getattr__ so that levels parameters can be accessed as attributes
     def __getattr__(self, attr_name : str) -> Any:
-        if attr_name.startswith("lvl_"):
+        if attr_name == "lvl_params":
+            return object.__getattribute__(self, attr_name)
+        elif attr_name.startswith("lvl_"):
             lvl_index = int(attr_name[4:])
             if lvl_index < len(self.lvl_params):
                 return self.lvl_params[lvl_index]
+            else:
+                raise AttributeError(f"Attribute {attr_name} not found in Const object {self}")
         elif attr_name == "cname":
             return self.cname
         return super().__getattr__(attr_name) # type: ignore
+
+    # override __setattr__ so that levels parameters can be set as attributes
+    def __setattr__(self, attr_name : str, value : Any) -> None:
+        if attr_name == "lvl_params":
+            object.__setattr__(self, attr_name, value)
+        elif attr_name.startswith("lvl_"):
+            lvl_index = int(attr_name[4:])
+            assert 0 <= lvl_index
+            if lvl_index < len(self.lvl_params):
+                self.lvl_params[lvl_index] = value
+            else:
+                raise AttributeError(f"Cannot set attribute {attr_name} of Const object {self}")
+        elif attr_name == "cname":
+            assert isinstance(value, Name)
+            object.__setattr__(self, attr_name, value)
+        else:
+            object.__setattr__(self, attr_name, value)
 
 class App(Expression):
     @typechecked
@@ -352,8 +376,8 @@ class App(Expression):
         return max(self.fn.bvar_range, self.arg.bvar_range)
     
     @override
-    def get_num_mvars(self): 
-        return self.fn.num_mvars + self.arg.num_mvars
+    def get_num_expr_mvars(self): 
+        return self.fn.num_expr_mvars + self.arg.num_expr_mvars
     
     @override
     def get_lvl_mvars(self): 
@@ -371,7 +395,7 @@ class App(Expression):
             args.append(fn.arg)
             fn = fn.fn
         args = list(reversed(args))
-        return f"({fn} {' '.join(map(str, args))})"
+        return f"(({fn}) {' '.join(map(str, args))})"
     
     @override
     def structurally_equal(self, other : 'Expression', compare_cache : Set[Tuple[int, int]], use_cache : bool) -> bool:
@@ -404,8 +428,8 @@ class Pi(Expression):
         return max(self.domain.bvar_range, self.codomain.bvar_range-1) # the -1 is because the argument is a binder
     
     @override
-    def get_num_mvars(self): 
-        return self.domain.num_mvars + self.codomain.num_mvars
+    def get_num_expr_mvars(self): 
+        return self.domain.num_expr_mvars + self.codomain.num_expr_mvars
     
     @override
     def get_lvl_mvars(self): 
@@ -453,8 +477,8 @@ class Lambda(Expression):
         return max(self.domain.bvar_range, self.body.bvar_range-1) # the -1 is because the argument is a binder
     
     @override
-    def get_num_mvars(self): 
-        return self.domain.num_mvars + self.body.num_mvars
+    def get_num_expr_mvars(self): 
+        return self.domain.num_expr_mvars + self.body.num_expr_mvars
     
     @override
     def get_lvl_mvars(self): 
@@ -488,7 +512,7 @@ class Let(Expression):
     
     @override
     def get_hash(self) -> int: 
-        return hash(("Let", hash(self.bname), hash(self.domain), hash(self.val), hash(self.body)))
+        return hash(("Let", hash(self.domain), hash(self.val), hash(self.body)))
     
     @override
     def get_num_fvars(self): 
@@ -503,8 +527,8 @@ class Let(Expression):
         return max(self.domain.bvar_range, self.val.bvar_range, self.body.bvar_range-1) # the -1 is because the argument is a binder
     
     @override
-    def get_num_mvars(self): 
-        return self.domain.num_mvars + self.val.num_mvars + self.body.num_mvars
+    def get_num_expr_mvars(self): 
+        return self.domain.num_expr_mvars + self.val.num_expr_mvars + self.body.num_expr_mvars
     
     @override
     def get_lvl_mvars(self): 
@@ -550,8 +574,8 @@ class Proj(Expression):
         return self.expr.bvar_range
     
     @override
-    def get_num_mvars(self): 
-        return self.expr.num_mvars
+    def get_num_expr_mvars(self): 
+        return self.expr.num_expr_mvars
     
     @override
     def get_lvl_mvars(self): 
@@ -596,7 +620,7 @@ class NatLit(Expression):
         return -1
     
     @override
-    def get_num_mvars(self): 
+    def get_num_expr_mvars(self): 
         return 0
     
     @override
@@ -638,7 +662,7 @@ class StrLit(Expression):
         return -1
     
     @override
-    def get_num_mvars(self): 
+    def get_num_expr_mvars(self): 
         return 0
     
     @override
@@ -679,7 +703,7 @@ class MVar(Expression):
         return -1
     
     @override
-    def get_num_mvars(self): 
+    def get_num_expr_mvars(self): 
         return 1
     
     @override

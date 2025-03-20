@@ -5,7 +5,7 @@ from LeanPy.Kernel.KernelErrors import DeclarationError, PanicError
 from LeanPy.Structures.Name import Name
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Structures.Expression.Level import LevelParam
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 class RecursorRule:
     def __init__(self, constructor: Name, num_fields: int, value: Expression):
@@ -199,12 +199,12 @@ class Recursor(Declaration):
         
         return fn.cname
     
-    def get_recursion_rule(self, major : Expression) -> Optional[RecursorRule]:
+    def get_recursion_rule(self, major : Expression) -> Optional[Tuple[RecursorRule, Expression]]:
         fn = get_app_function(major)
         if not isinstance(fn, Const): return None
         for rule in self.recursor_rules:
             if rule.constructor == fn.cname:
-                return rule
+                return rule, fn
         return None
 
 

@@ -276,7 +276,7 @@ def abstract_multiple_bvars(fvars : List[FVar], body : Expression) -> Expression
             for i, fvar in enumerate(fvars):
                 if fvar is expr: return BVar(db_index=depth + i, source=expr.source)
         return None
-    return replace_expression_w_depth(body, replace_fn, 0)
+    return replace_expression_w_depth(body, replace_fn, 0, source)
 
 def unfold_app(expr : Expression) -> Tuple[Expression, List[Expression], List[Expression]]:
     """ 
@@ -331,6 +331,7 @@ class ReductionStatus(Enum):
     UNKNOWN = 3
 
 def replace_bvars_by_fvar(expr : Expression, fvar_list : List[FVar]) -> Expression:
+    # TODO: replacing source? is it even necessary?
     """
     Replace all bvars with the corresponding fvars in the given expression. Used for printing.
     """

@@ -58,14 +58,15 @@ class StructureError(KernelError):
     def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
 
-class UnboundVariableError(KernelError):
-    def __init__(self, message : str, source : Expression):
-        super().__init__(message, source)
-
 class LocalContextError(KernelError):
     def __init__(self, message : str, source : Expression):
         super().__init__(message, source)
 
+class UnboundVariableError(KernelError):
+    def __init__(self, message : str, source : Expression):
+        super().__init__(message, source)
+
+# special error for definitional equality
 class DefinitionalEqualityError(Exception):
     def __init__(self, l : Expression, r : Expression):
         if isinstance(l, MVar) or isinstance(r, MVar):

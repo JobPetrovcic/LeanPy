@@ -1,5 +1,5 @@
 from typing import Dict
-from LeanPy.Kernel.KernelErrors import DeclarationError, InvalidDeclarationNameError, TCEnvironmentError
+from LeanPy.Kernel.KernelErrors import InvalidDeclarationNameError, TCEnvironmentError
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 from LeanPy.Structures.Name import *
 from LeanPy.Structures.Expression.Level import *

@@ -2,7 +2,6 @@ from typing import List, Optional, Sequence, Tuple
 from LeanPy.Kernel.Cache.Cache import InferCache, PairCache, WHNFCache # TODO: Pair cache is redundant, can be replace by map from tuple to value
 from LeanPy.Kernel.Cache.EquivManager import EquivManager, FailureCache
 from LeanPy.Kernel.KernelErrors import *
-from LeanPy.Kernel.LevelEqualityChecking import make_imax
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration, compare_reducibility_hints
 from LeanPy.Structures.Environment.Environment import Environment
 from LeanPy.Structures.Environment.LocalContext import LocalContext
@@ -88,7 +87,7 @@ class TypeChecker:
         """
         return self.local_context.get_fvar_value(fvar)
     
-    def instantiate(self, body : Expression, val : Expression) -> Expression:
+    def instantiate(self, body : Expression, val : Expression, source : Optional[Expression]) -> Expression:
         """
         Replace the outermost bound variable in the body with the value. 
         IMPORTANT:
@@ -98,13 +97,13 @@ class TypeChecker:
         if cached_inst_body is not None: 
             return cached_inst_body
 
-        inst_body = instantiate_bvar(body, val)
+        inst_body = instantiate_bvar(body, val, source)
         if not body.has_mvars: # cache only if there are no metavariables in the body
             assert not inst_body.has_mvars
             self.instantiation_cache.put(body, val, inst_body)
         return inst_body
     
-    def instantiate_multiple(self, body : Expression, vals : Sequence[Expression]) -> Expression:
+    def instantiate_multiple(self, body : Expression, vals : Sequence[Expression], source : Optional[Expression]) -> Expression:
         """
         Replace the outermost bound variables in the body with the values. 
         IMPORTANT:
@@ -116,26 +115,27 @@ class TypeChecker:
         if cached_inst_body is not None: 
             return cached_inst_body
 
-        inst_body = instantiate_bvars(body, vals_tuple)
-        if not body.has_mvars: # cache only if there are no metavariables in the body
-            assert not inst_body.has_mvars
+        inst_body = instantiate_bvars(body, vals_tuple, source)
+        if not inst_body.has_mvars: # cache only if there are no metavariables in the instantiate body
+            assert not body.has_mvars
             self.instantiation_multiple_cache.put(body, vals_tuple, inst_body)
         return inst_body
     
-    def subst_level_params(self, expr : Expression, lvl_params : List[LevelParam], levels : List[Level]) -> Expression:
+    def subst_level_params(self, expr : Expression, lvl_params : List[LevelParam], levels : List[Level], source : Optional[Expression]) -> Expression:
         """
         Substitute the level parameters in the expression with the levels. Allows for caching.
         """
         lvl_subst = level_zip(lvl_params, levels)
         lvl_subst_tuple = tuple(lvl_subst)
 
+        # TODO: should we also put souce in the key for the cache?
         cached_subst_expr = self.lvl_param_subst_cache.get(expr, lvl_subst_tuple)
         if cached_subst_expr is not None: 
             return cached_subst_expr
 
-        subst_expr = substitute_level_params_in_expression(expr, lvl_subst)
-        if not expr.has_mvars: # cache only if there are no metavariables in the expression
-            assert not subst_expr.has_mvars
+        subst_expr = substitute_level_params_in_expression(expr, lvl_subst, source)
+        if not subst_expr.has_mvars: # cache only if there are no metavariables in the expression
+            assert not expr.has_mvars
             self.lvl_param_subst_cache.put(expr, lvl_subst_tuple, subst_expr)
 
         return subst_expr
@@ -149,19 +149,19 @@ class TypeChecker:
             Subs parameters : {[str(l) for l in subst]}
             """)
     
-    def get_declaration_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level]) -> Expression:
+    def get_declaration_type_with_substituted_level_params(self, decl : Declaration, subs : List[Level], source : Optional[Expression]) -> Expression:
         """
         Substitute the level parameters in the declaration type with the levels. 
         """
         self.check_level_params_length(decl, decl.lvl_params, subs)
-        return self.subst_level_params(decl.type, decl.lvl_params, subs)
+        return self.subst_level_params(decl.type, decl.lvl_params, subs, source)
     
-    def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level]) -> Expression:
+    def get_declaration_val_with_substituted_level_params(self, decl : Definition | Theorem | Opaque, subs : List[Level], source : Optional[Expression]) -> Expression:
         """
         Substitute the level parameters in the declaration value with the levels.
         """
         self.check_level_params_length(decl, decl.lvl_params, subs)
-        return self.subst_level_params(decl.value, decl.lvl_params, subs)
+        return self.subst_level_params(decl.value, decl.lvl_params, subs, source)
     
     def ensure_pi(self, expr : Expression, pi_source : Expression) -> Pi:
         """
@@ -224,11 +224,7 @@ class TypeChecker:
         if not isinstance(inferred_type, Sort):
             return False
         
-        if inferred_type.level.has_mvars:
-            raise UnfinishedExpressionError(inferred_type.source)
-        if self.environment.level_zero.has_mvars:
-            raise PanicError("Unfinished expression in right side of definitional equality.")
-        return is_equivalent(inferred_type.level, self.environment.level_zero)
+        return is_equivalent(inferred_type.level, self.environment.level_zero, False)
     
     # DEFINITIONAL EQUALITY
     def def_eq_offset(self, t : Expression, s : Expression, expect_true : bool) -> Optional[bool]:
@@ -252,9 +248,9 @@ class TypeChecker:
         if r.level.has_mvars:
             raise PanicError("Unfinished expression in right hand side of definitional equality.")
         
-        ret = is_equivalent(l.level, r.level)
+        ret = is_equivalent(l.level, r.level, expect_true=expect_true)
         if expect_true and not ret:
-            raise DefinitionalEqualityError(l, r)
+            raise PanicError(f"This should be unreachable")
         return ret
     
     def def_eq_const(self, l : Const, r : Const, expect_true : bool) -> bool:
@@ -269,7 +265,7 @@ class TypeChecker:
                 if lvl.has_mvars:
                     raise PanicError("Unfinished expression in right hand side of definitional equality.")
 
-            if is_equivalent_list(l.lvl_params, r.lvl_params): 
+            if is_equivalent_list(l.lvl_params, r.lvl_params, expect_true): 
                 return True
             #else: print(f"Constants {l} and {r} have the same name but different level parameters : {[str(lvl) for lvl in l.lvl_params]} and {[str(lvl) for lvl in r.lvl_params]}", file=sys.stderr)
         if expect_true:
@@ -303,20 +299,20 @@ class TypeChecker:
         while isinstance(t, Pi) and isinstance(s, Pi):
             var_s_type = None
             if not (t.domain == s.domain):
-                var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
+                var_s_type = self.instantiate_multiple(s.domain, subs[::-1], None)
+                var_t_type = self.instantiate_multiple(t.domain, subs[::-1], None)
                 if not self.def_eq(var_t_type, var_s_type, expect_true):
                     self.cleanup_fvars(subs)
                     return False
             if t.codomain.has_loose_bvars or s.codomain.has_loose_bvars:
                 if var_s_type is None:
-                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
+                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1], None)
                 subs.append(self.create_fvar(s.bname, var_s_type, val=None, is_let=False, source=s.source))
             else:
                 subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, val=None, is_let=False, source=s.source))
             t = t.codomain
             s = s.codomain
-        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]), expect_true)
+        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1], None), self.instantiate_multiple(s, subs[::-1], None), expect_true)
 
         self.cleanup_fvars(subs)
 
@@ -334,21 +330,21 @@ class TypeChecker:
         while isinstance(t, Lambda) and isinstance(s, Lambda):
             var_s_type = None
             if not (t.domain == s.domain):
-                var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
-                var_t_type = self.instantiate_multiple(t.domain, subs[::-1])
+                var_s_type = self.instantiate_multiple(s.domain, subs[::-1], None)
+                var_t_type = self.instantiate_multiple(t.domain, subs[::-1], None)
                 if not self.def_eq(var_t_type, var_s_type, expect_true):
                     self.cleanup_fvars(subs)
                     return False
             if t.body.has_loose_bvars or s.body.has_loose_bvars:
                 if var_s_type is None:
-                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1])
+                    var_s_type = self.instantiate_multiple(s.domain, subs[::-1], None)
                 subs.append(self.create_fvar(s.bname, var_s_type, val=None, is_let=False, source=s.source))
             else:
                 subs.append(self.create_fvar(self.environment.filler_name, self.environment.filler_const, val=None, is_let=False, source=s.source))
             t = t.body
             s = s.body
             
-        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1]), self.instantiate_multiple(s, subs[::-1]), expect_true)
+        ret = self.def_eq(self.instantiate_multiple(t, subs[::-1], None), self.instantiate_multiple(s, subs[::-1], None), expect_true)
         self.cleanup_fvars(subs)
         return ret
 
@@ -935,7 +931,7 @@ class TypeChecker:
         rest_arg_sources = args_sources[n_successful_subs:]
         successful_args = args[:n_successful_subs][::-1]
         
-        inst_f = self.instantiate_multiple(f, successful_args)
+        inst_f = self.instantiate_multiple(f, successful_args, None)
 
         return fold_apps(inst_f, rest_args, sources=rest_arg_sources)
     
@@ -978,7 +974,7 @@ class TypeChecker:
             Expression
                 The expression after the delta reduction.
         """
-        decl_val = self.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params)
+        decl_val = self.get_declaration_val_with_substituted_level_params(decl, fn.lvl_params, source=fn.source)
         return fold_apps(decl_val, args, sources=arg_sources)
     
     def delta_reduction(self, expr : Expression) -> Optional[Expression]:
@@ -1298,16 +1294,17 @@ class TypeChecker:
         else:
             major = self.to_constructor_when_structure(rec_decl.get_major_induct(), major, inductive_name_source=rec_fn.source, cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         
-        rule = rec_decl.get_recursion_rule(major)
-        if rule is None: 
+        prule = rec_decl.get_recursion_rule(major)
+        if prule is None: 
             return None
+        rule, source_fn = prule
 
         _, major_args, major_arg_sources = unfold_app(major)
         if len(major_args) < rule.num_fields: 
             return None 
         if len(rec_fn.lvl_params) != len(rec_decl.lvl_params): 
             return None
-        rhs = self.subst_level_params(rule.value, rec_decl.lvl_params, rec_fn.lvl_params) # clones the rule.value
+        rhs = self.subst_level_params(rule.value, rec_decl.lvl_params, rec_fn.lvl_params, source=source_fn) # clones the rule.value
 
         # apply parameters, motives and minor premises from recursor application.
         if rec_decl.num_params + rec_decl.num_motives + rec_decl.num_minors >= len(rec_args):
@@ -1435,7 +1432,7 @@ class TypeChecker:
             else:
                 r = self.whnf_core(fold_apps(fn, raw_args, raw_arg_sources), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         elif isinstance(expr, Let):
-            r = self.whnf_core(self.instantiate(body=expr.body, val=expr.val), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
+            r = self.whnf_core(self.instantiate(body=expr.body, val=expr.val, source=None), cheap_rec=cheap_rec, cheap_proj=cheap_proj)
         
         if r is None:
             raise PanicError(f"Expr of type {expr.__class__.__name__} could not be matched, this should not happen.")
@@ -1517,7 +1514,7 @@ class TypeChecker:
             if not self.def_eq(inferred_domain, fn_type.domain, expect_true=False):
                 raise ExpectedEqualExpressionsError(inferred_domain, fn_type.domain, source=app.source)
             
-            infered_type = self.instantiate(body=fn_type.codomain, val=app.arg)
+            infered_type = self.instantiate(body=fn_type.codomain, val=app.arg, source=None)
             return infered_type
         else:
             # If infer_only is true we only check that the type of fn is a pi type and keep substituting the arguments into the function type's codomain. We don't check that arguments match the function type's domain.
@@ -1529,18 +1526,18 @@ class TypeChecker:
                 if isinstance(fn_type, Pi):
                     fn_type = fn_type.codomain
                 else:
-                    fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1])
+                    fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1], None)
                     fn_type = self.ensure_pi(fn_type, pi_source=arg_sources[j].source)
                     fn_type = fn_type.codomain
                     j = i
             
-            return self.instantiate_multiple(fn_type, args[j:][::-1])
+            return self.instantiate_multiple(fn_type, args[j:][::-1], None)
             
     def infer_sort(self, sort : Sort) -> Expression:
         """
         The type of Sort l is Sort (l+1).
         """
-        return Sort(LevelSucc(sort.level), source=sort.source)
+        return Sort(LevelSucc(sort.level, source=sort), source=sort.source)
     
     def infer_pi(self, pi : Pi, infer_only : bool) -> Expression:
         """
@@ -1559,13 +1556,13 @@ class TypeChecker:
         pi_sources : List[Expression] = []
         while isinstance(e, Pi):
             pi_sources.append(e)
-            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
+            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1], None)
             t1 = self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
             us.append(t1.level)
-            fvars.append(self.create_fvar(e.bname, inst_domain, val=None, is_let=False, source=e.source))
+            fvars.append(self.create_fvar(e.bname, inst_domain, val=None, is_let=False, source=e.domain.source))
             e = e.codomain
 
-        e = self.instantiate_multiple(e, fvars[::-1])
+        e = self.instantiate_multiple(e, fvars[::-1], None)
         t1 = self.ensure_sort(self.infer_core(e, infer_only), sort_source=e.source)
         lvl = t1.level
         for i in range(len(us)-1, -1, -1):
@@ -1582,7 +1579,7 @@ class TypeChecker:
         decl = self.environment.get_declaration_under_name(c.cname, source=c.source)
         if len(c.lvl_params) != len(decl.lvl_params):
             raise PanicError("The number of level parameters of the constant does not match the number of level parameters in the environment.")
-        return self.get_declaration_type_with_substituted_level_params(decl, c.lvl_params)
+        return self.get_declaration_type_with_substituted_level_params(decl, c.lvl_params, source=c.source)
 
     def make_pi_binding(self, fvars : List[FVar], b : Expression, pi_sources : List[Expression]) -> Expression:
         """
@@ -1595,12 +1592,12 @@ class TypeChecker:
                 The body of the pi binding to be abstracted.
         """
 
-        r = abstract_multiple_bvars(fvars[::-1], b)
+        r = abstract_multiple_bvars(fvars[::-1], b, source=None)
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
             if c_fvar.is_let:
                 raise PanicError("Cannot have a let binding in a pi binding.")
-            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.original_type)
+            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.original_type, source=None)
             r = Pi(c_fvar.name, abs_type, r, source=pi_sources[i])
         
         return r
@@ -1615,13 +1612,13 @@ class TypeChecker:
         pi_sources : List[Expression] = []
         while isinstance(e, Lambda):
             pi_sources.append(e.source)
-            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1])
+            inst_domain = self.instantiate_multiple(e.domain, fvars[::-1], None)
             fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=e.source))
             if not infer_only:
-                self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.source)
+                self.ensure_sort(self.infer_core(inst_domain, infer_only), sort_source=e.domain.source)
             e = e.body
         
-        r = self.instantiate_multiple(e, fvars[::-1])
+        r = self.instantiate_multiple(e, fvars[::-1], None)
         if r.has_loose_bvars:
             raise UnboundVariableError("The body of the lambda has loose bound variables.", source=lam.source)
         r = self.infer_core(r, infer_only)
@@ -1648,7 +1645,7 @@ class TypeChecker:
         """
         If we have a body with free variables fvars, then we abstract the body, replacing the free variables with bound variables, and then create Let bindings corresponding to the bound variables (if they are present in the abstracted body). Also abstracts the domains and values of the let bindings. 
         """
-        r = abstract_multiple_bvars(fvars[::-1], b)
+        r = abstract_multiple_bvars(fvars[::-1], b, None)
         for i in range(len(fvars)-1, -1, -1):
             c_fvar = fvars[i]
             if not c_fvar.is_let:
@@ -1656,11 +1653,11 @@ class TypeChecker:
             if c_fvar.val is None:
                 raise PanicError("Cannot have a let binding without a value.")
 
-            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.original_type) # TODO: think about this deeply
+            abs_type = abstract_multiple_bvars(fvars[:i][::-1], c_fvar.original_type, None) # TODO: think about this deeply
 
             ov = c_fvar.original_val
             assert ov is not None
-            abs_val = abstract_multiple_bvars(fvars[:i][::-1], ov)
+            abs_val = abstract_multiple_bvars(fvars[:i][::-1], ov, None)
 
             r = Let(bname=c_fvar.name, domain=abs_type, val=abs_val, body=r, source=let_sources[i])
         
@@ -1678,22 +1675,22 @@ class TypeChecker:
 
         e = let
         while isinstance(e, Let):
-            l_type = self.instantiate_multiple(e.domain, fvars[::-1])
-            val = self.instantiate_multiple(e.val, fvars[::-1])
+            l_type = self.instantiate_multiple(e.domain, fvars[::-1], None)
+            val = self.instantiate_multiple(e.val, fvars[::-1], None)
             fvars.append(self.create_fvar(e.bname, l_type, val=val, is_let=True, source=e.source))
             vals.append(val)
             let_sources.append(e.source)
 
             if not infer_only:
-                self.ensure_sort(self.infer_core(l_type, infer_only), sort_source=e.source)
+                self.ensure_sort(self.infer_core(l_type, infer_only), sort_source=e.domain.source)
                 inferred_val_type = self.infer_core(val, infer_only)
 
                 if not self.def_eq(inferred_val_type, l_type, expect_true=False):
-                    raise ExpectedEqualExpressionsError(inferred_val_type, l_type, e.source)
+                    raise ExpectedEqualExpressionsError(inferred_val_type, l_type, e.val.source)
             
             e = e.body
         
-        r = self.instantiate_multiple(e, fvars[::-1])
+        r = self.instantiate_multiple(e, fvars[::-1], None)
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
         used = [False] * len(fvars)
@@ -1753,7 +1750,7 @@ class TypeChecker:
         if constructor_decl.num_params != I_decl.num_params:
             raise DeclarationError(f"Sanity check failed: number of parameters in inductive type and constructor do not match.")
 
-        r = self.subst_level_params(constructor_decl.type, I_decl.lvl_params, inductive_fn.lvl_params)
+        r = self.subst_level_params(constructor_decl.type, I_decl.lvl_params, inductive_fn.lvl_params, source=inductive_fn.source)
         
         for i in range(I_decl.num_params):
             if i >= len(args):
@@ -1763,7 +1760,7 @@ class TypeChecker:
                 raise UnfinishedExpressionError(proj.source)
             if not isinstance(r, Pi):
                 raise ProjectionError(f"Expected a Pi type when instantiating projection args but got {r.__class__.__name__}", source=proj.source)
-            r = self.instantiate(body=r.codomain, val=args[i])
+            r = self.instantiate(body=r.codomain, val=args[i], source=None)
         
         is_prop_type = self.is_prop(r)
 
@@ -1775,7 +1772,8 @@ class TypeChecker:
             if r.codomain.has_loose_bvars:
                 r = self.instantiate(
                     body=r.codomain, 
-                    val=Proj(I_name, i, proj.expr, source=proj.expr.source) # proj.expr.source or proj.source?
+                    val=Proj(I_name, i, proj.expr, source=proj.expr.source), # proj.expr.source or proj.source?
+                    source=None
                 )
                 if is_prop_type and not self.is_prop(r):
                     raise ProjectionError(f"When substituting proj indices, the body should remain a prop type.", source=proj.source)
@@ -1848,7 +1846,7 @@ class TypeChecker:
         
         # cache the result
         if not expr.has_mvars: # cache the result if it does not have mvars
-            assert not inferred_type.has_mvars
+            assert not inferred_type.has_mvars, f"{expr} was inferred to have mvars {inferred_type}"
             self.infer_cache[infer_only].put(expr, inferred_type)
 
         return inferred_type
@@ -1903,7 +1901,7 @@ class TypeChecker:
 
     def check_value_has_expected_type(self, value : Expression, expected_type : Expression, clear_caches : bool = True, clear_local_context : bool = False) -> bool:
         inferred_type = self.infer(value, clear_caches, clear_local_context)
-        print(f"Value {value} of type {inferred_type}")
+        print(f"inferred_type {inferred_type}")
         return self.def_eq(inferred_type, expected_type, expect_true=True)
         
     def check_declaration_value(self, decl : Declaration):

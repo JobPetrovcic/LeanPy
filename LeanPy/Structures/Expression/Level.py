@@ -1,10 +1,7 @@
 from typing import Optional, override
-
-from typeguard import typechecked
 from LeanPy.Structures.Name import Name
 
 class Level:
-    @typechecked
     def __init__(self, source : Optional['Level']):
         self.is_external = False
         self.is_expected_type = False
@@ -37,8 +34,7 @@ class Level:
 
 class LevelZero(Level):
     @override
-    @typechecked
-    def __init__(self, source : Optional['Level']):
+    def __init__(self, source : Optional['Level'] = None):
         Level.__init__(self, source)
         
     @override
@@ -55,8 +51,7 @@ class LevelZero(Level):
 
 class LevelSucc(Level):
     @override
-    @typechecked
-    def __init__(self, anc: Level, source : Optional['Level']):
+    def __init__(self, anc: Level, source : Optional['Level'] = None):
         self.anc = anc
         Level.__init__(self, source)
     
@@ -82,8 +77,7 @@ class LevelSucc(Level):
 
 class LevelMax(Level):
     @override
-    @typechecked
-    def __init__(self, lhs: Level, rhs: Level, source : Optional['Level']):
+    def __init__(self, lhs: Level, rhs: Level, source : Optional['Level'] = None):
         self.lhs = lhs
         self.rhs = rhs
         Level.__init__(self, source)
@@ -102,8 +96,7 @@ class LevelMax(Level):
 
 class LevelIMax(Level):
     @override
-    @typechecked
-    def __init__(self, lhs: Level, rhs: Level, source : Optional['Level']):
+    def __init__(self, lhs: Level, rhs: Level, source : Optional['Level'] = None):
         self.lhs = lhs
         self.rhs = rhs
         Level.__init__(self, source)
@@ -122,8 +115,7 @@ class LevelIMax(Level):
 
 class LevelParam(Level):
     @override
-    @typechecked
-    def __init__(self, pname: Name, source : Optional['Level']):
+    def __init__(self, pname: Name, source : Optional['Level'] = None):
         self.pname = pname
         Level.__init__(self, source)
     
@@ -141,8 +133,7 @@ class LevelParam(Level):
 
 class LevelMVar(Level):
     @override
-    @typechecked
-    def __init__(self, source : Optional['Level']):
+    def __init__(self, source : Optional['Level'] = None):
         Level.__init__(self, source)
     
     @override
@@ -156,9 +147,6 @@ class LevelMVar(Level):
     @override
     def get_num_mvars(self) -> int: 
         return 1
-    
-    def structurally_equal(self, other: 'Level') -> bool:
-        return self is other
 
 level_constructors = [LevelZero, LevelSucc, LevelMax, LevelIMax, LevelParam]
 

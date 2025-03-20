@@ -173,3 +173,16 @@ line_profile.txt
 .vscode/
 *.pyc
 __pycache__/
+progress.txt
+LeanPy/Parsing/sizes.txt
+constructable_hashes_sentences_only.json
+constructable_hashes.json
+log.txt
+nohup.out
+number_of_unique_nodes.png
+number_of_unique_nodes.svg
+Statistics/statistics_old.csv
+Statistics/indegree.txt
+Statistics/topological_order.pkl
+LeanPy/Parsing/nohup.out
+constructable_hashes.txt
