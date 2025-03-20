@@ -4,6 +4,8 @@ from typing import Callable, Dict, Optional, List, Sequence, Set, Tuple
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.LevelErrors import DefinitionalEqualityLevelError, PanicLevelError, UnfinishedLevelError
 from typeguard import typechecked
+
+from LeanPy.Structures.Name import Name, string_to_name
     
 def to_offset(level : Level) -> Tuple[Level, int, List[Level]]:
     cur = level
@@ -279,8 +281,23 @@ def do_fn_level_aux(level : Level, visited : Set[int], fn : Callable[[Level], No
 
 def do_fn_level(level : Level, fn : Callable[[Level], None]) :
     do_fn_level_aux(level, set(), fn)
+
+def mark_as_external_level(level : Level):
+    def mark_fn_level(e : Level):
+        e.is_external = True
+    do_fn_level(level, mark_fn_level)
     
 def mark_as_expected_type_level(level : Level):
     def mark_fn_level(e : Level):
         e.is_expected_type = True
     do_fn_level(level, mark_fn_level)
+
+def rename_level_params_with_index_level(level : Level, rename_dict : Dict[Name, int]) -> Level:
+    def rename_fn_level(e : Level):
+        if isinstance(e, LevelParam):
+            if e.pname not in rename_dict:
+                rename_dict[e.pname] = len(rename_dict)
+            index = rename_dict[e.pname]
+            return LevelParam(string_to_name(f"param_{index}"), source=e.source)
+        return None
+    return replace_level(level, rename_fn_level)
