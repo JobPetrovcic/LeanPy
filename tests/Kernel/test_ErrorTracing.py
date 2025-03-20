@@ -1,4 +1,5 @@
-from LeanPy.Kernel.KernelErrors import KernelError
+from LeanPy.Kernel.KernelErrors import KernelError, UnfinishedExpressionError
+from LeanPy.Parsing.DependencyManager import DependencyManager
 from LeanPy.Structures.Expression.Level import *
 from LeanPy.Structures.Expression.Expression import *
 from LeanPy.Kernel.TypeChecker import TypeChecker
@@ -43,13 +44,34 @@ def test_tracing3():
     assert inferred_type.domain.source is fn.domain
     assert inferred_type.codomain.source is fn
 
-def test_mvar_infer():
-    tc = TypeChecker()
+#def test_mvar_infer():
+#    tc = TypeChecker()
+#
+#    unfinished_pi = Pi(string_to_name("x"), Sort(LevelZero()), MVar())
+#
+#    inferred_type = tc.infer(unfinished_pi)
 
-    unfinished_pi = Pi(string_to_name("x"), Sort(LevelZero()), MVar())
+    #assert isinstance(inferred_type, Sort)
+    #assert inferred_type.domain == Sort(LevelZero())
+    #assert inferred_type.codomain == MVar()
 
-    inferred_type = tc.infer(unfinished_pi)
+some_constants = [
+    "Eq",
+    "OfNat.ofNat",
+    "Nat",
+    "Nat.zero",
+    "Nat.succ",
+]
 
-    assert isinstance(inferred_type, Pi)
-    assert inferred_type.domain == Sort(LevelZero())
-    assert inferred_type.codomain == MVar()
+def test_app_mvar():
+    dir = "/home/jp/projects/Mathlib4Extraction/mathlib4/json_dump"
+    dm = DependencyManager(dir, preloaded_declarations=some_constants)
+
+    # @Eq.{1} @Nat @Nat.zero MVar
+    expr = App(App(App(Const(string_to_name("Eq"), [LevelSucc(LevelZero())]), Const(string_to_name("Nat"), [])), Const(string_to_name("Nat.zero"), [])), MVar())
+
+    try:
+        dm.type_checker.infer(expr)
+        assert False
+    except UnfinishedExpressionError as e:
+        pass
