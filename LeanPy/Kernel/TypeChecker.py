@@ -1527,11 +1527,23 @@ class TypeChecker:
                     fn_type = fn_type.codomain
                 else:
                     fn_type = self.instantiate_multiple(fn_type, args[j:i][::-1], None)
+
                     fn_type = self.ensure_pi(fn_type, pi_source=arg_sources[j].source)
                     fn_type = fn_type.codomain
+                    
+                    for k in range(j, i): # TODO: check if this is correct
+                        if arg_sources[k].source.is_external:
+                            self.fun_on_successful_inference(arg_sources[k].source, MVar()) # TODO: this is a hack
+
                     j = i
             
-            return self.instantiate_multiple(fn_type, args[j:][::-1], None)
+            ret = self.instantiate_multiple(fn_type, args[j:][::-1], None)
+
+            for k in range(j, len(args)):
+                if arg_sources[k].source.is_external:
+                    self.fun_on_successful_inference(arg_sources[k].source, MVar())
+
+            return ret
             
     def infer_sort(self, sort : Sort) -> Expression:
         """
@@ -1569,6 +1581,10 @@ class TypeChecker:
             lvl = make_imax(us[i], lvl, source=pi_sources[i].source)
 
         self.cleanup_fvars(fvars)
+        
+        for pi_source in pi_sources:
+            if pi_source.source.is_external:
+                self.fun_on_successful_inference(pi_source.source, MVar())
 
         return Sort(level=lvl, source=pi.source)
     
@@ -1609,9 +1625,9 @@ class TypeChecker:
         fvars : List[FVar] = []
         e = lam
 
-        pi_sources : List[Expression] = []
+        lambda_sources : List[Expression] = []
         while isinstance(e, Lambda):
-            pi_sources.append(e.source)
+            lambda_sources.append(e.source)
             inst_domain = self.instantiate_multiple(e.domain, fvars[::-1], None)
             fvars.append(self.create_fvar(e.bname, inst_domain, None, False, source=e.source))
             if not infer_only:
@@ -1624,9 +1640,14 @@ class TypeChecker:
         r = self.infer_core(r, infer_only)
         r = self.cheap_beta_reduce(r)
 
-        r = self.make_pi_binding(fvars, r, pi_sources)
+        r = self.make_pi_binding(fvars, r, lambda_sources)
 
         self.cleanup_fvars(fvars)
+
+        for lambda_source in lambda_sources:
+            if lambda_source.source.is_external:
+                self.fun_on_successful_inference(lambda_source.source, MVar())
+
         return r
     
     def infer_nat_lit(self, n : NatLit) -> Expression:
@@ -1713,6 +1734,11 @@ class TypeChecker:
         r = self.make_let_binding(used_fvars, r, used_let_sources)
 
         self.cleanup_fvars(fvars)
+
+        for let_source in let_sources:
+            if let_source.source.is_external:
+                self.fun_on_successful_inference(let_source.source, MVar())
+
         return r
 
     def infer_proj(self, proj : Proj, infer_only : bool) -> Expression:
@@ -1841,8 +1867,9 @@ class TypeChecker:
         else: 
             raise PanicError(f"Unknown expression type {expr.__class__.__name__}")
 
-        if expr.is_external:
-            self.fun_on_successful_inference(expr, inferred_type)
+        #print(f"Internal: {expr} {expr.source.is_external} was inferred to have type {inferred_type}")
+        if expr.source.is_external:
+            self.fun_on_successful_inference(expr.source, inferred_type)
         
         # cache the result
         if not expr.has_mvars: # cache the result if it does not have mvars
