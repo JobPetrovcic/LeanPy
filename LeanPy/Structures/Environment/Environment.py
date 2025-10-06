@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Any, Dict, Optional
 from LeanPy.Kernel.KernelErrors import InvalidDeclarationNameError, TCEnvironmentError
 from LeanPy.Structures.Environment.Declarations.Declaration import Declaration
 from LeanPy.Structures.Name import *
@@ -80,7 +80,7 @@ class Environment:
         self.filler_name = string_to_name("filler")
         self.filler_const = Const(self.filler_name, [], source=None)
 
-    def get_declaration_under_name(self, name : Name, source : Expression) -> Declaration:
+    def get_declaration_under_name(self, name : Name, source : Optional[Any]) -> Declaration:
         if name not in self.name_dict:
             raise InvalidDeclarationNameError(f"Name {name} does not exist in environment.", source)
         found = self.name_dict[name]

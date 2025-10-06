@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple, Type
 from typeguard import typechecked
 from typing_extensions import override
 
@@ -13,7 +13,7 @@ EXPR_COMPARE_RAW_THRESHOLD = 100 # the threshold for when to compare expressions
 
 class Expression:
     @typechecked
-    def __init__(self, source : Optional['Expression']):
+    def __init__(self, source : Optional[Any]):
         self.source = source if source is not None else self
         self.is_external = False
         self.is_expected_type = False
@@ -718,6 +718,6 @@ class MVar(Expression):
     def __str__(self) -> str: 
         return "MVar"
 
-expr_constructors = [BVar, FVar, Sort, Const, App, Pi, Lambda, Let, Proj, NatLit, StrLit]
+expr_constructors : List[Type[Expression]] = [BVar, FVar, Sort, Const, App, Pi, Lambda, Let, Proj, NatLit, StrLit]
 
 __all__ = ['Expression', 'BVar', 'FVar', 'Sort', 'Const', 'App', 'Pi', 'Lambda', 'Let', 'Proj', 'NatLit', 'StrLit', 'MVar', 'expr_constructors']

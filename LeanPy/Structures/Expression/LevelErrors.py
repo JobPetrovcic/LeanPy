@@ -1,3 +1,4 @@
+from typing import Any
 from LeanPy.Structures.Expression.Level import *
 
 
@@ -15,5 +16,5 @@ class DefinitionalEqualityLevelError(Exception):
         super().__init__(f"Levels {l} and {r} are not definitionally equal")
 
 class UnfinishedLevelError(Exception):
-    def __init__(self, source : Level):
+    def __init__(self, source : Any):
         super().__init__("Level is unfinished, cannot continue", source)

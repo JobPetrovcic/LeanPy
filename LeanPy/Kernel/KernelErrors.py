@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Any, Type
 from LeanPy.Structures.Expression.Expression import Expression, MVar
 
 should_print_expressions = True
@@ -22,48 +22,48 @@ class TCEnvironmentError(Exception):
 
 # Kernel errors
 class KernelError(Exception):
-    def __init__(self, message : str, source : Expression):
+    def __init__(self, message : str, source : Any):
         assert source.source is source, "KernelError source must be a source expression"
         self.source = source
         self.message = message
         super().__init__(self.message)
 
 class ExpectedEqualExpressionsConstructorsError(KernelError):
-    def __init__(self, expected : Type[Expression], got : Type[Expression], source : Expression):
+    def __init__(self, expected : Type[Expression], got : Type[Expression], source : Any):
         super().__init__(f"Expected expression of type {expected.__name__} but got {got.__name__}", source)
 
 class ExpectedEqualExpressionsError(KernelError):
-    def __init__(self, expected : Expression, got : Expression, source : Expression):
+    def __init__(self, expected : Expression, got : Expression, source : Any):
         if should_print_expressions:
            super().__init__(f"Expected type\n\t{expected}\nbut got\n\t{got}", source)
         else:
             super().__init__(f"Expected types to be the same", source)
 
 class ProjectionError(KernelError):
-    def __init__(self, message : str, source : Expression):
+    def __init__(self, message : str, source : Any):
         if should_print_expressions:
             super().__init__(message + f"\n\t{source}", source)
         else:
             super().__init__(message, source)
 
 class InvalidDeclarationNameError(KernelError):
-    def __init__(self, message : str, source : Expression):
+    def __init__(self, message : str, source : Any):
         super().__init__(message, source)
 
 class RecursorError(KernelError):
-    def __init__(self, message : str, source : Expression):
+    def __init__(self, message : str, source : Any):
         super().__init__(message, source)
 
 class StructureError(KernelError):
-    def __init__(self, message : str, source : Expression):
+    def __init__(self, message : str, source : Any):
         super().__init__(message, source)
 
 class LocalContextError(KernelError):
-    def __init__(self, message : str, source : Expression):
+    def __init__(self, message : str, source : Any):
         super().__init__(message, source)
 
 class UnboundVariableError(KernelError):
-    def __init__(self, message : str, source : Expression):
+    def __init__(self, message : str, source : Any):
         super().__init__(message, source)
 
 # special error for definitional equality
@@ -83,5 +83,5 @@ class DefinitionalEqualityError(Exception):
 
 # Special error for unfinished expressions
 class UnfinishedExpressionError(Exception):
-    def __init__(self, source : Expression):
+    def __init__(self, source : Any):
         super().__init__("Expression is unfinished, cannot continue", source)
