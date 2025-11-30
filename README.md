@@ -1,6 +1,6 @@
 # LeanPy
-
-LeanPy is an external Python typechecker for Lean 4.
+(
+LeanPy is an external Python typechecker for Lean 4 build for easier integration into machine learning libraries, especially reinforcement learning. It is used in [Lean kernel reinforcement learning environment](https://github.com/JobPetrovcic/LeanKernelRLEnvironment).
 
 ## Installation
 
