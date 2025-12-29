@@ -1073,10 +1073,7 @@ class TypeChecker:
         #nested inductive types. 
         nparams = len(major_args) - rule.num_fields
         # apply fields from major premise
-        if nparams + rule.num_fields > len(major_args):
-            raise RecursionError(f"Major premise does not have the expected number of fields. Expected at least {nparams + rule.num_fields}, but got {len(major_args)}.")
         selected_major_args = major_args[nparams: nparams + rule.num_fields]
-        if len(selected_major_args) != rule.num_fields: raise RecursorError("Major premise does not have the expected number of fields.")
         rhs = fold_apps(rhs, selected_major_args) # reapply the indices' arguments back
 
         # the remaining arguments are not relevant for the recursor; they are just applied back to whatever we got from the reduction
